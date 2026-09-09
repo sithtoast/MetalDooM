@@ -73,3 +73,8 @@ int MD_TestKeyDoor(int key, float *x, float *y, float *angle, int *sector);
 typedef struct { int index, flat; char name[9]; } MD_Material;
 int MD_CopyAnimatedMaterials(MD_Material *output, int capacity);
 int MD_TranslatedMaterial(int index, int flat);
+
+int MD_Cheat(const char *name);
+int MD_StartDemo(const char *name);
+int MD_DemoPlaying(void);
+void MD_StopDemo(void);

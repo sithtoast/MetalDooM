@@ -4,6 +4,18 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 39 — Cheats, title screens and attract demos
+
+- Show the WAD's original title artwork and music before the menu, and identify the
+  loaded game on the menu. File → Return to Title Screen revisits the attract loop.
+- Play embedded single-player Doom 1.8/1.9 demos between title/credit pages, including
+  Ultimate Doom's fourth demo. Key/click opens the menu; menus/console/focus loss pause.
+- Connect typed god, ammo/keys, noclip, power-up, chainsaw and level-warp cheats,
+  with console aliases and HUD feedback. Reject gameplay cheats on Nightmare and
+  during demos; restrict weapon grants to the loaded game's weapons.
+- Validate demo headers/streams, ignore live gameplay input during playback, and
+  clean up demo state when starting or loading a game. Attract states cannot be saved.
+
 ## Build 35 — Animated surfaces and Doomguy expressions
 
 - Animate original wall textures and floor/ceiling flats using the engine's frame

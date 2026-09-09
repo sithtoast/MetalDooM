@@ -121,14 +121,14 @@ The original engine decoder has not been hardened for deliberately crafted paylo
 
 ## Current limitations
 
-- Demos and networking are not connected. The main, episode and difficulty menus use original Doom artwork and layout
+- Networking is not connected. The main, episode and difficulty menus use original Doom artwork and layout
   with an animated skull. Options and save slots use matching bitmap controls.
 - Sound positioning is sampled when an effect starts; continuous repositioning,
   original priority/pitch variation, PC-speaker sounds, and audio-device changes
   need further work. Native output has been validated through offline mixing;
   physical speaker output has not been independently recorded.
 - Progression uses original completion/load-level functions rather than the full
-  G_Ticker loop. Death requires R (fresh inventory). Demos, networking, and
+  G_Ticker loop. Death requires R (fresh inventory). Networking and
   original finale/story sequences are not connected. Episode endings show final
   stats; choose another episode with the map selector.
 - Intermission background animation remains. Doom II story breaks are
@@ -285,3 +285,36 @@ A local visual fixture can be generated with
 `python3 Tests/make_animation_fixture.py /path/to/DOOM.WAD /tmp/doom-animation-check.wad`.
 It replaces E1M1 floors/walls with animated nukage/fire and places invulnerability
 at the start to exercise the god face. The generated IWAD stays outside Git.
+
+## Title screen, demos and cheats
+
+Opening a WAD shows its original `TITLEPIC` with title music before the menu.
+Leave it unattended for about 11 seconds to start an embedded demo. Title/credit
+pages alternate with DEMO1–3 (also DEMO4 in Ultimate Doom). Press a key or click to
+open the menu; Escape resumes the attract sequence. New Game or loading a save
+starts normal play. File → Return to Title Screen returns to the sequence; save
+current progress first. `-warp` launches directly into gameplay.
+
+Playback supports bounded, single-player Doom 1.8/1.9 recordings from the loaded WAD,
+using their recorded commands with the original gameplay thinkers. Multiplayer,
+longtics, external demo files and demo recording are not supported. Unsupported or
+missing demos are skipped. This does not establish compatibility with every vanilla
+recording or its original executable. Playback pauses for menus, console and focus loss.
+
+During gameplay, type these codes without opening the console:
+
+| Code | Effect |
+|---|---|
+| `iddqd` | Toggle god mode |
+| `idclip` / `idspispopd` | Toggle noclip |
+| `idfa` / `idkfa` | Weapons, ammo and armor; `idkfa` also gives keys |
+| `idclev12` | Warp to E1M2 (MAP12 for Doom II) |
+| `idbeholdv/s/i/r/a/l` | Use one suffix: invulnerability, berserk, invisibility, suit, map, light |
+| `idchoppers` | Give chainsaw |
+
+Console aliases are `god`, `noclip`, `give all`, and `give ammo`; the classic codes
+except `idclev` also work there (use `map` to warp). Cheats are disabled in attract
+mode and on Nightmare. Weapon grants respect the loaded game's available weapons.
+Automap presentation and some power-up visual effects remain pending; `idbeholda`
+sets the engine map power but cannot display an automap yet. `idmus` and `iddt` are
+not connected. Validate with `bash scripts/test-cheats-demos.sh /path/to/DOOM.WAD`.

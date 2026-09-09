@@ -2,7 +2,7 @@ import AppKit
 
 /// A deliberately bounded in-game command language; commands never invoke a shell.
 enum ConsoleCommand {
-    static let names = ["help", "clear", "status", "maps", "map", "restart", "volume", "musicvolume", "music", "render_scale", "fps", "fullscreen", "close"]
+    static let names = ["help", "clear", "status", "maps", "map", "restart", "volume", "musicvolume", "music", "render_scale", "fps", "fullscreen", "close", "god", "noclip", "give"]
     case simple(String), map(String), number(String, Float), toggle(String, Bool)
     static func parse(_ text: String) throws -> ConsoleCommand {
         let words=text.lowercased().split(whereSeparator: { $0.isWhitespace }).map(String.init)

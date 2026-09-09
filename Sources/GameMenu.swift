@@ -91,7 +91,7 @@ final class GameMenu: NSView {
             reset("MetalDooM"); text("Open your Doom WAD to begin.")
             button("Open WAD…") { [weak self] in self?.app.openWAD() }; return
         }
-        let canSave=MD_GetProgress().phase==0 && MD_GetHUD().health>0
+        let canSave = !app.attractActive && MD_GetProgress().phase==0 && MD_GetHUD().health>0
         canvas("Paused",art:[("M_DOOM",94,2)],items:[
             .init(title:"New Game",patch:"M_NGAME",x:97,y:64,action:{ [weak self] in self?.newGame() }),
             .init(title:"Options",patch:"M_OPTION",x:97,y:80,action:{ [weak self] in self?.options() }),
@@ -99,7 +99,7 @@ final class GameMenu: NSView {
             .init(title:"Save Game",patch:"M_SAVEG",x:97,y:112,enabled:canSave,action:{ [weak self] in self?.slots(saving:true) }),
             .init(title:"Read This",patch:"M_RDTHIS",x:97,y:128,action:{ [weak self] in self?.readThis() }),
             .init(title:"Quit Game",patch:"M_QUITG",x:97,y:144,action:{ NSApp.terminate(nil) })
-        ],back:{ [weak self] in self?.app.closeGameMenu() })
+        ],labels:[(app.wad?.gameName.uppercased() ?? "DOOM",72,180)],back:{ [weak self] in self?.app.dismissGameMenu() })
     }
     private func readThis() {
         canvas("Help",art:[(app.wad?.lump("HELP1") != nil ? "HELP1" : "CREDIT",0,0)],items:[],back:{ [weak self] in self?.main() })

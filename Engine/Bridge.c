@@ -10,6 +10,7 @@
 #include "g_game.h"
 #include "d_main.h"
 #include "p_local.h"
+#include "p_inter.h"
 #include "p_setup.h"
 #include "p_tick.h"
 #include "r_local.h"
@@ -31,6 +32,8 @@ static int messageSerial;
 static int monstersEnabled = 1;
 static void RefreshAnimations(void);
 static int weaponGrinTicks;
+static byte *nativeDemo;
+static int nativeDemoSize, nativeDemoOffset;
 static int faceIndex, faceCount, facePriority, faceOldHealth, faceAttack;
 static unsigned faceRandom;
 // ST_Start is called for each new level. Keep presentation state out of saves.
@@ -207,6 +210,7 @@ int MD_ReadSave(const char *path) {
     if(setjmp(errorBoundary)) { if(save_stream) fclose(save_stream);save_stream=NULL;guarded=0;return 0; }
     savegame_error=false;
     if(!P_ReadSaveGameHeader()) I_Error("Invalid native save header");
+    MD_StopDemo();
     G_InitNew(gameskill,gameepisode,gamemap);
     P_UnArchivePlayers();P_UnArchiveWorld();P_UnArchiveThinkers();P_UnArchiveSpecials();
     if(!P_ReadSaveGameEOF() || savegame_error) I_Error("Invalid native save archive");
@@ -292,6 +296,7 @@ int MD_LoadSkill(const char *path, int episode, int map, int skill) {
     consoleplayer = displayplayer = 0;
     memset(playeringame,0,sizeof(playeringame)); playeringame[0] = true;
     nomonsters = !monstersEnabled; precache = false; netgame = false; deathmatch = 0;
+    MD_StopDemo();
     gametic = 0;
     G_InitNew((skill_t)skill,episode,map);
     progress = (MD_Progress){.episode=gameepisode,.map=gamemap,.commercial=gamemode == commercial};
@@ -321,6 +326,15 @@ int MD_CombatTick(int forward, int side, int turn, int use, int attack, int weap
     command->buttons = use && players[0].health > 0 ? BT_USE : 0;
     if (attack) command->buttons |= BT_ATTACK;
     if (weapon >= 0 && weapon <= 6) command->buttons |= BT_CHANGE | (weapon << BT_WEAPONSHIFT);
+    if (nativeDemo) {
+        if(nativeDemoOffset>=nativeDemoSize || nativeDemo[nativeDemoOffset]==0x80) {
+            MD_StopDemo(); guarded=0; return 1;
+        }
+        byte *tic=nativeDemo+nativeDemoOffset; nativeDemoOffset+=4;
+        command->forwardmove=(signed char)tic[0]; command->sidemove=(signed char)tic[1];
+        command->angleturn=(short)(tic[2]<<8); command->buttons=tic[3];
+        if(command->buttons & BT_SPECIAL) command->buttons=0;
+    }
     if (gameaction == ga_nothing) {
         unsigned oldWeapons = WeaponMask();
         if (weaponGrinTicks > 0) --weaponGrinTicks;
@@ -330,7 +344,8 @@ int MD_CombatTick(int forward, int side, int turn, int use, int attack, int weap
         if (players[0].health <= 0) weaponGrinTicks = 0;
         UpdateFace(players[0].bonuscount && (WeaponMask() & ~oldWeapons));
     }
-    if (gameaction == ga_completed) CompleteLevel();
+    if (nativeDemo && (gameaction!=ga_nothing || players[0].playerstate==PST_REBORN)) { MD_StopDemo(); gameaction=ga_nothing; }
+    else if (gameaction == ga_completed) CompleteLevel();
     guarded = 0; return 1;
 }
 MD_Player MD_GetPlayer(void) {
@@ -505,4 +520,57 @@ static void RefreshAnimations(void) {
         int pic=a->basepic+(time/a->speed+i)%a->numpics;
         if(a->istexture) texturetranslation[i]=pic; else flattranslation[i]=pic;
     }
+}
+
+int MD_DemoPlaying(void) { return nativeDemo!=NULL; }
+void MD_StopDemo(void) {
+    if(!nativeDemo) return;
+    free(nativeDemo); nativeDemo=NULL; nativeDemoOffset=nativeDemoSize=0;
+    demoplayback=false; usergame=true;gameversion=gamemode==retail ? exe_ultimate:exe_doom_1_9; respawnparm=fastparm=false; nomonsters=!monstersEnabled;
+}
+int MD_StartDemo(const char *name) {
+    if(!loaded || poisoned) return 0;
+    int lump=W_CheckNumForName(name);
+    if(lump<0) { snprintf(errorText,sizeof(errorText),"Demo is absent."); return 0; }
+    int size=W_LumpLength(lump);
+    if(size<14 || size>4*1024*1024) { snprintf(errorText,sizeof(errorText),"Invalid demo size.");return 0; }
+    byte *data=malloc(size); if(!data) return 0;
+    guarded=1;if(setjmp(errorBoundary)) { free(data);guarded=0;return 0; }
+    W_ReadLump(lump,data);
+    int valid=(data[0]==108 || data[0]==109) && data[1]<=4 && data[2]>=1 && data[2]<=4 && data[3]>=1
+        && data[3]<=(gamemode==commercial ? 32:9) && !data[4] && data[5]<=1 && data[6]<=1 && data[7]<=1
+        && !data[8] && data[9]==1 && !data[10] && !data[11] && !data[12];
+    int end=13;while(end<size && data[end]!=0x80) end+=4;
+    valid=valid && end<size && end>13;
+    char mapName[9]; if(gamemode==commercial) snprintf(mapName,9,"MAP%02d",data[3]);else snprintf(mapName,9,"E%dM%d",data[2],data[3]);
+    valid=valid && W_CheckNumForName(mapName)>=0;
+    if(!valid) { free(data);guarded=0;snprintf(errorText,sizeof(errorText),"Only valid single-player Doom 1.8/1.9 demos are supported.");return 0; }
+    MD_StopDemo(); respawnparm=data[5];fastparm=data[6];nomonsters=data[7];gametic=0;
+    gameversion=data[0]==108 ? exe_doom_1_8 : gamemode==retail ? exe_ultimate:exe_doom_1_9;
+    G_InitNew(data[1],data[2],data[3]); demoplayback=true;usergame=false;
+    nativeDemo=data;nativeDemoSize=end+1;nativeDemoOffset=13;
+    progress=(MD_Progress){.episode=gameepisode,.map=gamemap,.commercial=gamemode==commercial};
+    lastMessage[0]=0;++messageSerial;UpdateFace(0);guarded=0;return 1;
+}
+int MD_Cheat(const char *name) {
+    if(!loaded || poisoned || nativeDemo || progress.phase || gameskill==sk_nightmare || players[0].health<=0) return 0;
+    player_t *p=&players[0]; const char *message=NULL;
+    if(!strcmp(name,"iddqd")) { p->cheats^=CF_GODMODE;if(p->cheats & CF_GODMODE) p->health=p->mo->health=100;message=(p->cheats & CF_GODMODE) ? "Degreelessness Mode On":"Degreelessness Mode Off"; }
+    else if(!strcmp(name,"idclip") || !strcmp(name,"idspispopd")) { p->cheats^=CF_NOCLIP;message=(p->cheats & CF_NOCLIP) ? "No Clipping Mode ON":"No Clipping Mode OFF"; }
+    else if(!strcmp(name,"idfa") || !strcmp(name,"idkfa")) {
+        p->armorpoints=200;p->armortype=2;
+        for(int i=0;i<NUMWEAPONS;++i) if((gamemode!=shareware || (i!=wp_plasma && i!=wp_bfg)) && (gamemode==commercial || i!=wp_supershotgun)) p->weaponowned[i]=true;
+        for(int i=0;i<NUMAMMO;++i) p->ammo[i]=p->maxammo[i];
+        if(!strcmp(name,"idkfa")) for(int i=0;i<NUMCARDS;++i) p->cards[i]=true;
+        message=!strcmp(name,"idkfa") ? "Very Happy Ammo Added":"Ammo Added";
+    } else if(!strcmp(name,"idchoppers")) { p->weaponowned[wp_chainsaw]=true;p->powers[pw_invulnerability]=1;message="... doesn't suck - GM"; }
+    else {
+        const char *names[]={"idbeholdv","idbeholds","idbeholdi","idbeholdr","idbeholda","idbeholdl"};
+        for(int i=0;i<NUMPOWERS;++i) if(!strcmp(name,names[i])) {
+            if(!p->powers[i]) P_GivePower(p,i);else p->powers[i]=i==pw_strength ? 0:1;
+            message="Power-up Toggled";break;
+        }
+    }
+    if(!message) return 0;
+    p->message=(char *)message;CaptureMessage();UpdateFace(0);return 1;
 }

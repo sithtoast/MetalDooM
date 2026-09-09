@@ -212,3 +212,25 @@ and UVs. P_UpdateSpecials owns the 8-tic animation clock; pause freezes it. Save
 restoration rebuilds translation tables from the saved level time without ticking
 thinkers or advancing gameplay. The private animation layout is mirrored only in
 Bridge.c against the pinned upstream revision; no engine pointers escape to Swift.
+
+## Attract mode and cheats
+
+AttractScreen renders the WAD title/credit patch with 4:3 pixel scaling. App owns the
+foreground-only attract timer and title music, retaining the page or paused demo
+behind GameMenu. Demo map resources load through Renderer before copied snapshots
+are consumed. Title/menu/console input is isolated from playback; normal New Game,
+load or map selection clears attract state. Saving an attract state is blocked.
+
+The bridge validates a complete, bounded single-player 1.8/1.9 demo header and
+four-byte command stream before starting playback. G_InitNew resets the original
+engine with the recorded skill/options and appropriate executable version; each
+35 Hz tic uses recorded movement/turn/buttons through P_Ticker. Live commands are
+ignored. End markers and level completion return to the attract sequence. Demo
+buffers are freed on completion, restart and load. Full G_Ticker/network/demo
+recording compatibility is outside this implementation.
+
+Typed cheat prefixes are consumed only in gameplay. Console aliases dispatch to
+the same bridge implementation; cheats modify original player flags, inventory
+and powers, emitting HUD feedback. Nightmare/dead players and demos reject cheats.
+Weapon grants filter shareware and Doom II-only weapons. No vendored engine files
+are changed.

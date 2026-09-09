@@ -3,6 +3,7 @@ import MetalKit
 import simd
 
 final class GameView: MTKView {
+    var onBlockedClick: (() -> Void)?
     var inputBlocked = false
     var keys = Set<UInt16>()
     private var movementQueued = Set<UInt16>()
@@ -44,7 +45,7 @@ final class GameView: MTKView {
         let result = keys.union(movementQueued); movementQueued.removeAll(); return result
     }
     override func mouseDown(with event: NSEvent) {
-        guard !inputBlocked else { return }
+        guard !inputBlocked else { onBlockedClick?();return }
         window?.makeFirstResponder(self)
         if !captured {
             captured = true
@@ -79,6 +80,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var sprites: SpriteRenderer?
     private var sound: SoundPlayer?
     private var music: MusicPlayer?
+    private var demoPlayback=false
     var paused = false { didSet { if paused { pauseAudio() } } }
     var skill: Int32 = 2
     var effectsVolume: Float = Float(UserDefaults.standard.object(forKey:"effectsVolume") as? Double ?? 0.7) {
@@ -218,7 +220,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         self.depth = depth
         super.init()
     }
-    func load(wad: WAD, map name: String, continuing: Bool = false, restorePath: String? = nil) throws -> (triangles:Int,missing:[String]) {
+    func load(wad: WAD, map name: String, continuing: Bool = false, restorePath: String? = nil, demo: String? = nil) throws -> (triangles:Int,missing:[String]) {
         guard wad.signature == "IWAD" else { throw PortError("The gameplay prototype requires a standalone Doom IWAD. PWAD merging is not connected yet.") }
         let map = try DoomMap(wad:wad,name:name), art = try Art(wad:wad)
         let heights = try art.textureHeights(), geometry = try Geometry(map:map,textureHeights:heights)
@@ -277,6 +279,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             if MD_SectorCount() == 0 { engineReady = false }
             throw PortError(String(cString:MD_LastError()))
         }
+        if let demo, MD_StartDemo(demo)==0 { throw PortError(String(cString:MD_LastError())) }
         guard MD_SectorCount() == map.sectors.count else { engineReady = false; throw PortError("Engine and Metal sector counts differ.") }
         var animationIDs: [MaterialKey:Int32]=[:], walls: [Int32:MTLTexture]=[:], flats: [Int32:MTLTexture]=[:]
         var frames=Array(repeating:MD_Material(),count:Int(MD_CopyAnimatedMaterials(nil,0)))
@@ -288,6 +291,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             if key.flat { flats[frame.index]=cached[key] } else { walls[frame.index]=cached[key] }
         }
         animatedIDs=animationIDs; animatedWalls=walls; animatedFlats=flats
+        demoPlayback = demo != nil
         skill=MD_GetSkill()
         progress = MD_GetProgress(); intermission = IntermissionSequence(progress); intermissionTime = 0; lastGeometryTick = -1
         intermissionArt = loadedIntermission
@@ -486,6 +490,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             sound?.drain()
             currentPlayer = MD_GetPlayer(); accumulator -= step
             hud = MD_GetHUD(); progress = MD_GetProgress()
+            if demoPlayback && MD_DemoPlaying()==0 { paused=true;accumulator=0;break }
             if progress.phase != 0 {
                 view.releaseMouse(); accumulator = 0; intermissionTime = 0; messageUntil = 0
                 intermission = IntermissionSequence(progress)

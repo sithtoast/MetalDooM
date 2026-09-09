@@ -19,6 +19,11 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var message: MessageLabel!
     var wad: WAD?
     var menuAudio: SoundPlayer?
+    var attractActive=false, attractDemo=false, attractIndex=0, attractElapsed=0.0
+    var attractTimer: Timer?
+    var titleScreen: AttractScreen?
+    var titleMusic: MusicPlayer?
+    var cheatBuffer=""
     var console: DeveloperConsole?
     var consoleVisible = false
     var gameMenu: GameMenu?
@@ -34,6 +39,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             appMenu.addItem(withTitle:"Quit MetalDooM",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q")
             let fileItem = NSMenuItem(), fileMenu = NSMenu(title:"File"); fileItem.submenu = fileMenu; menu.addItem(fileItem)
             fileMenu.addItem(withTitle:"Open WAD…",action:#selector(openWAD),keyEquivalent:"o").target = self
+            fileMenu.addItem(withTitle:"Return to Title Screen",action:#selector(returnToTitle),keyEquivalent:"").target=self
             fileMenu.addItem(.separator())
             fileMenu.addItem(withTitle:"Save Game…",action:#selector(saveGame),keyEquivalent:"s").target = self
             fileMenu.addItem(withTitle:"Load Game…",action:#selector(loadGame),keyEquivalent:"l").target = self
@@ -58,6 +64,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             view.preferredFramesPerSecond = 120; view.framebufferOnly = true
             renderer = try Renderer(view:view); view.delegate = renderer
             view.onEscape = { [weak self] in self?.openGameMenu() }
+            view.onBlockedClick = { [weak self] in if self?.attractActive==true && self?.consoleVisible==false { self?.openGameMenu() } }
             view.renderScale=CGFloat(UserDefaults.standard.object(forKey:"renderScale") as? Double ?? 1)
             view.preferredFramesPerSecond=UserDefaults.standard.object(forKey:"frameLimit") as? Int ?? 120
             menuKeyMonitor=NSEvent.addLocalMonitorForEvents(matching:.keyDown) { [weak self] event in
@@ -70,6 +77,10 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     if event.keyCode == 53 { self.toggleConsole(); return nil }
                     if self.window.firstResponder === self.view { self.window.makeFirstResponder(self.console?.input) }
                     return event
+                }
+                if self.gameMenu == nil, !modified {
+                    if self.attractActive { if !event.isARepeat { self.openGameMenu() };return nil }
+                    if !event.isARepeat, self.typeCheat(event.characters ?? "") { return nil }
                 }
                 return self.gameMenu?.handleKey(event) == true ? nil : event
             }
@@ -113,7 +124,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.center(); window.makeKeyAndOrderFront(nil); window.makeFirstResponder(view); NSApp.activate(ignoringOtherApps:true)
             let arguments = CommandLine.arguments
             if let index = arguments.firstIndex(of:"-iwad"), index+1 < arguments.count {
-                load(URL(fileURLWithPath:NSString(string:arguments[index+1]).expandingTildeInPath))
+                load(URL(fileURLWithPath:NSString(string:arguments[index+1]).expandingTildeInPath),showTitle:!arguments.contains("-warp"))
             }
             if let index = arguments.firstIndex(of:"-warp"), index+1 < arguments.count {
                 maps.selectItem(withTitle:arguments[index+1].uppercased()); changeMap()
@@ -124,7 +135,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func quickSaveGame() {
         view.releaseMouse()
         do {
-            guard let wad else { throw PortError("Open a WAD before saving.") }
+            guard let wad, !attractActive else { throw PortError("Start a game before saving.") }
             try renderer.saveGame(to:SaveStore.quickURL(wad:wad))
         } catch { show(error) }
     }
@@ -134,12 +145,12 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             guard let wad else { throw PortError("Open the matching WAD before loading.") }
             let url = try SaveStore.quickURL(wad:wad)
             guard FileManager.default.fileExists(atPath:url.path) else { throw PortError("No quick save exists for this WAD yet.") }
-            try renderer.loadGame(from:url)
+            try renderer.loadGame(from:url);endAttract();renderer.paused=gameMenu != nil || consoleVisible
         } catch { show(error) }
     }
     @objc func saveGame() {
         view.releaseMouse(); renderer.pauseAudio()
-        guard let wad else { show(PortError("Open a WAD before saving.")); return }
+        guard let wad, !attractActive else { show(PortError("Start a game before saving.")); return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension:"mdsave") ?? .data]
         panel.nameFieldStringValue = "\(wad.gameName) - \(maps.titleOfSelectedItem ?? "Save").mdsave"
@@ -154,7 +165,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.canChooseDirectories = false; panel.allowsMultipleSelection = false
         panel.beginSheetModal(for:window) { [weak self] response in
             guard let self, response == .OK, let url = panel.url else { return }
-            do { try self.renderer.loadGame(from:url) } catch { self.show(error) }
+            do { try self.renderer.loadGame(from:url);self.endAttract();self.renderer.paused=self.gameMenu != nil || self.consoleVisible } catch { self.show(error) }
         }
     }
     @objc func openWAD() {
@@ -163,20 +174,21 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.canChooseDirectories = false; panel.allowsMultipleSelection = false
         panel.beginSheetModal(for:window) { [weak self] response in if response == .OK, let url = panel.url { self?.load(url) } }
     }
-    func load(_ url: URL) {
+    func load(_ url: URL, showTitle:Bool=true) {
         do {
             let candidate = try WAD(url:url)
             let selected = candidate.maps.contains("E1M1") ? "E1M1" : candidate.maps[0]
             let result = try renderer.load(wad:candidate,map:selected)
             wad = candidate; maps.removeAllItems(); maps.addItems(withTitles:candidate.maps); maps.selectItem(withTitle:selected); maps.isEnabled = true
             describe(selected,result)
-            if gameMenu != nil { gameMenu?.main() } else { window.makeFirstResponder(view) }
+            if showTitle { beginAttract() }
+            else if gameMenu != nil { gameMenu?.main() } else { window.makeFirstResponder(view) }
         } catch { show(error) }
     }
     @objc func changeMap() {
         guard let wad, let name = maps.titleOfSelectedItem else { return }
         view.releaseMouse()
-        do { describe(name,try renderer.load(wad:wad,map:name)); window.makeFirstResponder(view) }
+        do { endAttract();describe(name,try renderer.load(wad:wad,map:name));renderer.paused=gameMenu != nil || consoleVisible; window.makeFirstResponder(view) }
         catch { show(error) }
     }
     func updateTitle(map name: String) {
@@ -215,7 +227,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func syncMusicMenu() { musicMenuItem?.state=renderer.musicEnabled ? .on : .off }
     func openGameMenu() {
         guard gameMenu == nil, !consoleVisible else { return }
-        view.releaseMouse(); renderer.paused=true; playMenuSound("DSSWTCHN")
+        cheatBuffer="";view.releaseMouse(); renderer.paused=true; playMenuSound("DSSWTCHN")
         let panel=GameMenu(app:self); gameMenu=panel
         panel.translatesAutoresizingMaskIntoConstraints=false; window.contentView!.addSubview(panel)
         NSLayoutConstraint.activate([panel.centerXAnchor.constraint(equalTo:window.contentView!.centerXAnchor),
@@ -224,17 +236,17 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     func closeGameMenu() {
         guard wad != nil else { return }
-        gameMenu?.removeFromSuperview(); gameMenu=nil; view.releaseMouse(); renderer.paused=consoleVisible
+        endAttract();gameMenu?.removeFromSuperview(); gameMenu=nil; view.releaseMouse(); renderer.paused=consoleVisible
         window.makeFirstResponder(consoleVisible ? console?.input : view)
     }
     func toggleConsole() {
         if consoleVisible {
-            console?.removeFromSuperview(); consoleVisible=false; view.inputBlocked=false; gameMenu?.isHidden=false
-            view.releaseMouse(); renderer.paused = gameMenu != nil
+            console?.removeFromSuperview(); consoleVisible=false; view.inputBlocked=attractActive; gameMenu?.isHidden=false
+            view.releaseMouse(); renderer.paused = gameMenu != nil || (attractActive && !attractDemo)
             window.makeFirstResponder(gameMenu ?? view)
             return
         }
-        view.releaseMouse(); view.inputBlocked=true; renderer.paused=true; gameMenu?.isHidden=true
+        cheatBuffer="";view.releaseMouse(); view.inputBlocked=true; renderer.paused=true; gameMenu?.isHidden=true
         if console == nil {
             let panel=DeveloperConsole(frame:.zero)
             panel.execute={ [weak self] in self?.executeConsole($0) ?? "" }
@@ -251,16 +263,21 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     func executeConsole(_ text: String) -> String {
         do {
+            let raw=text.lowercased().trimmingCharacters(in:.whitespacesAndNewlines)
+            let aliases=["god":"iddqd","noclip":"idclip","give all":"idkfa","give ammo":"idfa"]
+            if let cheat=aliases[raw] { return runCheat(cheat) }
+            if Self.typedCheats.contains(raw) { return runCheat(raw) }
             switch try ConsoleCommand.parse(text) {
             case .simple(let name):
                 switch name {
-                case "help": return "help / clear / status / maps / map <name> / restart / close\nvolume <0–1> / musicvolume <0–1> / music on|off\nrender_scale <50|75|100> / fps <35|60|120> / fullscreen on|off\nMap and restart begin a fresh level; save your progress first."
+                case "help": return "help / clear / status / maps / map <name> / restart / close\nvolume <0–1> / musicvolume <0–1> / music on|off\nrender_scale <50|75|100> / fps <35|60|120> / fullscreen on|off\ngod / noclip / give all / give ammo (or classic cheat codes)\nMap and restart begin a fresh level; save your progress first."
+                case "give": return "Usage: give all | give ammo"
                 case "clear": console?.clear(); return ""
                 case "close": toggleConsole(); return ""
                 case "maps": return wad?.maps.joined(separator:"  ") ?? "No WAD loaded."
                 case "restart":
                     guard wad != nil else { throw ConsoleError("No WAD loaded.") }
-                    try renderer.reset(); return "Level restarted."
+                    endAttract();try renderer.reset(); return "Level restarted."
                 default:
                     let size=view.drawableSize
                     return "\(appTitle)\n\(wad?.gameName ?? "No WAD") — \(summary)\n\(renderer.playerStatus)\nGPU: \(renderer.device.name)\nRender: \(Int(size.width))x\(Int(size.height)) at \(Int(view.renderScale*100))%; limit \(view.preferredFramesPerSecond) FPS\nEffects: \(renderer.effectsVolume); music: \(renderer.musicVolume) (\(renderer.musicEnabled ? "on" : "off"))"
@@ -268,6 +285,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             case .map(let name):
                 guard let wad else { throw ConsoleError("No WAD loaded.") }
                 guard wad.maps.contains(name) else { throw ConsoleError("Map \(name) is not in this WAD. Type maps.") }
+                endAttract()
                 let result=try renderer.load(wad:wad,map:name)
                 maps.selectItem(withTitle:name); describe(name,result)
                 return "Loaded \(wad.mapTitle(name)). Missing textures: \(result.missing.isEmpty ? "none" : result.missing.joined(separator:", "))"
