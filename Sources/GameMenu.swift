@@ -5,6 +5,11 @@ import AppKit
 final class GameMenu: NSView {
     unowned let app: App
     private let stack=NSStackView()
+    private var menuWidth: NSLayoutConstraint!
+    private var classic: ClassicMenuCanvas?
+    private var decoder: Art?
+    private var images: [String:NSImage] = [:]
+    private var chosenMap="E1M1"
     private var mainButtons: [NSButton] = []
     private var selected = 0
     override var acceptsFirstResponder: Bool { true }
@@ -21,15 +26,18 @@ final class GameMenu: NSView {
         layer?.cornerRadius=8
         stack.orientation = .vertical; stack.spacing=12; stack.alignment = .leading
         stack.translatesAutoresizingMaskIntoConstraints=false; addSubview(stack)
+        menuWidth=widthAnchor.constraint(equalToConstant:520)
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo:topAnchor,constant:24),stack.bottomAnchor.constraint(equalTo:bottomAnchor,constant:-24),
             stack.leadingAnchor.constraint(equalTo:leadingAnchor,constant:28),stack.trailingAnchor.constraint(equalTo:trailingAnchor,constant:-28),
-            widthAnchor.constraint(equalToConstant:520)
+            menuWidth
         ])
         main()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     private func reset(_ title: String) {
+        classic=nil; menuWidth.constant=520; layer?.backgroundColor=NSColor.black.withAlphaComponent(0.88).cgColor
+        layer?.borderWidth=1
         page=title; actions=[]; mainButtons=[]; selected=0; resolutionLabel=nil
         for view in stack.arrangedSubviews { stack.removeArrangedSubview(view); view.removeFromSuperview() }
         let heading=NSTextField(labelWithString:title.uppercased()); heading.font = .monospacedSystemFont(ofSize:24,weight:.heavy)
@@ -40,12 +48,15 @@ final class GameMenu: NSView {
         label.font = .systemFont(ofSize:12); stack.addArrangedSubview(label)
     }
     private func image(_ name: String) -> NSImage? {
-        guard let wad=app.wad, let art=try? Art(wad:wad), let patch=try? art.patch(named:name) else { return nil }
+        if let image=images[name] { return image }
+        guard let wad=app.wad else { return nil }
+        if decoder == nil { decoder=try? Art(wad:wad) }
+        guard let decoder, let patch=try? decoder.patch(named:name) else { return nil }
         let pixels=patch.image
         guard let rep=NSBitmapImageRep(bitmapDataPlanes:nil,pixelsWide:pixels.width,pixelsHigh:pixels.height,
             bitsPerSample:8,samplesPerPixel:4,hasAlpha:true,isPlanar:false,colorSpaceName:.deviceRGB,bytesPerRow:pixels.width*4,bitsPerPixel:32),let data=rep.bitmapData else { return nil }
         pixels.rgba.withUnsafeBytes { data.update(from:$0.bindMemory(to:UInt8.self).baseAddress!,count:pixels.rgba.count) }
-        let image=NSImage(size:NSSize(width:pixels.width*2,height:Int(Double(pixels.height)*2.4))); image.addRepresentation(rep)
+        let image=NSImage(size:NSSize(width:pixels.width,height:pixels.height)); image.addRepresentation(rep); images[name]=image
         return image
     }
     @discardableResult private func button(_ title: String, art: String? = nil, enabled: Bool = true, action: @escaping () -> Void) -> NSButton {
@@ -60,56 +71,75 @@ final class GameMenu: NSView {
     }
     @objc private func invoke(_ sender: NSButton) { actions[sender.tag]() }
     private func back() { button("Back — Esc") { [weak self] in self?.main() } }
-    func main() {
-        reset("Paused")
-        if let logo=image("M_DOOM") {
-            let imageView=NSImageView(); imageView.image=logo; imageView.imageScaling = .scaleProportionallyUpOrDown
-            imageView.heightAnchor.constraint(equalToConstant:72).isActive=true; stack.addArrangedSubview(imageView)
-        }
-        button("Resume",enabled:app.wad != nil) { [weak self] in self?.app.closeGameMenu() }.keyEquivalent="\r"
-        button("New Game",art:"M_NGAME",enabled:app.wad != nil) { [weak self] in self?.newGame() }
-        button("Options",art:"M_OPTION") { [weak self] in self?.options() }
-        button("Save Game",art:"M_SAVEG",enabled:app.wad != nil && MD_GetProgress().phase==0 && MD_GetHUD().health>0) { [weak self] in self?.slots(saving:true) }
-        button("Load Game",art:"M_LOADG",enabled:app.wad != nil) { [weak self] in self?.slots(saving:false) }
-        button("Open WAD…") { [weak self] in self?.app.openWAD() }
-        button("Quit Game",art:"M_QUITG") { NSApp.terminate(nil) }
-        text("Game paused · Esc resumes · Tab selects controls")
+    private func canvas(_ title: String, art: [(String,CGFloat,CGFloat)], items: [ClassicMenuCanvas.Item], selected: Int=0, back: @escaping () -> Void) {
+        reset(title)
+        for child in stack.arrangedSubviews { stack.removeArrangedSubview(child); child.removeFromSuperview() }
+        layer?.backgroundColor=NSColor.clear.cgColor; layer?.borderWidth=0; menuWidth.constant=640
+        let canvas=ClassicMenuCanvas(); canvas.image={ [weak self] in self?.image($0) }
+        canvas.artwork=art; canvas.items=items; canvas.selected=selected; canvas.onBack=back
+        canvas.translatesAutoresizingMaskIntoConstraints=false
+        stack.addArrangedSubview(canvas)
+        NSLayoutConstraint.activate([canvas.widthAnchor.constraint(equalTo:stack.widthAnchor),canvas.heightAnchor.constraint(equalTo:canvas.widthAnchor,multiplier:0.75)])
+        canvas.configure(); classic=canvas; window?.makeFirstResponder(canvas)
     }
-    func escape() { if page=="Main" || page=="Paused" { app.closeGameMenu() } else { main() } }
-    func handleKey(_ event: NSEvent) -> Bool {
-        if event.keyCode == 53 { if !event.isARepeat { escape() }; return true }
-        guard page=="Paused", !mainButtons.isEmpty else { return false }
-        if event.keyCode == 125 || event.keyCode == 126 {
-            mainButtons[selected].highlight(false)
-            selected=(selected+(event.keyCode == 125 ? 1 : mainButtons.count-1)) % mainButtons.count
-            mainButtons[selected].highlight(true); window?.makeFirstResponder(self); return true
+    func main() {
+        guard app.wad != nil else {
+            reset("MetalDooM"); text("Open your Doom WAD to begin.")
+            button("Open WAD…") { [weak self] in self?.app.openWAD() }; return
         }
-        if event.keyCode == 36 { if !event.isARepeat { mainButtons[selected].performClick(nil) }; return true }
+        let canSave=MD_GetProgress().phase==0 && MD_GetHUD().health>0
+        canvas("Paused",art:[("M_DOOM",94,2)],items:[
+            .init(title:"New Game",patch:"M_NGAME",x:97,y:64,action:{ [weak self] in self?.newGame() }),
+            .init(title:"Options",patch:"M_OPTION",x:97,y:80,action:{ [weak self] in self?.options() }),
+            .init(title:"Load Game",patch:"M_LOADG",x:97,y:96,action:{ [weak self] in self?.slots(saving:false) }),
+            .init(title:"Save Game",patch:"M_SAVEG",x:97,y:112,enabled:canSave,action:{ [weak self] in self?.slots(saving:true) }),
+            .init(title:"Read This",patch:"M_RDTHIS",x:97,y:128,action:{ [weak self] in self?.readThis() }),
+            .init(title:"Quit Game",patch:"M_QUITG",x:97,y:144,action:{ NSApp.terminate(nil) })
+        ],back:{ [weak self] in self?.app.closeGameMenu() })
+    }
+    private func readThis() {
+        canvas("Help",art:[(app.wad?.lump("HELP1") != nil ? "HELP1" : "CREDIT",0,0)],items:[],back:{ [weak self] in self?.main() })
+    }
+    func escape() {
+        if let classic { classic.onBack?() }
+        else if page=="Main" || page=="Paused" { app.closeGameMenu() } else { main() }
+    }
+    func handleKey(_ event: NSEvent) -> Bool {
+        if let classic {
+            if page=="Help", event.keyCode==36 { if !event.isARepeat { main() }; return true }
+            return classic.handle(event)
+        }
+        if event.keyCode == 53 { if !event.isARepeat { escape() }; return true }
         return false
     }
     private func newGame() {
-        reset("New Game")
-        let episodes=NSPopUpButton()
-        if app.wad?.maps.contains("MAP01")==true { episodes.addItem(withTitle:"Doom II"); episodes.lastItem?.representedObject="MAP01" }
-        else {
-            let names=["Knee-Deep in the Dead","The Shores of Hell","Inferno","Thy Flesh Consumed"]
-            for i in 1...4 where app.wad?.maps.contains("E\(i)M1")==true {
-                episodes.addItem(withTitle:names[i-1]); episodes.lastItem?.representedObject="E\(i)M1"
-            }
+        if app.wad?.maps.contains("MAP01")==true { chosenMap="MAP01"; chooseSkill(); return }
+        let names=["Knee-Deep in the Dead","The Shores of Hell","Inferno","Thy Flesh Consumed"]
+        let items=(1...4).filter { app.wad?.maps.contains("E\($0)M1")==true }.map { i in
+            ClassicMenuCanvas.Item(title:names[i-1],patch:"M_EPI\(i)",x:48,y:CGFloat(63+(i-1)*16),action:{ [weak self] in
+                self?.chosenMap="E\(i)M1"; self?.chooseSkill()
+            })
         }
-        episode=episodes; row("Episode",episodes)
-        let skills=NSPopUpButton(); skills.addItems(withTitles:["I'm too young to die.","Hey, not too rough.","Hurt me plenty.","Ultra-Violence.","Nightmare!"])
-        skills.selectItem(at:Int(app.renderer.skill)); difficulty=skills; row("Difficulty",skills)
-        text("Starting a new game replaces the current unsaved run. Nightmare uses fast, respawning monsters.")
-        button("Start Game") { [weak self] in
-            guard let self, let map=self.episode?.selectedItem?.representedObject as? String, let wad=self.app.wad else { return }
-            let old=self.app.renderer.skill; self.app.renderer.skill=Int32(self.difficulty?.indexOfSelectedItem ?? 2)
-            do {
-                self.app.describe(map,try self.app.renderer.load(wad:wad,map:map)); self.app.maps.selectItem(withTitle:map)
-                self.app.closeGameMenu()
-            } catch { self.app.renderer.skill=old; self.app.show(error) }
+        canvas("Episode",art:[("M_EPISOD",54,38)],items:items,back:{ [weak self] in self?.main() })
+    }
+    private func chooseSkill() {
+        let names=["I'm too young to die.","Hey, not too rough.","Hurt me plenty.","Ultra-Violence.","Nightmare!"]
+        let patches=["M_JKILL","M_ROUGH","M_HURT","M_ULTRA","M_NMARE"]
+        let items=names.indices.map { i in
+            ClassicMenuCanvas.Item(title:names[i],patch:patches[i],x:48,y:CGFloat(63+i*16),action:{ [weak self] in self?.startGame(skill:Int32(i)) })
         }
-        back()
+        canvas("Difficulty",art:[("M_NEWG",96,14),("M_SKILL",54,38)],items:items,selected:Int(app.renderer.skill),back:{ [weak self] in
+            guard let self else { return }
+            if self.app.wad?.maps.contains("MAP01")==true { self.main() } else { self.newGame() }
+        })
+    }
+    private func startGame(skill: Int32) {
+        guard let wad=app.wad else { return }
+        let old=app.renderer.skill; app.renderer.skill=skill
+        do {
+            app.describe(chosenMap,try app.renderer.load(wad:wad,map:chosenMap)); app.maps.selectItem(withTitle:chosenMap)
+            app.closeGameMenu()
+        } catch { app.renderer.skill=old; app.show(error) }
     }
     private func row(_ title: String,_ control: NSView) {
         let label=NSTextField(labelWithString:title); label.widthAnchor.constraint(equalToConstant:110).isActive=true

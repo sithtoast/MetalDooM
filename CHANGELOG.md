@@ -4,6 +4,15 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 28 — Original-style Doom menus
+
+- Draw the main, episode and difficulty menus with original artwork, 320×200
+  coordinates, crisp pixel scaling, and Doom's animated skull cursor.
+- Restore original main-menu ordering and Read This artwork. Escape resumes or
+  returns to the previous menu; arrows, Tab, Enter, Space, hotkeys and mouse work.
+- Keep native display/audio options and named-save screens available.
+- Cache decoded menu artwork during menu navigation.
+
 ## Build 23 — Pause menu, display options and save slots
 
 - Escape opens a paused menu with Doom artwork; mouse and keyboard navigation

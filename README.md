@@ -121,8 +121,8 @@ The original engine decoder has not been hardened for deliberately crafted paylo
 
 ## Current limitations
 
-- Demos and networking are not connected. The pause menu uses original Doom artwork
-  with native controls; it is not the original software-drawn menu implementation.
+- Demos and networking are not connected. The main, episode and difficulty menus use original Doom artwork and layout
+  with an animated skull. Extended options and save slots use native controls.
 - Sound positioning is sampled when an effect starts; continuous repositioning,
   original priority/pitch variation, PC-speaker sounds, and audio-device changes
   need further work. Native output has been validated through offline mixing;
@@ -230,7 +230,7 @@ counter timing, sound cues, skipping, map timeout, episode endings and secret ma
 ## Pause menu and options
 
 Escape pauses simulation, intermission timing, and audio. The menu supports mouse
-buttons, Up/Down/Enter on the main page, and Tab through native controls. New Game
+buttons, arrows/Enter/Space/Tab on the original-style pages, and Tab through native controls. New Game
 offers the episodes present in the WAD and all five original difficulty settings.
 Restart retains difficulty, and loading restores the difficulty saved in the slot.
 
@@ -245,3 +245,7 @@ The pixel dimensions shown reflect the actual drawable, including Retina scaling
 Fullscreen uses the current desktop display mode; it does not switch the monitor's
 resolution. Window preset, render scale, frame limit, music enablement, and separate
 music/effects volume levels persist.
+
+Launch the app by opening `~/Dev/MetalDooM/build/MetalDooM.app` in Finder. Save and
+quit an older running build first. If no WAD is open, choose Open WAD and select
+your IWAD; for example `~/Downloads/The_Ultimate_Doom/DOOM.WAD`.
