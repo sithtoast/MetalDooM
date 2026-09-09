@@ -14,6 +14,8 @@ Swift owns native input/windowing and direct Metal rendering.
 | Sources/Renderer.swift | Fixed tics, interpolation, sector synchronization, Metal resources |
 | Sources/SpriteRenderer.swift | Sprite texture cache, billboard quads, original HUD patch composition |
 | Sources/IntermissionRenderer.swift | Original intermission patches, stats and destination screen |
+| Sources/SaveStore.swift | Versioned save container, WAD hash, integrity, atomic persistence |
+| Sources/MapNames.swift | Canonical English map titles from the pinned engine |
 | Sources/SoundPlayer.swift | DMX decoding, native AVAudioEngine voices, focus pause |
 | Sources/main.swift | AppKit lifecycle, WAD picker, map selector, cursor/focus handling |
 
@@ -134,3 +136,24 @@ Surface regression tests assert E1M1 BRNBIG panels and their UV bounds, sky plan
 and curtains, and floor/ceiling containment with an unused far-away fixture vertex.
 `make_surface_fixture.py` creates local exit/sky viewing positions without monsters;
 it changes only THINGS records, retaining original geometry and art.
+
+## Native persistence
+
+MD_WriteSave calls the original player/world/thinker/special archives inside the
+C error boundary. A fixed-width extension adds gametic, full level time, both RNG
+indices and active button timers with line indices. MD_ReadSave validates the
+header, loads the base map and unarchives state without a simulation tic, then
+restores the extension. Engine pointers never enter the Swift save container.
+Enemy target/tracer pointers retain vanilla load behavior (cleared/reacquired).
+
+SaveStore wraps the payload in a version-1 binary property list with the exact WAD
+SHA-256, map id, view pitch, timestamp and payload checksum. It validates identity,
+size, digest and map before preparing renderer resources and invoking the native
+loader. File replacement is atomic; quick saves use an Application Support path
+per WAD digest. Native fatal archive errors still poison the engine instance.
+This wrapper detects accidental damage; it does not make the upstream decoder a
+hardened parser for malicious, checksum-recomputed files.
+
+SaveValidation exercises cross-map world/player round trips, enemy health, pickups,
+switch timers, bad containers, wrong WADs, save-write failure, death/intermission
+loading and rejection of bad native headers before live state changes.

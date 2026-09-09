@@ -18,6 +18,8 @@
 #include "z_zone.h"
 #include "i_system.h"
 #include "d_items.h"
+#include "p_saveg.h"
+#include "s_sound.h"
 
 static jmp_buf errorBoundary;
 static int guarded, initialized, poisoned, loaded;
@@ -34,6 +36,11 @@ void MD_TestTarget(int type, float distance) {
     double angle = (double)p->angle * (2*M_PI/4294967296.0);
     testTarget = P_SpawnMobj(p->x+cos(angle)*distance*FRACUNIT,p->y+sin(angle)*distance*FRACUNIT,ONFLOORZ,(mobjtype_t)type);
     testTarget->angle = p->angle+ANG180;
+}
+int MD_TestHealthForType(int type) {
+    for(thinker_t *t=thinkercap.next;t!=&thinkercap;t=t->next)
+        if(t->function.acp1==(actionf_p1)P_MobjThinker && ((mobj_t *)t)->type==type) return ((mobj_t *)t)->health;
+    return -99999;
 }
 int MD_TestTargetHealth(void) { return testTarget ? testTarget->health : 0; }
 void MD_TestDamagePlayer(int damage) { P_DamageMobj(players[0].mo,NULL,NULL,damage); }
@@ -92,6 +99,80 @@ int MD_Continue(void) {
     memset(&players[0].cmd,0,sizeof(players[0].cmd));
     guarded = 0; return 1;
 }
+// Fixed-width extension preserves RNG, full tic time and pending button resets
+// omitted by the original archive. All pointers remain process-local.
+extern int rndindex, prndindex;
+#define MD_SAVE_WORDS (6 + MAXBUTTONS*4)
+int MD_WriteSave(const char *path) {
+    if (!loaded || poisoned || progress.phase || players[0].health <= 0) {
+        snprintf(errorText,sizeof(errorText),"Save during a live level, before death."); return 0;
+    }
+    save_stream = fopen(path,"wb");
+    if (!save_stream) { snprintf(errorText,sizeof(errorText),"Cannot create save data."); return 0; }
+    guarded=1;
+    if(setjmp(errorBoundary)) { if(save_stream) fclose(save_stream);save_stream=NULL;guarded=0;return 0; }
+    savegame_error=false;
+    P_WriteSaveGameHeader("MetalDooM");
+    P_ArchivePlayers();P_ArchiveWorld();P_ArchiveThinkers();P_ArchiveSpecials();P_WriteSaveGameEOF();
+    int32_t extra[MD_SAVE_WORDS]={0x4d445331,gametic,leveltime,rndindex,prndindex,1};
+    for(int i=0;i<MAXBUTTONS;++i) {
+        button_t *b=&buttonlist[i];int offset=6+i*4;
+        extra[offset]=b->btimer ? (int)(b->line-lines) : -1;
+        extra[offset+1]=b->where;extra[offset+2]=b->btexture;extra[offset+3]=b->btimer;
+    }
+    int ok=!savegame_error && fwrite(extra,sizeof(extra),1,save_stream)==1 && !ferror(save_stream);
+    if(fclose(save_stream)) ok=0;
+    save_stream=NULL;guarded=0;
+    if(!ok) snprintf(errorText,sizeof(errorText),"Cannot finish writing save data.");
+    return ok;
+}
+int MD_ReadSave(const char *path) {
+    if(!loaded || poisoned) { snprintf(errorText,sizeof(errorText),"Open the matching WAD before loading a save.");return 0; }
+    save_stream=fopen(path,"rb");
+    if(!save_stream) { snprintf(errorText,sizeof(errorText),"Cannot read save data.");return 0; }
+    // Reject bad headers/extensions before changing the live game.
+    unsigned char header[50];int32_t extra[MD_SAVE_WORDS];char version[16]={0};
+    snprintf(version,sizeof(version),"version %i",G_VanillaVersionCode());
+    int ok=fread(header,sizeof(header),1,save_stream)==1;
+    ok=ok && !memcmp(header+24,version,16) && header[40]<=4 && header[41]>=1 && header[41]<=4
+        && header[42]>=1 && header[42]<=(gamemode==commercial ? 32 : 9)
+        && header[43]==1 && !header[44] && !header[45] && !header[46];
+    ok=ok && !fseek(save_stream,-(long)sizeof(extra),SEEK_END) && fread(extra,sizeof(extra),1,save_stream)==1
+        && extra[0]==0x4d445331 && extra[5]==1 && extra[1]>=0 && extra[2]>=0
+        && extra[3]>=0 && extra[3]<256 && extra[4]>=0 && extra[4]<256;
+    char mapName[16];
+    if(ok) {
+        if(gamemode==commercial) snprintf(mapName,sizeof(mapName),"MAP%02d",header[42]);
+        else snprintf(mapName,sizeof(mapName),"E%dM%d",header[41],header[42]);
+        ok=W_CheckNumForName(mapName)>=0;
+    }
+    if(!ok) { fclose(save_stream);save_stream=NULL;snprintf(errorText,sizeof(errorText),"Invalid or incompatible save data.");return 0; }
+    rewind(save_stream);guarded=1;
+    if(setjmp(errorBoundary)) { if(save_stream) fclose(save_stream);save_stream=NULL;guarded=0;return 0; }
+    savegame_error=false;
+    if(!P_ReadSaveGameHeader()) I_Error("Invalid native save header");
+    G_InitNew(gameskill,gameepisode,gamemap);
+    P_UnArchivePlayers();P_UnArchiveWorld();P_UnArchiveThinkers();P_UnArchiveSpecials();
+    if(!P_ReadSaveGameEOF() || savegame_error) I_Error("Invalid native save archive");
+    int32_t trailing[MD_SAVE_WORDS];
+    if(fread(trailing,sizeof(trailing),1,save_stream)!=1 || memcmp(trailing,extra,sizeof(extra)) || fgetc(save_stream)!=EOF) I_Error("Invalid native save extension");
+    fclose(save_stream);save_stream=NULL;
+    gametic=extra[1];leveltime=extra[2];rndindex=extra[3];prndindex=extra[4];
+    memset(buttonlist,0,sizeof(buttonlist));
+    for(int i=0;i<MAXBUTTONS;++i) {
+        int offset=6+i*4,line=extra[offset],where=extra[offset+1],texture=extra[offset+2],timer=extra[offset+3];
+        if(!timer) continue;
+        if(line<0 || line>=numlines || where<0 || where>2 || texture<0 || texture>=numtextures || timer<0 || timer>BUTTONTIME) I_Error("Invalid saved switch");
+        buttonlist[i].line=&lines[line];buttonlist[i].where=where;buttonlist[i].btexture=texture;buttonlist[i].btimer=timer;
+        buttonlist[i].soundorg=&lines[line].frontsector->soundorg;
+    }
+    memset(&players[0].cmd,0,sizeof(players[0].cmd));
+    players[0].attackdown=players[0].usedown=false;
+    lastMessage[0]=0;++messageSerial;
+    progress=(MD_Progress){.episode=gameepisode,.map=gamemap,.commercial=gamemode==commercial};
+    gameaction=ga_nothing;S_Start();guarded=0;return 1;
+}
+
 MD_Side MD_GetSide(int index) {
     MD_Side result = {0};
     if (!loaded || index < 0 || index >= numsides) return result;

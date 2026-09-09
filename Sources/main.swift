@@ -28,6 +28,13 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             appMenu.addItem(withTitle:"Quit MetalDooM",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q")
             let fileItem = NSMenuItem(), fileMenu = NSMenu(title:"File"); fileItem.submenu = fileMenu; menu.addItem(fileItem)
             fileMenu.addItem(withTitle:"Open WAD…",action:#selector(openWAD),keyEquivalent:"o").target = self
+            fileMenu.addItem(.separator())
+            fileMenu.addItem(withTitle:"Save Game…",action:#selector(saveGame),keyEquivalent:"s").target = self
+            fileMenu.addItem(withTitle:"Load Game…",action:#selector(loadGame),keyEquivalent:"l").target = self
+            let quickSave = fileMenu.addItem(withTitle:"Quick Save",action:#selector(quickSaveGame),keyEquivalent:"s")
+            quickSave.target = self; quickSave.keyEquivalentModifierMask = [.command,.shift]
+            let quickLoad = fileMenu.addItem(withTitle:"Quick Load",action:#selector(quickLoadGame),keyEquivalent:"l")
+            quickLoad.target = self; quickLoad.keyEquivalentModifierMask = [.command,.shift]
             NSApp.mainMenu = menu
             window = NSWindow(contentRect:NSRect(x:0,y:0,width:1100,height:760),styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)
             window.title = "\(appTitle) — Gameplay Preview"; window.minSize = NSSize(width:720,height:480)
@@ -68,7 +75,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             renderer.onMapChanged = { [weak self] name in
                 guard let self else { return }
-                self.maps.selectItem(withTitle:name); self.summary = name
+                self.maps.selectItem(withTitle:name); self.summary = self.wad?.mapTitle(name) ?? name
                 self.updateTitle(map:name)
             }
             renderer.onError = { [weak self] error in self?.show(error) }
@@ -81,6 +88,42 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 maps.selectItem(withTitle:arguments[index+1].uppercased()); changeMap()
             }
         } catch { show(error) }
+    }
+    @objc func quickSaveGame() {
+        view.releaseMouse()
+        do {
+            guard let wad else { throw PortError("Open a WAD before saving.") }
+            try renderer.saveGame(to:SaveStore.quickURL(wad:wad))
+        } catch { show(error) }
+    }
+    @objc func quickLoadGame() {
+        view.releaseMouse()
+        do {
+            guard let wad else { throw PortError("Open the matching WAD before loading.") }
+            let url = try SaveStore.quickURL(wad:wad)
+            guard FileManager.default.fileExists(atPath:url.path) else { throw PortError("No quick save exists for this WAD yet.") }
+            try renderer.loadGame(from:url)
+        } catch { show(error) }
+    }
+    @objc func saveGame() {
+        view.releaseMouse(); renderer.pauseAudio()
+        guard let wad else { show(PortError("Open a WAD before saving.")); return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType(filenameExtension:"mdsave") ?? .data]
+        panel.nameFieldStringValue = "\(wad.gameName) - \(maps.titleOfSelectedItem ?? "Save").mdsave"
+        panel.beginSheetModal(for:window) { [weak self] response in
+            guard let self, response == .OK, let url = panel.url else { return }
+            do { try self.renderer.saveGame(to:url) } catch { self.show(error) }
+        }
+    }
+    @objc func loadGame() {
+        view.releaseMouse(); renderer.pauseAudio()
+        let panel = NSOpenPanel(); panel.allowedContentTypes = [UTType(filenameExtension:"mdsave") ?? .data]
+        panel.canChooseDirectories = false; panel.allowsMultipleSelection = false
+        panel.beginSheetModal(for:window) { [weak self] response in
+            guard let self, response == .OK, let url = panel.url else { return }
+            do { try self.renderer.loadGame(from:url) } catch { self.show(error) }
+        }
     }
     @objc func openWAD() {
         view.releaseMouse()
@@ -106,11 +149,11 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     func updateTitle(map name: String) {
         guard let wad else { return }
-        window.title = "\(appTitle) — \(wad.gameName) — \(wad.url.lastPathComponent) — \(name)"
+        window.title = "\(appTitle) — \(wad.gameName) — \(wad.url.lastPathComponent) — \(wad.mapTitle(name))"
     }
     func describe(_ name: String, _ result: (triangles:Int,missing:[String])) {
         updateTitle(map:name)
-        summary = name
+        summary = wad?.mapTitle(name) ?? name
         if !result.missing.isEmpty { summary += " · \(result.missing.count) missing textures" }
         status.stringValue = summary
         print("Loaded \(name): \(result.triangles) triangles. Missing textures: \(result.missing)")
@@ -119,12 +162,12 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         view.releaseMouse()
         let alert = NSAlert(); alert.messageText = appTitle
         let date = Bundle.main.object(forInfoDictionaryKey:"MetalDooMBuildDate") as? String ?? "Unknown"
-        alert.informativeText = "Native Apple Silicon / Metal gameplay preview.\nBuilt: \(date)\n\nChocolate Doom combat, monsters, pickups, doors, Metal weapon sprites, and native sound effects. Level exits, classic intermission stats, inventory carryover, and live switch textures. Music, saves, and original finale sequences remain pending.\n\nGPL-2.0-or-later. Includes Chocolate Doom code by id Software, Simon Howard, and contributors."
+        alert.informativeText = "Native Apple Silicon / Metal gameplay preview.\nBuilt: \(date)\n\nChocolate Doom combat, monsters, pickups, doors, Metal weapon sprites, and native sound effects. Level exits, classic intermission stats, inventory carryover, and live switch textures. Native save/load and quick saves are available in File. Music and original finale sequences remain pending.\n\nGPL-2.0-or-later. Includes Chocolate Doom code by id Software, Simon Howard, and contributors."
         alert.runModal()
     }
     func show(_ error: Error) {
         view?.releaseMouse()
-        let alert = NSAlert(); alert.messageText = "Unable to load MetalDooM"; alert.informativeText = String(describing:error); alert.runModal()
+        let alert = NSAlert(); alert.messageText = "MetalDooM"; alert.informativeText = String(describing:error); alert.runModal()
     }
     func windowDidResignKey(_ notification: Notification) { view.releaseMouse(); renderer.pauseAudio() }
     func applicationWillResignActive(_ notification: Notification) { view.releaseMouse(); renderer.pauseAudio() }

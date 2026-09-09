@@ -47,6 +47,9 @@ typedef struct {
 } MD_Progress;
 MD_Progress MD_GetProgress(void);
 int MD_Continue(void);
+// Native payload I/O; the Swift save container checks format, WAD identity and digest.
+int MD_WriteSave(const char *path);
+int MD_ReadSave(const char *path);
 
 #ifdef MD_TESTING
 void MD_TestMonsters(int enabled);
@@ -54,6 +57,7 @@ void MD_TestExit(int secret);
 int MD_TestSwitch(int special, float *x,float *y,float *angle,int *side);
 void MD_TestTarget(int type, float distance);
 int MD_TestTargetHealth(void);
+int MD_TestHealthForType(int type);
 void MD_TestDamagePlayer(int damage);
 int MD_TestPlacePlayer(float x, float y, float angle);
 int MD_TestDoor(int ordinal, float *x, float *y, float *angle, int *sector);

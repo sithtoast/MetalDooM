@@ -75,8 +75,11 @@ final class Renderer: NSObject, MTKViewDelegate {
     var onMapChanged: ((String) -> Void)?
     func pauseAudio() { try? sound?.setActive(false) }
     private var hud = MD_HUD()
+    var notice = ""
+    var noticeUntil: Double = 0
     private var messageSerial: Int32 = 0, messageUntil: Int32 = 0
     var pickupMessage: String {
+        if CACurrentMediaTime() < noticeUntil { return notice }
         guard engineReady, hud.tick < messageUntil else { return "" }
         var value = hud.message
         return withUnsafePointer(to:&value) { pointer in
@@ -190,7 +193,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         self.depth = depth
         super.init()
     }
-    func load(wad: WAD, map name: String, continuing: Bool = false) throws -> (triangles:Int,missing:[String]) {
+    func load(wad: WAD, map name: String, continuing: Bool = false, restorePath: String? = nil) throws -> (triangles:Int,missing:[String]) {
         guard wad.signature == "IWAD" else { throw PortError("The gameplay prototype requires a standalone Doom IWAD. PWAD merging is not connected yet.") }
         let map = try DoomMap(wad:wad,name:name), art = try Art(wad:wad)
         let heights = try art.textureHeights(), geometry = try Geometry(map:map,textureHeights:heights)
@@ -241,7 +244,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         let episode = name.hasPrefix("E") ? Int(String(name.dropFirst().prefix(1))) ?? 1 : 1
         let number = name.hasPrefix("MAP") ? Int(name.dropFirst(3)) ?? 1 : Int(name.suffix(1)) ?? 1
-        guard (continuing ? MD_Continue() : MD_Load(wad.url.path,Int32(episode),Int32(number))) != 0 else {
+        let result = restorePath.map { MD_ReadSave($0) } ?? (continuing ? MD_Continue() : MD_Load(wad.url.path,Int32(episode),Int32(number)))
+        guard result != 0 else {
             if MD_SectorCount() == 0 { engineReady = false }
             throw PortError(String(cString:MD_LastError()))
         }
@@ -258,6 +262,20 @@ final class Renderer: NSObject, MTKViewDelegate {
         try uploadSkyGeometry(geometry)
         try syncGeometry()
         return (geometry.triangleCount,Array(Set(missing)).sorted())
+    }
+    func saveGame(to url: URL) throws {
+        guard engineReady, let wad, let map else { throw PortError("Open a WAD before saving.") }
+        try SaveStore.write(to:url,wad:wad,map:map.name,pitch:pitch)
+        notice = "Game saved"; noticeUntil = CACurrentMediaTime()+3
+    }
+    func loadGame(from url: URL) throws {
+        guard let wad else { throw PortError("Open the matching WAD before loading a save.") }
+        let save = try SaveStore.read(from:url,wad:wad)
+        let temporary = SaveStore.temporaryURL(); defer { try? FileManager.default.removeItem(at:temporary) }
+        try save.payload.write(to:temporary,options:.atomic)
+        _ = try load(wad:wad,map:save.map,restorePath:temporary.path)
+        pitch = save.pitch; onMapChanged?(save.map)
+        notice = "Game loaded"; noticeUntil = CACurrentMediaTime()+3
     }
     func reset() throws { if let wad, let map { _ = try load(wad:wad,map:map.name) } }
     private func makeBatches(_ geometry: Geometry, textures: [MaterialKey:MTLTexture]) throws -> [GPUBatch] {

@@ -2,9 +2,9 @@
 
 A native Apple Silicon / Metal source-port project for classic Doom and Doom II.
 
-**Current milestone: Ultimate Doom level progression and classic intermission stats.**
+**Current milestone: named maps, native save/load, and persistent quick saves.**
 Original gameplay and exit routing run in the Doom engine, with Metal world,
-weapon, HUD, and intermission rendering. Music, saves, and original finales remain.
+weapon, HUD, and intermission rendering. Music and original finales remain.
 The world is drawn as triangles by Metal. No software framebuffer, SDL, OpenGL, or
 Vulkan presentation layer is used.
 
@@ -50,14 +50,38 @@ releases; independent checkouts do not share a global numbering sequence.
 | R | Restart map with fresh starting inventory |
 | Return / Enter | Intermission: show destination, then press again to start it |
 | Command-O | Choose IWAD (restart first to change loaded IWAD) |
+| Command-S / Command-L | Save Game… / Load Game… |
+| Command-Shift-S / Command-Shift-L | Quick Save / Quick Load for this WAD |
 
 Mouse capture releases and simulation/audio pause on focus loss. Aim uses classic
 Doom horizontal targeting and vertical autoaim; looking up/down is cosmetic.
 Weapon selection requires ownership. R restarts after death; it resets inventory.
 
+## Saving and loading
+
+Use **File → Save Game…** to choose a `.mdsave` file, or **Quick Save** for one
+persistent slot per WAD. Quick saves live under
+`~/Library/Application Support/MetalDooM/Saves/`, keyed by the WAD's SHA-256 digest.
+Open the same WAD before loading; renaming an unchanged WAD does not invalidate saves.
+Quick Save replaces that WAD's previous quick save. Named saves let you keep several.
+
+Save while alive during a level. You can load from another map, after death, or at
+intermission. Loading restores player/view, inventory, pickups and enemies, world
+and moving-sector state, random state, and pending switch resets. The original
+archive clears enemy target/tracer pointers; enemies reacquire targets as in
+classic Doom saves. Some world coordinates use the original archive's integer
+precision. This is not a frame-exact replay format.
+
+Versioned containers check WAD identity and payload integrity before entering the
+native loader. Atomic replacement preserves the previous file if saving fails.
+Only MetalDooM `.mdsave` files are supported; arbitrary `.dsg` imports and guarantees
+of compatibility with future format versions are outside this first implementation.
+The original engine decoder has not been hardened for deliberately crafted payloads.
+
 ## Implemented
 
 - ARM64 AppKit app, MetalKit viewport, direct Metal shaders.
+- Canonical map names in titles and status text, plus native save/load and quick saves.
 - Classic WAD/map loading, BSP/seg-clipped floors and ceilings, textured walls.
 - Two-sided middle textures with transparent openings, distinct front/back faces,
   opening-height clipping, sidedef offsets, and upper/lower/middle pegging rules.
@@ -90,7 +114,7 @@ Weapon selection requires ownership. R restarts after death; it resets inventory
 
 ## Current limitations
 
-- Music, saves, Doom menus, demos, and networking are not connected.
+- Music, Doom menus, demos, and networking are not connected.
 - Sound positioning is sampled when an effect starts; continuous repositioning,
   original priority/pitch variation, PC-speaker sounds, and audio-device changes
   need further work. Native output has been validated through offline mixing;
@@ -135,6 +159,7 @@ bash scripts/test-input.sh
 bash scripts/test-combat.sh "$HOME/Downloads/doom1.WAD"
 bash scripts/test-audio.sh "$HOME/Downloads/doom1.WAD"
 bash scripts/test-progression.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD"
+bash scripts/test-save.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD" "$HOME/Downloads/doom1.WAD"
 bash scripts/test.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD"
 ```
 
@@ -173,10 +198,19 @@ secret-map routes and endings, and load/tick every map. Native checks showed Han
 Finished, Entering Nuclear Plant, E1M2's updated selector/title, and the pillar
 switch lighting up. The supplied Ultimate Doom WAD remains external to the project.
 
+Build 17 save tests cover a cross-map round trip, player/view/tic and inventory,
+enemy health and object frames/positions, removed pickups, sectors, timed switches,
+loading from death/intermission, wrong WADs, corrupt/truncated files, and preserving
+an existing save after failure. Native checks verified the Save/Load dialogs and
+quick-loading restored position and ammo after movement and firing. After an app
+restart into E1M2, Quick Load restored the persisted E1M1 save and its map title.
+
 ## Next milestones
 
-1. Add save/load, then music and menus.
+1. Add music and menus; refine the save-slot experience.
 2. Complete intermission animations, finales, and respawning.
 3. Verify Doom II, longer play sessions, texture effects, and less common sector actions.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for module boundaries.
+
+See [CHANGELOG.md](CHANGELOG.md) for the build-by-build history.
