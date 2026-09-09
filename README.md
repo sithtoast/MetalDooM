@@ -2,8 +2,8 @@
 
 A native Apple Silicon / Metal source-port project for classic Doom and Doom II.
 
-**Current milestone: Chocolate Doom movement, collision, and doors rendered in Metal.**
-This is a gameplay preview; actors, combat, audio, and level transitions are pending.
+**Current milestone: visible pickups, decorations, keys, and a classic Metal HUD.**
+This is a gameplay preview; monsters, combat, audio, and level transitions are pending.
 The world is drawn as triangles by Metal. No software framebuffer, SDL, OpenGL, or
 Vulkan presentation layer is used.
 
@@ -59,20 +59,28 @@ preview camera feature, not a decision about classic gameplay rules.
 - Original player movement, momentum, sliding, collision, stairs, view height, and use logic.
 - Fixed 35 Hz simulation with interpolated camera presentation.
 - Engine-driven moving sector heights and lighting synchronized to Metal geometry.
-- Map switching/restarting, focus pause, and queued use taps between tics.
+- Camera-facing sprite quads with transparent edges, depth occlusion, original patch
+  origins, engine animation frames, rotation/mirroring, and fullbright states.
+- Original pickups and decorations restored: item collection/removal, inventory,
+  key-gated doors, and engine pickup/locked-door messages.
+- Original status-bar artwork drawn by Metal: health, armor, active ammo, ammo
+  reserves/capacity, weapons owned, key cards/skulls, and a health-based face.
+- Map switching/restarting, focus pause, and queued movement/use taps between tics.
 
 ## Current limitations
 
-- Monsters are disabled and non-player things removed until sprite rendering lands;
-  there are no invisible pickups or decorations. Combat, weapons/HUD, audio, saves,
-  Doom menus, demos, and networking are not connected.
+- Monsters remain disabled. Combat, the held weapon view, audio, saves, Doom menus,
+  demos, and networking are not connected. Weapon pickups can change the engine's
+  selected weapon/ammo, but firing and manual weapon selection are still pending.
 - The engine's full game-state loop is pending. Exits stop the preview with a status
-  message; R restarts. Death also requires R. Locked doors require keys, which are
-  not yet available.
+  message; R restarts. Death also requires R. Keys now unlock their matching doors.
 - Manual doors have been validated. Other sector actions use upstream logic but
   lifts, crushers, switches, and special-case maps need dedicated validation.
 - Lighting and sky projection are approximate; sky occlusion, texture pegging,
   masked middle walls, animations, scrolling textures, and palette effects remain.
+  Sprite animation is implemented; the pending animations are world textures/flats.
+  The HUD face uses health bands and idle frames, not Doom's complete expression
+  state machine. Power-up screen effects and fuzz rendering remain pending.
 - Classic binary Doom maps only; no UDMF, Hexen format, extended/compressed nodes,
   Boom/MBF extensions, GZDoom mods, or IWAD+PWAD merging.
 - All geometry is submitted each frame. Sector height/light changes rebuild geometry
@@ -93,24 +101,31 @@ world-rendering function is needed by the native presentation path.
 ```sh
 bash scripts/test.sh "$HOME/Downloads/doom1.WAD"
 bash scripts/test-engine.sh "$HOME/Downloads/doom1.WAD"
+bash scripts/test-input.sh
 ```
 
 The geometry suite checks an original generated room, sector lookup, malformed WAD
 rejection, every supplied map, and texture decoding. Python 3 generates the fixture.
 The engine suite currently targets Doom shareware: fixed-tic movement, closed-door
-blocking, use/opening, walking through, reset, all nine maps, and rejected loads.
+blocking, use/opening, walking through, reset, all nine maps, rejected loads,
+health/armor/ammo collection, sprite removal/animation, red-key collection and
+locked-door access, and inventory/item reset. Patch tests cover transparent gaps,
+signed origins, malformed columns, all 483 sprite patches, and HUD artwork. The
+input test delivers key-down/up before a tic and checks tap retention, holds,
+queued use, and focus-release cleanup.
 Engine placement helpers exist only in the test build.
 
 Validated: all nine maps and 138 world materials in the supplied shareware WAD;
-engine movement/door tests; native visual door opening and walking into the room
-beyond. The visual fixture changes only the player start in a temporary WAD copy,
-never the user's original. Generated WADs are excluded from source control.
+engine movement/door/pickup tests; native visual sprites, status bar, collection,
+locked-door messages, red-key HUD indicator, and passage through the unlocked door.
+Visual fixtures change only THINGS records in temporary
+WAD copies, never the user's original. Generated WADs are excluded from source control.
 About 110–120 FPS was observed on an Apple M5 Pro during that check. This is a display
 rate reading, not a GPU benchmark or proof of wider compatibility.
 
 ## Next milestones
 
-1. Render things, pickups, weapons, and HUD; enable actors and combat.
+1. Draw the held weapon, connect firing/weapon selection, and enable monsters/combat.
 2. Connect exits/intermissions, full game-state progression, and respawning.
 3. Add native audio/music, save/load, and menus.
 4. Verify Doom II, longer play sessions, texture effects, and less common sector actions.

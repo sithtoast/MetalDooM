@@ -6,12 +6,17 @@ let version = Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionStrin
 let buildNumber = Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "unbundled"
 let appTitle = "MetalDooM \(version) (build \(buildNumber))"
 
+final class MessageLabel: NSTextField {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
 final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var window: NSWindow!
     var view: GameView!
     var renderer: Renderer!
     var status: NSTextField!
     var maps: NSPopUpButton!
+    var message: MessageLabel!
     var wad: WAD?
     var summary = "Open a Doom WAD to explore a map"
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -30,7 +35,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let root = NSView(); window.contentView = root
             view = GameView(frame:.zero,device:MTLCreateSystemDefaultDevice())
             view.colorPixelFormat = .bgra8Unorm; view.depthStencilPixelFormat = .depth32Float
-            view.clearColor = MTLClearColor(red:0.13,green:0.16,blue:0.20,alpha:1)
+            view.clearColor = MTLClearColor(red:0,green:0,blue:0,alpha:1)
             view.preferredFramesPerSecond = 120; view.framebufferOnly = true
             renderer = try Renderer(view:view); view.delegate = renderer
             let button = NSButton(title:"Open WAD…",target:self,action:#selector(openWAD))
@@ -40,16 +45,27 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let spacer = NSView()
             let toolbar = NSStackView(views:[label,spacer,maps,button]); toolbar.spacing = 16
             status = NSTextField(labelWithString:summary); status.font = .monospacedSystemFont(ofSize:11,weight:.regular)
+            status.lineBreakMode = .byTruncatingTail
             let help = NSTextField(labelWithString:"WASD move · Shift run · E / Space use · Click to look · Esc release · R restart")
             help.font = .systemFont(ofSize:11); help.textColor = .secondaryLabelColor
             for child in [toolbar,view!,status!,help] { child.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(child) }
+            message = MessageLabel(labelWithString:""); message.translatesAutoresizingMaskIntoConstraints = false
+            message.font = .monospacedSystemFont(ofSize:14,weight:.bold); message.textColor = .yellow
+            message.backgroundColor = NSColor.black.withAlphaComponent(0.7); message.drawsBackground = true; message.isHidden = true
+            root.addSubview(message)
             NSLayoutConstraint.activate([
                 toolbar.topAnchor.constraint(equalTo:root.topAnchor,constant:12),toolbar.leadingAnchor.constraint(equalTo:root.leadingAnchor,constant:16),toolbar.trailingAnchor.constraint(equalTo:root.trailingAnchor,constant:-16),toolbar.heightAnchor.constraint(equalToConstant:30),
                 view.topAnchor.constraint(equalTo:toolbar.bottomAnchor,constant:12),view.leadingAnchor.constraint(equalTo:root.leadingAnchor),view.trailingAnchor.constraint(equalTo:root.trailingAnchor),view.bottomAnchor.constraint(equalTo:status.topAnchor,constant:-10),
                 status.leadingAnchor.constraint(equalTo:root.leadingAnchor,constant:16),status.trailingAnchor.constraint(equalTo:root.trailingAnchor,constant:-16),status.bottomAnchor.constraint(equalTo:help.topAnchor,constant:-6),
-                help.leadingAnchor.constraint(equalTo:root.leadingAnchor,constant:16),help.bottomAnchor.constraint(equalTo:root.bottomAnchor,constant:-10)
+                help.leadingAnchor.constraint(equalTo:root.leadingAnchor,constant:16),help.bottomAnchor.constraint(equalTo:root.bottomAnchor,constant:-10),
+                message.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:16),message.topAnchor.constraint(equalTo:view.topAnchor,constant:16),
+                message.trailingAnchor.constraint(lessThanOrEqualTo:view.trailingAnchor,constant:-16)
             ])
-            renderer.onFrame = { [weak self] fps in guard let self else { return }; self.status.stringValue = "\(self.summary) · \(self.renderer.playerStatus) · \(Int(fps)) FPS" }
+            renderer.onFrame = { [weak self] fps in
+                guard let self else { return }
+                self.status.stringValue = "\(self.summary) · \(self.renderer.playerStatus) · \(Int(fps)) FPS"
+                self.message.stringValue = self.renderer.pickupMessage; self.message.isHidden = self.message.stringValue.isEmpty
+            }
             renderer.onError = { [weak self] error in self?.show(error) }
             window.center(); window.makeKeyAndOrderFront(nil); window.makeFirstResponder(view); NSApp.activate(ignoringOtherApps:true)
             let arguments = CommandLine.arguments
@@ -86,7 +102,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     func describe(_ name: String, _ result: (triangles:Int,missing:[String])) {
         window.title = "\(appTitle) — \(name)"
-        summary = "\(name) · \(result.triangles) triangles · \(renderer.device.name)"
+        summary = name
         if !result.missing.isEmpty { summary += " · \(result.missing.count) missing textures" }
         status.stringValue = summary
         print("Loaded \(name): \(result.triangles) triangles. Missing textures: \(result.missing)")
@@ -95,7 +111,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         view.releaseMouse()
         let alert = NSAlert(); alert.messageText = appTitle
         let date = Bundle.main.object(forInfoDictionaryKey:"MetalDooMBuildDate") as? String ?? "Unknown"
-        alert.informativeText = "Native Apple Silicon / Metal gameplay preview.\nBuilt: \(date)\n\nChocolate Doom movement, collision, and moving sectors. No actors, combat, sound, saves, or level transitions yet.\n\nGPL-2.0-or-later. Includes Chocolate Doom code by id Software, Simon Howard, and contributors."
+        alert.informativeText = "Native Apple Silicon / Metal gameplay preview.\nBuilt: \(date)\n\nChocolate Doom movement, doors, pickups, keys, and a Metal-rendered status bar. Monsters, combat, sound, saves, and level transitions are still pending.\n\nGPL-2.0-or-later. Includes Chocolate Doom code by id Software, Simon Howard, and contributors."
         alert.runModal()
     }
     func show(_ error: Error) {

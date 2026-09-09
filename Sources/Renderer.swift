@@ -4,6 +4,7 @@ import simd
 
 final class GameView: MTKView {
     var keys = Set<UInt16>()
+    private var movementQueued = Set<UInt16>()
     var mouseMotion = SIMD2<Float>.zero
     var captured = false
     var running = false
@@ -11,11 +12,15 @@ final class GameView: MTKView {
     override var acceptsFirstResponder: Bool { true }
     override func keyDown(with event: NSEvent) {
         if event.isARepeat { return }
+        if [0,1,2,13,123,124,125,126].contains(Int(event.keyCode)) { movementQueued.insert(event.keyCode) }
         if event.keyCode == 14 || event.keyCode == 49 { useQueued = true }
         if event.keyCode == 53 { releaseMouse() } else { keys.insert(event.keyCode) }
     }
     override func keyUp(with event: NSEvent) { keys.remove(event.keyCode) }
     override func flagsChanged(with event: NSEvent) { running = event.modifierFlags.contains(.shift) }
+    func consumeMovement() -> Set<UInt16> {
+        let result = keys.union(movementQueued); movementQueued.removeAll(); return result
+    }
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         if !captured {
@@ -29,7 +34,7 @@ final class GameView: MTKView {
     }
     override func mouseDragged(with event: NSEvent) { mouseMoved(with:event) }
     func releaseMouse() {
-        keys.removeAll(); mouseMotion = .zero; running = false; useQueued = false
+        keys.removeAll(); movementQueued.removeAll(); mouseMotion = .zero; running = false; useQueued = false
         if captured { captured = false; CGAssociateMouseAndMouseCursorPosition(1); NSCursor.unhide() }
     }
 }
@@ -38,11 +43,21 @@ private struct GPUBatch { let vertices: MTLBuffer, texture: MTLTexture; let coun
 private struct Uniforms { var matrix: simd_float4x4 }
 
 final class Renderer: NSObject, MTKViewDelegate {
-    let device: MTLDevice, queue: MTLCommandQueue, pipeline: MTLRenderPipelineState, skyPipeline: MTLRenderPipelineState, depth: MTLDepthStencilState
+    let device: MTLDevice, queue: MTLCommandQueue, pipeline: MTLRenderPipelineState, skyPipeline: MTLRenderPipelineState, spritePipeline: MTLRenderPipelineState, depth: MTLDepthStencilState
     private var batches: [GPUBatch] = []
     private var sky: MTLTexture?
     private var map: DoomMap?
     private var wad: WAD?
+    private var sprites: SpriteRenderer?
+    private var hud = MD_HUD()
+    private var messageSerial: Int32 = 0, messageUntil: Int32 = 0
+    var pickupMessage: String {
+        guard engineReady, hud.tick < messageUntil else { return "" }
+        var value = hud.message
+        return withUnsafePointer(to:&value) { pointer in
+            pointer.withMemoryRebound(to:CChar.self,capacity:128) { String(cString:$0) }
+        }
+    }
     private var textures: [MaterialKey: MTLTexture] = [:]
     private var engineReady = false
     private var previousPlayer = MD_Player(), currentPlayer = MD_Player()
@@ -62,7 +77,9 @@ final class Renderer: NSObject, MTKViewDelegate {
         guard engineReady else { return "" }
         if currentPlayer.exitRequested != 0 { return "Exit reached — next level is not connected yet; R to restart" }
         if currentPlayer.health <= 0 { return "You died — R to restart" }
-        return "35 Hz engine · Health \(currentPlayer.health)"
+        let names = ["Blue card","Yellow card","Red card","Blue skull","Yellow skull","Red skull"]
+        let keys = names.indices.filter { hud.keys & (1 << $0) != 0 }.map { names[$0] }
+        return "Health \(hud.health) · Armor \(hud.armor) · Ammo \(hud.readyAmmo >= 0 ? String(hud.readyAmmo) : "—") · Keys: \(keys.isEmpty ? "none" : keys.joined(separator:", "))"
     }
     var renderedFrames = 0
     init(view: GameView) throws {
@@ -72,11 +89,11 @@ final class Renderer: NSObject, MTKViewDelegate {
         #include <metal_stdlib>
         using namespace metal;
         struct Vertex { float4 position; float4 uvLight; };
-        struct Out { float4 position [[position]]; float2 uv; float light; float distance; };
+        struct Out { float4 position [[position]]; float2 uv; float light; float distance; float fullbright; };
         vertex Out worldVertex(uint id [[vertex_id]], const device Vertex *v [[buffer(0)]],
                                constant float4x4 &matrix [[buffer(1)]]) {
             Out o; o.position = matrix * v[id].position; o.uv = v[id].uvLight.xy;
-            o.light = v[id].uvLight.z; o.distance = o.position.w; return o;
+            o.light = v[id].uvLight.z; o.distance = o.position.w; o.fullbright = v[id].uvLight.w; return o;
         }
         fragment float4 worldFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]]) {
             constexpr sampler s(coord::normalized, address::repeat, filter::nearest);
@@ -84,6 +101,13 @@ final class Renderer: NSObject, MTKViewDelegate {
             if (c.a < 0.5) discard_fragment();
             float shade = in.light * clamp(1.0 - in.distance / 3200.0, 0.3, 1.0);
             return float4(c.rgb * shade, 1.0);
+        }
+        fragment float4 spriteFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]]) {
+            constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::nearest);
+            float4 c = tex.sample(s,in.uv / float2(tex.get_width(),tex.get_height()));
+            if (c.a < 0.5) discard_fragment();
+            float shade = in.fullbright > 0.5 ? 1.0 : in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
+            return float4(c.rgb*shade,1.0);
         }
         struct SkyOut { float4 position [[position]]; float2 uv; };
         vertex SkyOut skyVertex(uint id [[vertex_id]]) {
@@ -109,6 +133,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         descriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
         descriptor.depthAttachmentPixelFormat = .depth32Float
         pipeline = try device.makeRenderPipelineState(descriptor:descriptor)
+        descriptor.fragmentFunction = library.makeFunction(name:"spriteFragment")
+        spritePipeline = try device.makeRenderPipelineState(descriptor:descriptor)
         descriptor.vertexFunction = library.makeFunction(name:"skyVertex")
         descriptor.fragmentFunction = library.makeFunction(name:"skyFragment")
         skyPipeline = try device.makeRenderPipelineState(descriptor:descriptor)
@@ -120,6 +146,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     func load(wad: WAD, map name: String) throws -> (triangles:Int,missing:[String]) {
         guard wad.signature == "IWAD" else { throw PortError("The gameplay prototype requires a standalone Doom IWAD. PWAD merging is not connected yet.") }
         let map = try DoomMap(wad:wad,name:name), geometry = try Geometry(map:map), art = try Art(wad:wad)
+        let loadedSprites = try SpriteRenderer(device:device,wad:wad)
         var materials = Set(geometry.batches.map(\.material))
         for side in map.sides {
             for name in [side.upper,side.lower,side.middle] where name != "-" && !name.isEmpty {
@@ -165,7 +192,8 @@ final class Renderer: NSObject, MTKViewDelegate {
             throw PortError(String(cString:MD_LastError()))
         }
         guard MD_SectorCount() == map.sectors.count else { engineReady = false; throw PortError("Engine and Metal sector counts differ.") }
-        self.map = map; self.wad = wad; textures = cached; batches = loaded; sky = loadedSky; pitch = 0
+        self.map = map; self.wad = wad; textures = cached; batches = loaded; sky = loadedSky; sprites = loadedSprites; pitch = 0
+        hud = MD_GetHUD(); messageSerial = hud.messageSerial; messageUntil = hud.messageSerial > 0 ? hud.tick+140 : 0
         currentPlayer = MD_GetPlayer(); previousPlayer = currentPlayer
         position = SIMD2(currentPlayer.x,currentPlayer.y); yaw = currentPlayer.angle; eyeZ = currentPlayer.eyeZ
         accumulator = 0; pendingTurn = 0; turnHeld = 0; lastTime = CACurrentMediaTime(); engineReady = true
@@ -214,7 +242,10 @@ final class Renderer: NSObject, MTKViewDelegate {
         guard let encoder = command.makeRenderCommandEncoder(descriptor:pass) else { inFlight.signal(); return }
         encoder.setRenderPipelineState(pipeline); encoder.setDepthStencilState(depth); encoder.setCullMode(.none)
         if map != nil {
-            let aspect = Float(max(1,view.drawableSize.width)/max(1,view.drawableSize.height))
+            let width = max(1,view.drawableSize.width), height = max(1,view.drawableSize.height)
+            let worldHeight = max(1,height-SpriteRenderer.hudHeight(width:width))
+            encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:worldHeight,znear:0,zfar:1))
+            let aspect = Float(width/worldHeight)
             if let sky {
                 var camera = SIMD4(yaw,pitch,aspect,0)
                 encoder.setRenderPipelineState(skyPipeline)
@@ -230,6 +261,12 @@ final class Renderer: NSObject, MTKViewDelegate {
             for batch in batches {
                 encoder.setVertexBuffer(batch.vertices,offset:0,index:0); encoder.setFragmentTexture(batch.texture,index:0)
                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:batch.count)
+            }
+            if let sprites, engineReady {
+                encoder.setRenderPipelineState(spritePipeline)
+                do { try sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw) }
+                catch { engineReady = false; DispatchQueue.main.async { [weak self] in self?.onError?(error) } }
+                sprites.drawHUD(encoder:encoder,state:hud,width:width,height:height)
             }
         }
         encoder.endEncoding(); command.present(drawable); command.commit(); renderedFrames += 1
@@ -247,24 +284,27 @@ final class Renderer: NSObject, MTKViewDelegate {
         accumulator += delta
         let step = 1.0/35.0
         while accumulator >= step {
+            let movement = view.consumeMovement()
             var forward: Int32 = 0, side: Int32 = 0
             let speed: Int32 = view.running ? 50 : 25, strafe: Int32 = view.running ? 40 : 24
-            if view.keys.contains(13) || view.keys.contains(126) { forward += speed }
-            if view.keys.contains(1) || view.keys.contains(125) { forward -= speed }
-            if view.keys.contains(0) { side -= strafe }
-            if view.keys.contains(2) { side += strafe }
+            if movement.contains(13) || movement.contains(126) { forward += speed }
+            if movement.contains(1) || movement.contains(125) { forward -= speed }
+            if movement.contains(0) { side -= strafe }
+            if movement.contains(2) { side += strafe }
             let mouseTurn = Int32((pendingTurn * 65536/(2 * .pi)).clamped(-30000,30000))
             pendingTurn -= Float(mouseTurn)*(2 * .pi)/65536
             var turn = mouseTurn
-            if view.keys.contains(123) || view.keys.contains(124) { turnHeld += 1 } else { turnHeld = 0 }
+            if movement.contains(123) || movement.contains(124) { turnHeld += 1 } else { turnHeld = 0 }
             let turnSpeed: Int32 = turnHeld < 6 ? 320 : view.running ? 1280 : 640
-            if view.keys.contains(123) { turn += turnSpeed }
-            if view.keys.contains(124) { turn -= turnSpeed }
+            if movement.contains(123) { turn += turnSpeed }
+            if movement.contains(124) { turn -= turnSpeed }
             let use: Int32 = view.useQueued || view.keys.contains(14) || view.keys.contains(49) ? 1 : 0
             view.useQueued = false
             previousPlayer = currentPlayer
             guard MD_Tick(forward,side,turn,use) != 0 else { throw PortError(String(cString:MD_LastError())) }
             currentPlayer = MD_GetPlayer(); accumulator -= step
+            hud = MD_GetHUD()
+            if hud.messageSerial != messageSerial { messageSerial = hud.messageSerial; messageUntil = hud.tick+140 }
         }
         try syncGeometry()
         let blend = Float(accumulator/step)

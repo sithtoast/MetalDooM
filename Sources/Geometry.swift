@@ -2,6 +2,7 @@ import Foundation
 import simd
 
 struct PixelImage { let width: Int, height: Int; let rgba: [UInt8] }
+struct PatchImage { let image: PixelImage; let left: Int, top: Int }
 struct MaterialKey: Hashable { let name: String; let flat: Bool }
 struct WorldVertex {
     var position: SIMD4<Float>
@@ -42,6 +43,42 @@ final class Art {
         guard let palette else { return [index,index,index,255] }
         let p = Int(index)*3
         return [palette.data[p],palette.data[p+1],palette.data[p+2],255]
+    }
+    func patch(named name: String) throws -> PatchImage? {
+        guard let bytes = wad.lump(name) else { return nil }
+        return try decodePatch(bytes)
+    }
+    func patch(lump: Int) throws -> PatchImage {
+        guard wad.lumps.indices.contains(lump) else { throw PortError("Invalid sprite lump index.") }
+        return try decodePatch(wad.lumps[lump].bytes)
+    }
+    func decodePatch(_ bytes: Bytes) throws -> PatchImage {
+        let width = try bytes.u16(0), height = try bytes.u16(2)
+        let left = try bytes.i16(4), top = try bytes.i16(6)
+        guard width > 0, height > 0, width <= 4096, height <= 4096, width*height <= 4_194_304 else {
+            throw PortError("Unsupported sprite/HUD patch dimensions.")
+        }
+        try bytes.check(8,width*4)
+        var pixels = [UInt8](repeating:0,count:width*height*4)
+        for column in 0..<width {
+            var cursor = try bytes.i32(8+column*4), previousTop = -1
+            guard cursor >= 8+width*4 else { throw PortError("Patch column overlaps its directory.") }
+            while true {
+                try bytes.check(cursor,1)
+                let delta = Int(bytes.data[cursor]); if delta == 255 { break }
+                try bytes.check(cursor,3)
+                let length = Int(bytes.data[cursor+1])
+                try bytes.check(cursor,length+4)
+                let row = delta <= previousTop ? previousTop+delta : delta
+                previousTop = row
+                for pixel in 0..<length where row+pixel < height {
+                    let offset = ((row+pixel)*width+column)*4
+                    pixels.replaceSubrange(offset..<offset+4,with:color(bytes.data[cursor+3+pixel]))
+                }
+                cursor += length+4
+            }
+        }
+        return PatchImage(image:PixelImage(width:width,height:height,rgba:pixels),left:left,top:top)
     }
     func image(_ key: MaterialKey) throws -> PixelImage? {
         if key.flat {

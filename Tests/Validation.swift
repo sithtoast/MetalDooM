@@ -21,6 +21,24 @@ import simd
             catch {}
         }
         print("PASS: test-room geometry, sector lookup, and five malformed WAD cases")
+        let fixtureArt = try Art(wad:fixture)
+        // Two sparse columns, signed origin, and transparent gaps.
+        let patchData = Data([2,0,4,0,254,255,3,0,16,0,0,0,23,0,0,0,
+                              1,2,0,10,20,0,255,0,1,0,30,0,255])
+        let patch = try fixtureArt.decodePatch(Bytes(data:patchData))
+        guard patch.left == -2, patch.top == 3, patch.image.width == 2, patch.image.height == 4,
+              patch.image.rgba[3] == 0, patch.image.rgba[7] == 255,
+              patch.image.rgba[4] == 30, patch.image.rgba[8] == 10,
+              patch.image.rgba[16] == 20, patch.image.rgba[31] == 0 else {
+            throw PortError("Sparse patch pixels, transparency, or offsets are incorrect.")
+        }
+        var badColumn = patchData; badColumn[8] = 0
+        for invalid in [Data(patchData.prefix(patchData.count-1)),badColumn,Data(patchData.prefix(7))] {
+            var rejected = false
+            do { _ = try fixtureArt.decodePatch(Bytes(data:invalid)) } catch { rejected = true }
+            guard rejected else { throw PortError("Malformed sprite patch was accepted.") }
+        }
+        print("PASS: sprite patch transparency, signed offsets, and malformed column rejection")
         for path in CommandLine.arguments.dropFirst(2) {
             let wad = try WAD(url:URL(fileURLWithPath:path)), art = try Art(wad:wad)
             var checked = Set<MaterialKey>()
@@ -40,6 +58,18 @@ import simd
                 print("PASS: \(name), \(map.sectors.count) sectors, \(geometry.triangleCount) triangles")
             }
             print("PASS: \(wad.maps.count) maps, \(checked.count) decoded materials from \(path)")
+            var inSprites = false, spriteCount = 0
+            for (index,lump) in wad.lumps.enumerated() {
+                if lump.name == "S_START" || lump.name == "SS_START" { inSprites = true; continue }
+                if lump.name == "S_END" || lump.name == "SS_END" { inSprites = false; continue }
+                if inSprites && lump.bytes.count > 0 { _ = try art.patch(lump:index); spriteCount += 1 }
+            }
+            for name in ["STBAR","STARMS","STTPRCNT","STFDEAD0"]
+                + (0...9).flatMap({ ["STTNUM\($0)","STYSNUM\($0)"] })
+                + (0...5).map({ "STKEYS\($0)" }) {
+                guard try art.patch(named:name) != nil else { throw PortError("Missing HUD patch \(name).") }
+            }
+            print("PASS: \(spriteCount) sprite patches and HUD artwork decoded")
         }
     }
 }

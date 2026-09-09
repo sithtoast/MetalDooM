@@ -17,11 +17,23 @@
 #include "w_wad.h"
 #include "z_zone.h"
 #include "i_system.h"
+#include "d_items.h"
 
 static jmp_buf errorBoundary;
 static int guarded, initialized, poisoned, loaded;
 static char errorText[1024], loadedPath[4096];
 static char *arguments[] = {"MetalDooM", NULL};
+static char lastMessage[128];
+static int messageSerial;
+extern spritedef_t *sprites;
+
+static void CaptureMessage(void) {
+    if (players[0].message) {
+        snprintf(lastMessage,sizeof(lastMessage),"%s",players[0].message);
+        ++messageSerial;
+        players[0].message = NULL;
+    }
+}
 
 // Native replacement for Chocolate Doom's fatal platform error handler.
 // Unwind only within C; no Swift frames are crossed by longjmp.
@@ -63,19 +75,12 @@ int MD_Load(const char *path, int episode, int map) {
     nomonsters = true; precache = false; netgame = false; deathmatch = 0;
     gametic = 0;
     G_InitNew(sk_medium,episode,map);
-    // Until sprite rendering lands, avoid invisible pickups and decorations.
-    // Player/sector thinkers remain original engine objects.
-    thinker_t *thinker = thinkercap.next;
-    while (thinker != &thinkercap) {
-        thinker_t *next = thinker->next;
-        if (thinker->function.acp1 == (actionf_p1)P_MobjThinker) {
-            mobj_t *object = (mobj_t *)thinker;
-            if (!object->player) P_RemoveMobj(object);
-        }
-        thinker = next;
-    }
+    // Pickups and decorations keep their original thinker/state lifecycle.
+    // nomonsters remains enabled until weapons and combat presentation land.
+    lastMessage[0] = 0; messageSerial = 0;
     memset(&players[0].cmd,0,sizeof(players[0].cmd));
     P_Ticker(); ++gametic;
+    CaptureMessage();
     loaded = 1; guarded = 0; errorText[0] = 0;
     return 1;
 }
@@ -90,7 +95,7 @@ int MD_Tick(int forward, int side, int turn, int use) {
     command->sidemove = (signed char)(side < -40 ? -40 : side > 40 ? 40 : side);
     command->angleturn = (short)turn;
     command->buttons = use ? BT_USE : 0;
-    if (gameaction == ga_nothing) { P_Ticker(); ++gametic; }
+    if (gameaction == ga_nothing) { P_Ticker(); ++gametic; CaptureMessage(); }
     guarded = 0; return 1;
 }
 MD_Player MD_GetPlayer(void) {
@@ -113,6 +118,56 @@ MD_Sector MD_GetSector(int index) {
         result.light = (float)sectors[index].lightlevel/255.0f;
     }
     return result;
+}
+
+int MD_CopyThings(MD_Thing *output, int capacity, float cameraX, float cameraY) {
+    if (!loaded) return 0;
+    int count = 0;
+    for (thinker_t *thinker=thinkercap.next; thinker!=&thinkercap; thinker=thinker->next) {
+        if (thinker->function.acp1 != (actionf_p1)P_MobjThinker) continue;
+        mobj_t *object = (mobj_t *)thinker;
+        if (object->player || object->sprite < 0 || object->sprite >= numsprites) continue;
+        spritedef_t *definition = &sprites[object->sprite];
+        int frameIndex = object->frame & FF_FRAMEMASK;
+        if (frameIndex >= definition->numframes) continue;
+        spriteframe_t *frame = &definition->spriteframes[frameIndex];
+        unsigned rotation = 0;
+        if (frame->rotate) {
+            angle_t angle = R_PointToAngle2((fixed_t)(cameraX*FRACUNIT),(fixed_t)(cameraY*FRACUNIT),object->x,object->y);
+            rotation = (angle-object->angle+(unsigned)(ANG45/2)*9)>>29;
+        }
+        int lump = firstspritelump+frame->lump[rotation];
+        if (lump < firstspritelump || lump > lastspritelump) continue;
+        if (output && count < capacity) {
+            output[count] = (MD_Thing){
+                (float)object->x/FRACUNIT, (float)object->y/FRACUNIT, (float)object->z/FRACUNIT,
+                (float)object->subsector->sector->lightlevel/255.0f,
+                lump, frame->flip[rotation], (object->frame & FF_FULLBRIGHT) != 0,
+                mobjinfo[object->type].doomednum
+            };
+        }
+        ++count;
+    }
+    return count;
+}
+
+MD_HUD MD_GetHUD(void) {
+    MD_HUD hud = {0};
+    if (!loaded) return hud;
+    player_t *player = &players[0];
+    hud.health = player->health; hud.armor = player->armorpoints;
+    hud.readyWeapon = player->readyweapon;
+    ammotype_t ammo = weaponinfo[player->readyweapon].ammo;
+    hud.readyAmmo = ammo == am_noammo ? -1 : player->ammo[ammo];
+    hud.bullets = player->ammo[am_clip]; hud.shells = player->ammo[am_shell];
+    hud.cells = player->ammo[am_cell]; hud.rockets = player->ammo[am_misl];
+    hud.maxBullets = player->maxammo[am_clip]; hud.maxShells = player->maxammo[am_shell];
+    hud.maxCells = player->maxammo[am_cell]; hud.maxRockets = player->maxammo[am_misl];
+    for (int i=0; i<NUMCARDS; ++i) if (player->cards[i]) hud.keys |= 1u<<i;
+    for (int i=0; i<NUMWEAPONS; ++i) if (player->weaponowned[i]) hud.weapons |= 1u<<i;
+    hud.bonusFlash = player->bonuscount; hud.messageSerial = messageSerial; hud.tick = gametic;
+    snprintf(hud.message,sizeof(hud.message),"%s",lastMessage);
+    return hud;
 }
 
 #ifdef MD_TESTING
@@ -141,6 +196,19 @@ int MD_TestDoor(int ordinal, float *x, float *y, float *angle, int *sector) {
         *y = ((float)line->v1->y+(float)line->v2->y)/(2*FRACUNIT)-dx/length*40;
         *angle = atan2f(dx,-dy);
         *sector = (int)(line->backsector-sectors); return i;
+    }
+    return -1;
+}
+int MD_TestKeyDoor(int key, float *x, float *y, float *angle, int *sector) {
+    const int special[3] = {26,27,28}; // blue, yellow, red manual doors
+    if (key < 0 || key > 2) return -1;
+    for (int i=0; i<numlines; ++i) {
+        line_t *line = &lines[i];
+        if (line->special != special[key] || !line->backsector || line->backsector->ceilingheight != line->backsector->floorheight) continue;
+        float dx=(float)line->dx/FRACUNIT, dy=(float)line->dy/FRACUNIT, length=hypotf(dx,dy);
+        *x=((float)line->v1->x+(float)line->v2->x)/(2*FRACUNIT)+dy/length*40;
+        *y=((float)line->v1->y+(float)line->v2->y)/(2*FRACUNIT)-dx/length*40;
+        *angle=atan2f(dx,-dy); *sector=(int)(line->backsector-sectors); return i;
     }
     return -1;
 }
