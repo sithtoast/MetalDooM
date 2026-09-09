@@ -4,6 +4,18 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 47 — Doom II core validation and MIDI pitch reset
+
+- Reset MIDI pitch bend and controllers between songs and on loop restart to
+  prevent stale synth state carrying into subsequent music.
+- Validate all 32 Doom II maps and the super shotgun's firing, reload sounds,
+  weapon switching and inventory carryover; smoke-test eight added monster types.
+- Keep Ultimate Doom geometry, progression and music regression checks passing.
+- Verify native Doom II title/demo, MAP01 and super shotgun presentation. Story
+  breaks, MAP07/Icon of Sin encounter validation and cast ending remain future work.
+- Pitch-reset audio measurements pass; the reported startup title timbre has not
+  been matched against a reference recording.
+
 ## Build 45 — Episode endings and animated intermissions
 
 - Add original Doom episode story text, tiled backgrounds, ending artwork and

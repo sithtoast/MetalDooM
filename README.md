@@ -2,7 +2,7 @@
 
 A native Apple Silicon / Metal source-port project for classic Doom and Doom II.
 
-**Current milestone: Ultimate Doom episode endings and animated intermissions.**
+**Current milestone: Doom II core validation and MIDI state isolation.**
 Original gameplay and exit routing run in the Doom engine, with Metal world,
 weapon, HUD, intermission and Doom episode-finale rendering.
 The world is drawn as triangles by Metal. No software framebuffer, SDL, OpenGL, or
@@ -137,8 +137,8 @@ The original engine decoder has not been hardened for deliberately crafted paylo
   physical speaker output has not been independently recorded.
 - Progression uses original completion/load-level functions rather than the full
   G_Ticker loop. Networking is not connected.
-- Doom II story breaks and the cast ending are not presented; Doom II remains
-  unvalidated.
+- Doom II story breaks and the cast ending are not presented. All 32 maps have
+  load/tick/geometry coverage; special encounters and full playthroughs remain unvalidated.
 - Automated checks cover all Ultimate Doom map loads, normal and secret episode
   routes, plus representative doors, lifts, crushers, switches, secrets and saves.
   This does not replace full manual episode playthroughs or cover every map special.
@@ -358,3 +358,18 @@ Game and E restarted with 100 health. Timing, progression, save/load, input and
 classic-menu regression suites passed. Fixture exits exercise completion and
 presentation, not the original M8 boss battles. Full manual episode playthroughs
 and physical-speaker verification remain separate checks.
+
+Build 47 begins Doom II validation: all 32 maps load and tick, geometry/materials
+and sprite patches decode, and eight additional monster types run thinker smoke
+checks. Super shotgun tests cover ownership, slot-3 toggling, two-shell firing,
+damage, reload sounds, and inventory carryover from MAP01 to MAP02. Native build
+46 showed the title, demo playback, MAP01, and a super shotgun shot taking shells
+from 50 to 48 and killing a target. Final build 47 retains the MIDI bend/controller
+reset; measured A4 returns from a bent 496 Hz to 441 Hz on track selection.
+Ultimate Doom map, progression, and music regressions pass. These are focused
+checks, not full playthroughs or verification of the reported startup music timbre.
+
+```sh
+bash scripts/test-doom2.sh "$HOME/Downloads/doom2.wad"
+bash scripts/test-music.sh "$HOME/Downloads/doom2.wad"
+```

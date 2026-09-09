@@ -45,10 +45,19 @@ final class MusicPlayer {
         try next.load(from:MUS.midi(lump.data),options:.smf_ChannelsToTracks)
         for track in next.tracks { track.destinationAudioUnit=synth }
         guard next.tracks.contains(where:{$0.lengthInSeconds>0}) else { throw PortError("Empty music: \(name).") }
-        pause(); sequencer=next; trackName=name; loopCount=0
+        pause(); resetSynth(); sequencer=next; trackName=name; loopCount=0
         try engine.start()
         next.prepareToPlay()
         update(active:active)
+    }
+    // MUS scores need not initialize every channel. Never inherit a previous
+    // song's bend, sustain or expression (including on loops).
+    private func resetSynth() {
+        for channel in UInt8(0)...UInt8(15) {
+            synth.sendController(120, withValue:0, onChannel:channel)
+            synth.sendController(121, withValue:0, onChannel:channel)
+            synth.sendPitchBend(8192, onChannel:channel)
+        }
     }
     private func pause() {
         sequencer?.stop(); engine.pause()
@@ -60,7 +69,7 @@ final class MusicPlayer {
         do {
             if !engine.isRunning { try engine.start() }
             if position >= duration {
-                sequencer.stop(); sequencer.currentPositionInSeconds=0; loopCount += 1
+                sequencer.stop(); resetSynth(); sequencer.currentPositionInSeconds=0; loopCount += 1
             }
             if !sequencer.isPlaying { try sequencer.start() }
         } catch {

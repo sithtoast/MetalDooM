@@ -173,6 +173,11 @@ and pauses music alongside gameplay. Duration-based polling loops the score beca
 the sequencer can continue advancing after the last MIDI event. No completion
 callback retains the player or races a subsequent track selection.
 
+Track selection and loop restart send all-sounds-off, reset controllers, and center
+pitch bend on all 16 synth channels before playback. Pause/resume preserves state.
+A direct native synth regression measures A4 before bending it, after bending it,
+and after selecting another track, proving that the bend does not leak.
+
 MusicValidation loads every music lump in the supplied WAD into AVMIDIPlayer, then
 checks native position advance, pause/resume, mute, selection, and a short synthetic
 score's loop. It also checks malformed MUS data and percussion/controller mapping.
