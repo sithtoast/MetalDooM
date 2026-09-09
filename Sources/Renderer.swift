@@ -69,7 +69,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var sound: SoundPlayer?
     private var intermissionArt: IntermissionRenderer?
     private var progress = MD_Progress()
-    private var entering = false
+    private var intermission = IntermissionSequence()
     private var intermissionTime: Double = 0
     private var lastGeometryTick: Int32 = -1
     var onMapChanged: ((String) -> Void)?
@@ -105,7 +105,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         guard engineReady else { return "" }
         if progress.phase != 0 {
             if progress.phase == 2 { return "Episode complete · Kills \(progress.kills)/\(progress.maxKills) · Items \(progress.items)/\(progress.maxItems) · Secrets \(progress.secrets)/\(progress.maxSecrets) · Choose another map or R to restart" }
-            return "\(entering ? "Entering next level" : "Level complete") · Kills \(progress.kills)/\(progress.maxKills) · Items \(progress.items)/\(progress.maxItems) · Secrets \(progress.secrets)/\(progress.maxSecrets) · Time \(progress.seconds)s · Enter to continue"
+            return "\(intermission.entering ? "Entering next level" : "Level complete") · Kills \(progress.kills)/\(progress.maxKills) · Items \(progress.items)/\(progress.maxItems) · Secrets \(progress.secrets)/\(progress.maxSecrets) · Time \(progress.seconds)s · Enter to continue"
         }
         if currentPlayer.health <= 0 { return "You died — R to restart" }
         let names = ["Blue card","Yellow card","Red card","Blue skull","Yellow skull","Red skull"]
@@ -250,7 +250,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             throw PortError(String(cString:MD_LastError()))
         }
         guard MD_SectorCount() == map.sectors.count else { engineReady = false; throw PortError("Engine and Metal sector counts differ.") }
-        progress = MD_GetProgress(); entering = false; intermissionTime = 0; lastGeometryTick = -1
+        progress = MD_GetProgress(); intermission = IntermissionSequence(progress); intermissionTime = 0; lastGeometryTick = -1
         intermissionArt = loadedIntermission
         textureHeights = heights
         self.map = map; self.wad = wad; textures = cached; batches = loaded; sky = loadedSky; sprites = loadedSprites; pitch = 0
@@ -342,7 +342,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         encoder.setRenderPipelineState(pipeline); encoder.setDepthStencilState(depth); encoder.setCullMode(.none); encoder.setFrontFacing(.counterClockwise)
         if progress.phase != 0, let intermissionArt {
             encoder.setRenderPipelineState(spritePipeline)
-            intermissionArt.draw(encoder:encoder,state:progress,entering:entering,width:max(1,view.drawableSize.width),height:max(1,view.drawableSize.height))
+            intermissionArt.draw(encoder:encoder,state:progress,sequence:intermission,width:max(1,view.drawableSize.width),height:max(1,view.drawableSize.height))
         } else if map != nil {
             let width = max(1,view.drawableSize.width), height = max(1,view.drawableSize.height)
             let worldHeight = max(1,height-SpriteRenderer.hudHeight(width:width))
@@ -404,15 +404,13 @@ final class Renderer: NSObject, MTKViewDelegate {
         if view.keys.remove(15) != nil { view.releaseMouse(); try reset(); return }
         if progress.phase != 0 {
             intermissionTime += delta
-            if view.continueQueued {
-                view.continueQueued = false
-                if intermissionTime >= 0.3 && progress.phase == 1 {
-                    if !entering { entering = true; intermissionTime = 0 }
-                    else if let wad {
-                        let name = progress.commercial != 0 ? String(format:"MAP%02d",progress.nextMap) : "E\(progress.episode)M\(progress.nextMap)"
-                        view.releaseMouse(); _ = try load(wad:wad,map:name,continuing:true); onMapChanged?(name)
-                    }
-                }
+            let pressed = view.continueQueued && intermissionTime >= 0.3
+            view.continueQueued = false
+            for event in intermission.update(seconds:delta,pressed:pressed) { MD_IntermissionSound(event) }
+            sound?.drain()
+            if intermission.advance, let wad {
+                let name = progress.commercial != 0 ? String(format:"MAP%02d",progress.nextMap) : "E\(progress.episode)M\(progress.nextMap)"
+                view.releaseMouse(); _ = try load(wad:wad,map:name,continuing:true); onMapChanged?(name)
             }
             return
         }
@@ -445,6 +443,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             hud = MD_GetHUD(); progress = MD_GetProgress()
             if progress.phase != 0 {
                 view.releaseMouse(); accumulator = 0; intermissionTime = 0; messageUntil = 0
+                intermission = IntermissionSequence(progress)
                 break
             }
             if hud.messageSerial != messageSerial { messageSerial = hud.messageSerial; messageUntil = hud.tick+140 }

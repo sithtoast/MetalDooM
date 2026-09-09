@@ -3,14 +3,14 @@ import MetalKit
 import simd
 
 final class IntermissionRenderer {
-    private struct Patch { let texture: MTLTexture; let width, height: Float }
+    private struct Patch { let texture: MTLTexture; let width, height, left, top: Float }
     private var patches: [String:Patch] = [:]
     private let depth: MTLDepthStencilState
     init(device: MTLDevice, wad: WAD) throws {
         let descriptor = MTLDepthStencilDescriptor(); descriptor.depthCompareFunction = .always
         depth = device.makeDepthStencilState(descriptor:descriptor)!
         let art = try Art(wad:wad)
-        let names = ["INTERPIC","WIMAP0","WIMAP1","WIMAP2","WIF","WIENTER","WIOSTK","WIOSTI","WISCRT2","WITIME","WIPAR","WIPCNT","WICOLON"]
+        let names = ["WISPLAT","WIURH0","WIURH1","WISUCKS","INTERPIC","WIMAP0","WIMAP1","WIMAP2","WIF","WIENTER","WIOSTK","WIOSTI","WISCRT2","WITIME","WIPAR","WIPCNT","WICOLON"]
             + (0...9).map { "WINUM\($0)" }
             + (0...3).flatMap { episode in (0...8).map { "WILV\(episode)\($0)" } }
             + (0...31).map { String(format:"CWILV%02d",$0) }
@@ -21,13 +21,13 @@ final class IntermissionRenderer {
             desc.storageMode = .shared; desc.usage = .shaderRead
             guard let texture = device.makeTexture(descriptor:desc) else { throw PortError("Cannot allocate intermission art.") }
             image.rgba.withUnsafeBytes { texture.replace(region:MTLRegionMake2D(0,0,image.width,image.height),mipmapLevel:0,withBytes:$0.baseAddress!,bytesPerRow:image.width*4) }
-            patches[name] = Patch(texture:texture,width:Float(image.width),height:Float(image.height))
+            patches[name] = Patch(texture:texture,width:Float(image.width),height:Float(image.height),left:Float(patch.left),top:Float(patch.top))
         }
         for name in ["WIF","WIENTER","WIOSTK","WIOSTI","WISCRT2","WITIME","WIPCNT","WICOLON"] + (0...9).map({"WINUM\($0)"}) {
             guard patches[name] != nil else { throw PortError("Missing intermission art: \(name)") }
         }
     }
-    func draw(encoder: MTLRenderCommandEncoder, state: MD_Progress, entering: Bool, width: Double, height: Double) {
+    func draw(encoder: MTLRenderCommandEncoder, state: MD_Progress, sequence: IntermissionSequence, width: Double, height: Double) {
         encoder.setDepthStencilState(depth)
         encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:height,znear:0,zfar:1))
         var matrix = matrix_identity_float4x4
@@ -54,13 +54,37 @@ final class IntermissionRenderer {
         func level(_ map: Int32) -> String { state.commercial != 0 ? String(format:"CWILV%02d",map-1) : "WILV\(state.episode-1)\(map-1)" }
         let background = state.commercial == 0 && state.episode <= 3 ? "WIMAP\(state.episode-1)" : "INTERPIC"
         draw(background,0,0)
-        if entering { center("WIENTER",30); center(level(state.nextMap),50); return }
-        center(level(state.map),2); center("WIF",22)
-        for (name,value,total,y) in [("WIOSTK",state.kills,state.maxKills,55),("WIOSTI",state.items,state.maxItems,85),("WISCRT2",state.secrets,state.maxSecrets,115)] {
-            draw(name,45,Float(y)); number(String(total > 0 ? Int64(value)*100/Int64(total) : 0),255,Float(y)); draw("WIPCNT",255,Float(y))
+        if sequence.entering {
+            if state.commercial == 0, (1...3).contains(state.episode) {
+                let nodes = IntermissionSequence.nodes[Int(state.episode)-1]
+                func marker(_ names: [String], _ index: Int) {
+                    guard nodes.indices.contains(index) else { return }
+                    let (x,y) = nodes[index]
+                    for name in names {
+                        guard let patch = patches[name] else { continue }
+                        let left=x-patch.left, top=y-patch.top
+                        if left >= 0 && top >= 0 && left+patch.width < 320 && top+patch.height < 200 {
+                            draw(name,left,top); return
+                        }
+                    }
+                }
+                for index in IntermissionSequence.completedNodes(state) { marker(["WISPLAT"],index) }
+                if sequence.pointerVisible { marker(["WIURH0","WIURH1"],Int(state.nextMap)-1) }
+            }
+            center("WIENTER",30); center(level(state.nextMap),50); return
         }
-        func time(_ seconds: Int32) -> String { String(format:"%d:%02d",seconds/60,seconds%60) }
-        draw("WITIME",25,165); number(time(state.seconds),155,165)
-        if state.episode < 4 && state.phase != 2 { draw("WIPAR",175,165); number(time(state.parSeconds),305,165) }
+        center(level(state.map),2); center("WIF",22)
+        for (i,row) in [("WIOSTK",55),("WIOSTI",85),("WISCRT2",115)].enumerated() {
+            let (name,y) = row
+            draw(name,45,Float(y))
+            if sequence.values[i] >= 0 { number(String(sequence.values[i]),255,Float(y)); draw("WIPCNT",255,Float(y)) }
+        }
+        func time(_ seconds: Int32,_ right: Float) {
+            guard seconds >= 0 else { return }
+            if seconds > 3599 { draw("WISUCKS",right-(patches["WISUCKS"]?.width ?? 0),165) }
+            else { number(String(format:"%d:%02d",seconds/60,seconds%60),right,165) }
+        }
+        draw("WITIME",25,165); time(sequence.values[3],155)
+        if (state.commercial != 0 || state.episode < 4) && state.phase != 2 { draw("WIPAR",175,165); time(sequence.values[4],305) }
     }
 }

@@ -43,11 +43,12 @@ typedef struct { float x,y; char upper[9],lower[9],middle[9]; } MD_Side;
 MD_Side MD_GetSide(int index);
 // phase 0 = playing, 1 = intermission, 2 = episode/game complete.
 typedef struct {
-    int phase, episode, map, nextMap, commercial;
+    int phase, episode, map, nextMap, commercial, didSecret;
     int kills, maxKills, items, maxItems, secrets, maxSecrets, seconds, parSeconds;
 } MD_Progress;
 MD_Progress MD_GetProgress(void);
 int MD_Continue(void);
+void MD_IntermissionSound(int sound);
 // Native payload I/O; the Swift save container checks format, WAD identity and digest.
 int MD_WriteSave(const char *path);
 int MD_ReadSave(const char *path);

@@ -26,6 +26,14 @@ int main(int argc,char **argv) {
     assert(MD_Tick(0,0,0,1));MD_Progress result=MD_GetProgress();
     assert(result.phase==1 && result.map==1 && result.nextMap==2 && result.items>0 && result.seconds>=2);
     assert(!strcmp(MD_GetSide(side).middle,"SW2STRTN"));
+    MD_SoundEvent event; while(MD_PopSound(&event)) {}
+    for(int sound=0;sound<3;++sound) {
+        MD_IntermissionSound(sound); int heard=0;
+        while(MD_PopSound(&event)) if(event.lump>=0) heard=1;
+        assert(heard);
+    }
+    MD_IntermissionSound(-1); MD_IntermissionSound(3); assert(!MD_PopSound(&event));
+    puts("PASS: all three intermission sounds emit native playback events; invalid IDs ignored");
     int tick=MD_GetPlayer().tick;ticks(70);assert(MD_GetPlayer().tick==tick);
     assert(MD_Continue());MD_HUD after=MD_GetHUD();
     assert(MD_GetProgress().phase==0 && MD_GetProgress().map==2);
@@ -38,7 +46,7 @@ int main(int argc,char **argv) {
     int returns[]={4,6,7,3};
     for(int episode=1;episode<=4;++episode) {
         assert(MD_Load(argv[1],episode,3));MD_TestExit(1);ticks(1);assert(MD_GetProgress().nextMap==9);assert(MD_Continue());
-        MD_TestExit(0);ticks(1);assert(MD_GetProgress().nextMap==returns[episode-1]);assert(MD_Continue());
+        MD_TestExit(0);ticks(1);assert(MD_GetProgress().nextMap==returns[episode-1] && MD_GetProgress().didSecret);assert(MD_Continue());
         assert(MD_Load(argv[1],episode,8));MD_TestExit(0);ticks(1);assert(MD_GetProgress().phase==2 && !MD_Continue());
     }
     puts("PASS: all four episodes route to secret maps, return correctly, and stop at episode completion");

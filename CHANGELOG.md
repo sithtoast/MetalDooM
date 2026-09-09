@@ -4,6 +4,15 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 19 — Intermission count-up and map markers
+
+- Count kills, items, secrets, time and par with original Doom timing and sounds.
+- Enter finishes the count; another press shows the destination. The next level
+  starts after four seconds, or immediately with another Enter press.
+- Show completed-level splats and the flashing next-level pointer on episode 1–3
+  maps, including secret-level returns. Episode 4 and Doom II retain INTERPIC.
+- Pause the sequence with the game when inactive; episode endings remain on stats.
+
 ## Build 18 — Weapon pickup grin
 
 - Show Doomguy's original two-second grin when acquiring a new weapon, using the

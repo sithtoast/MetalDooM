@@ -48,7 +48,7 @@ releases; independent checkouts do not share a global numbering sequence.
 | 1–7 | Classic weapon slots; 1 fist/chainsaw, 2 pistol, 3 shotgun, etc. |
 | Escape | Release mouse |
 | R | Restart map with fresh starting inventory |
-| Return / Enter | Intermission: show destination, then press again to start it |
+| Return / Enter | Intermission: skip counting, show destination, then skip the four-second map display |
 | Command-O | Choose IWAD (restart first to change loaded IWAD) |
 | Command-S / Command-L | Save Game… / Load Game… |
 | Command-Shift-S / Command-Shift-L | Quick Save / Quick Load for this WAD |
@@ -99,7 +99,8 @@ The original engine decoder has not been hardened for deliberately crafted paylo
 - Original status-bar artwork drawn by Metal: health, armor, active ammo, ammo
   reserves/capacity, weapons owned, key cards/skulls, and a health-based face.
 - Original normal/secret exit routing, classic intermission artwork and final
-  kills/items/secrets/time/par stats, followed by an Entering screen.
+  kills/items/secrets/time/par count-up with original sounds, followed by an Entering
+  screen with completed-level markers and a flashing destination pointer.
 - Health, armor, weapons, and ammo carry across levels; keys and temporary powers
   clear through the original finish-level rules. Episode endings stop at a summary.
 - Live upper/middle/lower switch textures, including timed reset, and sidedef offsets
@@ -123,8 +124,7 @@ The original engine decoder has not been hardened for deliberately crafted paylo
   G_Ticker loop. Death requires R (fresh inventory). Menus, demos, networking, and
   original finale/story sequences are not connected. Episode endings show final
   stats; choose another episode with the map selector.
-- Intermission values appear as final totals. Animated counters, world-map markers,
-  background animation, and intermission music remain. Doom II story breaks are
+- Intermission background animation and music remain. Doom II story breaks are
   not presented, and Doom II has not been validated.
 - Manual doors have been validated. Other sector actions use upstream logic but
   lifts, crushers, switches, and special-case maps need dedicated validation.
@@ -208,9 +208,12 @@ restart into E1M2, Quick Load restored the persisted E1M1 save and its map title
 ## Next milestones
 
 1. Add music and menus; refine the save-slot experience.
-2. Complete intermission animations, finales, and respawning.
+2. Add intermission background animations, finales, and respawning.
 3. Verify Doom II, longer play sessions, texture effects, and less common sector actions.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for module boundaries.
 
 See [CHANGELOG.md](CHANGELOG.md) for the build-by-build history.
+
+Intermission regression checks: `bash scripts/test-intermission.sh` covers original
+counter timing, sound cues, skipping, map timeout, episode endings and secret markers.

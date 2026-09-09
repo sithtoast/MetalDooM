@@ -20,6 +20,7 @@
 #include "d_items.h"
 #include "p_saveg.h"
 #include "s_sound.h"
+#include "sounds.h"
 
 static jmp_buf errorBoundary;
 static int guarded, initialized, poisoned, loaded;
@@ -79,12 +80,18 @@ static void CacheTextureNames(void) {
 extern void G_DoCompleted(void), G_DoWorldDone(void);
 static MD_Progress progress;
 MD_Progress MD_GetProgress(void) { return progress; }
+void MD_IntermissionSound(int sound) {
+    if (!loaded || poisoned || !progress.phase) return;
+    const int ids[] = {sfx_pistol,sfx_barexp,sfx_sgcock};
+    if (sound >= 0 && sound < 3) S_StartSound(NULL,ids[sound]);
+}
 static void CompleteLevel(void) {
     progress = (MD_Progress){.phase=1,.episode=gameepisode,.map=gamemap,
         .commercial=gamemode == commercial,.kills=players[0].killcount,.maxKills=totalkills,
         .items=players[0].itemcount,.maxItems=totalitems,.secrets=players[0].secretcount,
         .maxSecrets=totalsecret,.seconds=leveltime/TICRATE};
     G_DoCompleted();
+    progress.didSecret = players[0].didsecret;
     if (gameaction == ga_victory || (gamemode == commercial && gamemap == 30)) {
         progress.phase = 2; gameaction = ga_nothing;
     } else {
