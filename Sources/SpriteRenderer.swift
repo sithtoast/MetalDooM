@@ -56,7 +56,10 @@ final class SpriteRenderer {
             guard let patch = patches[Int(thing.lump)] else { throw PortError("Missing sprite frame \(thing.lump).") }
             let center = SIMD3(thing.x,thing.z,-thing.y)
             let left = center-right*patch.left
-            let bottom = patch.top-patch.height
+            // Doom's patch origins can put artwork below the object's feet.
+            // Unlike the software renderer, Metal's floor depth test clips it.
+            // Lift only the visual quad, retaining offsets above the live floor.
+            let bottom = max(patch.top-patch.height,thing.floorZ-thing.z)
             let a = left+SIMD3(0,bottom,0), b = a+right*patch.width
             let c = b+SIMD3(0,patch.height,0), d = a+SIMD3(0,patch.height,0)
             let u0: Float = thing.flip != 0 ? patch.width : 0, u1: Float = thing.flip != 0 ? 0 : patch.width

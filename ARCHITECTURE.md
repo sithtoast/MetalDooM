@@ -61,7 +61,9 @@ pickups disappear from the next snapshot. Transparent fragments are discarded be
 depth writes; opaque portions test against world geometry and other sprites.
 
 Sprites remain upright and face the camera horizontally. Patch origins determine
-their placement. Metal draws the original STBAR, digits, keys, ammo reserves, arms,
+their placement, with the visual bottom clamped to the object's live floor height
+so below-origin artwork is not clipped by the floor. This does not move the engine
+object or change its collision/pickup position. Metal draws the original STBAR, digits, keys, ammo reserves, arms,
 and face patches as a final depth-independent pass. The HUD uses integer scaling
 in a centered 320x32 region below the world viewport. Native text displays temporary
 engine messages and accessible inventory values. Face expressions are an initial

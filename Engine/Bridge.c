@@ -142,6 +142,7 @@ int MD_CopyThings(MD_Thing *output, int capacity, float cameraX, float cameraY) 
             output[count] = (MD_Thing){
                 (float)object->x/FRACUNIT, (float)object->y/FRACUNIT, (float)object->z/FRACUNIT,
                 (float)object->subsector->sector->lightlevel/255.0f,
+                (float)object->floorz/FRACUNIT,
                 lump, frame->flip[rotation], (object->frame & FF_FULLBRIGHT) != 0,
                 mobjinfo[object->type].doomednum
             };

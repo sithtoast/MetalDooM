@@ -8,7 +8,7 @@ typedef struct {
 } MD_Player;
 typedef struct { float floor, ceiling, light; } MD_Sector;
 typedef struct {
-    float x, y, z, light;
+    float x, y, z, light, floorZ;
     int lump, flip, fullbright, doomedType;
 } MD_Thing;
 typedef struct {
