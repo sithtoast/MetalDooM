@@ -67,13 +67,17 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var wad: WAD?
     private var sprites: SpriteRenderer?
     private var sound: SoundPlayer?
+    private var music: MusicPlayer?
+    var musicEnabled = !UserDefaults.standard.bool(forKey:"musicMuted") {
+        didSet { music?.enabled=musicEnabled; UserDefaults.standard.set(!musicEnabled,forKey:"musicMuted") }
+    }
     private var intermissionArt: IntermissionRenderer?
     private var progress = MD_Progress()
     private var intermission = IntermissionSequence()
     private var intermissionTime: Double = 0
     private var lastGeometryTick: Int32 = -1
     var onMapChanged: ((String) -> Void)?
-    func pauseAudio() { try? sound?.setActive(false) }
+    func pauseAudio() { try? sound?.setActive(false); music?.update(active:false) }
     private var hud = MD_HUD()
     var notice = ""
     var noticeUntil: Double = 0
@@ -242,6 +246,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                 loadedSky?.replace(region:MTLRegionMake2D(0,0,pixels.width,pixels.height),mipmapLevel:0,withBytes:bytes.baseAddress!,bytesPerRow:pixels.width*4)
             }
         }
+        let loadedMusic = try MusicPlayer(wad:wad,map:name)
         let episode = name.hasPrefix("E") ? Int(String(name.dropFirst().prefix(1))) ?? 1 : 1
         let number = name.hasPrefix("MAP") ? Int(name.dropFirst(3)) ?? 1 : Int(name.suffix(1)) ?? 1
         let result = restorePath.map { MD_ReadSave($0) } ?? (continuing ? MD_Continue() : MD_Load(wad.url.path,Int32(episode),Int32(number)))
@@ -254,6 +259,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         intermissionArt = loadedIntermission
         textureHeights = heights
         self.map = map; self.wad = wad; textures = cached; batches = loaded; sky = loadedSky; sprites = loadedSprites; pitch = 0
+        music?.update(active:false); music=loadedMusic; music?.enabled=musicEnabled
         sound = loadedSound; sound?.drain()
         hud = MD_GetHUD(); messageSerial = hud.messageSerial; messageUntil = hud.messageSerial > 0 ? hud.tick+140 : 0
         currentPlayer = MD_GetPlayer(); previousPlayer = currentPlayer
@@ -397,10 +403,10 @@ final class Renderer: NSObject, MTKViewDelegate {
     private func update(view: GameView, delta: Double) throws {
         guard engineReady else { return }
         guard NSApp.isActive, view.window?.isKeyWindow == true, view.window?.attachedSheet == nil else {
-            try sound?.setActive(false)
+            try sound?.setActive(false); music?.update(active:false)
             accumulator = 0; pendingTurn = 0; previousPlayer = currentPlayer; return
         }
-        try sound?.setActive(true)
+        try sound?.setActive(true); music?.update(active:true)
         if view.keys.remove(15) != nil { view.releaseMouse(); try reset(); return }
         if progress.phase != 0 {
             intermissionTime += delta
@@ -444,6 +450,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             if progress.phase != 0 {
                 view.releaseMouse(); accumulator = 0; intermissionTime = 0; messageUntil = 0
                 intermission = IntermissionSequence(progress)
+                try music?.select(MusicPlayer.endTrack(progress))
                 break
             }
             if hud.messageSerial != messageSerial { messageSerial = hud.messageSerial; messageUntil = hud.tick+140 }

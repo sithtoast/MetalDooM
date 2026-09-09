@@ -4,6 +4,15 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 21 — Native WAD music
+
+- Play and loop original level, intermission and completion music using Apple's
+  MIDI player and built-in General MIDI sound bank; no instrument download needed.
+- Convert MUS tracks in memory and preserve Ultimate Doom episode-four track
+  assignments. Load/save and map changes select the corresponding level music.
+- Pause/resume music on focus loss and file dialogs. Audio → Music (Cmd–Shift–M)
+  toggles music independently of effects and remembers the setting.
+
 ## Build 19 — Intermission count-up and map markers
 
 - Count kills, items, secrets, time and par with original Doom timing and sounds.

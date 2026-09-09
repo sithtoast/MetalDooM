@@ -4,7 +4,7 @@ A native Apple Silicon / Metal source-port project for classic Doom and Doom II.
 
 **Current milestone: named maps, native save/load, and persistent quick saves.**
 Original gameplay and exit routing run in the Doom engine, with Metal world,
-weapon, HUD, and intermission rendering. Music and original finales remain.
+weapon, HUD, and intermission rendering. Original finales remain.
 The world is drawn as triangles by Metal. No software framebuffer, SDL, OpenGL, or
 Vulkan presentation layer is used.
 
@@ -109,13 +109,19 @@ The original engine decoder has not been hardened for deliberately crafted paylo
   projectiles, monster AI, damage, deaths, and automatic empty-ammo fallback.
 - Metal held-weapon/muzzle-flash overlays, number-key switching, damage/pickup tint,
   and an accessible kill count.
+- Original WAD music converted from MUS to MIDI in memory and played by Apple's
+  native MIDI player, using the built-in General MIDI bank. Level, intermission
+  and completion tracks loop; episode 4 uses the original reused tracks.
+  Audio → Music (Cmd–Shift–M) toggles music and remembers the setting. Music pauses
+  on focus loss and during file dialogs. Loading a save restarts its level track;
+  music position is not saved. This is General MIDI synthesis, not AdLib emulation.
 - Native AVAudioEngine sound effects decoded from the IWAD's DMX samples, with
   16 voices, distance attenuation, stereo pan, and focus pause/resume.
 - Map switching/restarting, focus pause, and queued movement/use/fire/weapon taps.
 
 ## Current limitations
 
-- Music, Doom menus, demos, and networking are not connected.
+- Doom menus, demos, and networking are not connected.
 - Sound positioning is sampled when an effect starts; continuous repositioning,
   original priority/pitch variation, PC-speaker sounds, and audio-device changes
   need further work. Native output has been validated through offline mixing;
@@ -124,7 +130,7 @@ The original engine decoder has not been hardened for deliberately crafted paylo
   G_Ticker loop. Death requires R (fresh inventory). Menus, demos, networking, and
   original finale/story sequences are not connected. Episode endings show final
   stats; choose another episode with the map selector.
-- Intermission background animation and music remain. Doom II story breaks are
+- Intermission background animation remains. Doom II story breaks are
   not presented, and Doom II has not been validated.
 - Manual doors have been validated. Other sector actions use upstream logic but
   lifts, crushers, switches, and special-case maps need dedicated validation.
@@ -158,6 +164,7 @@ bash scripts/test-engine.sh "$HOME/Downloads/doom1.WAD"
 bash scripts/test-input.sh
 bash scripts/test-combat.sh "$HOME/Downloads/doom1.WAD"
 bash scripts/test-audio.sh "$HOME/Downloads/doom1.WAD"
+bash scripts/test-music.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD"
 bash scripts/test-progression.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD"
 bash scripts/test-save.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD" "$HOME/Downloads/doom1.WAD"
 bash scripts/test.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD"
@@ -207,7 +214,7 @@ restart into E1M2, Quick Load restored the persisted E1M1 save and its map title
 
 ## Next milestones
 
-1. Add music and menus; refine the save-slot experience.
+1. Add Doom menus and refine the save-slot experience.
 2. Add intermission background animations, finales, and respawning.
 3. Verify Doom II, longer play sessions, texture effects, and less common sector actions.
 

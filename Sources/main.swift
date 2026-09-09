@@ -35,6 +35,11 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             quickSave.target = self; quickSave.keyEquivalentModifierMask = [.command,.shift]
             let quickLoad = fileMenu.addItem(withTitle:"Quick Load",action:#selector(quickLoadGame),keyEquivalent:"l")
             quickLoad.target = self; quickLoad.keyEquivalentModifierMask = [.command,.shift]
+            let audioItem=NSMenuItem(), audioMenu=NSMenu(title:"Audio")
+            audioItem.submenu=audioMenu; menu.addItem(audioItem)
+            let musicItem=audioMenu.addItem(withTitle:"Music",action:#selector(toggleMusic(_:)),keyEquivalent:"m")
+            musicItem.target=self; musicItem.keyEquivalentModifierMask=[.command,.shift]
+            musicItem.state=UserDefaults.standard.bool(forKey:"musicMuted") ? .off : .on
             NSApp.mainMenu = menu
             window = NSWindow(contentRect:NSRect(x:0,y:0,width:1100,height:760),styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)
             window.title = "\(appTitle) — Gameplay Preview"; window.minSize = NSSize(width:720,height:480)
@@ -168,6 +173,9 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func show(_ error: Error) {
         view?.releaseMouse()
         let alert = NSAlert(); alert.messageText = "MetalDooM"; alert.informativeText = String(describing:error); alert.runModal()
+    }
+    @objc func toggleMusic(_ sender: NSMenuItem) {
+        renderer.musicEnabled.toggle(); sender.state=renderer.musicEnabled ? .on : .off
     }
     func windowDidResignKey(_ notification: Notification) { view.releaseMouse(); renderer.pauseAudio() }
     func applicationWillResignActive(_ notification: Notification) { view.releaseMouse(); renderer.pauseAudio() }

@@ -108,7 +108,7 @@ DMX padding, converts unsigned PCM to 44.1 kHz float buffers, and caches samples
 AVAudioPlayerNode instances feed a native mixer; focus loss pauses the engine.
 This follows Apple's [player-node buffer scheduling](https://developer.apple.com/documentation/avfaudio/avaudioplayernode).
 Pan/attenuation are sampled on emission; voice allocation and resampling are native
-approximations, not bit-exact DMX behavior. Music and route-change recovery remain.
+approximations, not bit-exact DMX behavior. Route-change recovery remains.
 
 ## Validation boundaries
 
@@ -157,3 +157,18 @@ hardened parser for malicious, checksum-recomputed files.
 SaveValidation exercises cross-map world/player round trips, enemy health, pickups,
 switch timers, bad containers, wrong WADs, save-write failure, death/intermission
 loading and rejection of bad native headers before live state changes.
+
+## Music
+
+`MUS.swift` translates bounded MUS scores into type-0 MIDI at 70 ticks per beat
+(140 ticks per second), following the pinned upstream converter's event mapping.
+Conversion state is local; MIDI lumps pass through to Apple's parser.
+`MusicPlayer.swift` owns AVMIDIPlayer on the main thread, with the built-in macOS
+General MIDI sound bank. The renderer selects level/intermission/completion tracks
+and pauses music alongside gameplay. Duration-based polling loops the score because
+the native player can continue advancing after the last MIDI event. No completion
+callback retains the player or races a subsequent track selection.
+
+MusicValidation loads every music lump in the supplied WAD into AVMIDIPlayer, then
+checks native position advance, pause/resume, mute, selection, and a short synthetic
+score's loop. It also checks malformed MUS data and percussion/controller mapping.
