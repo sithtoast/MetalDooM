@@ -96,7 +96,8 @@ void S_ResumeSound(void) {}
 // Native Metal intermission consumes copied stats; no software WI drawing.
 void WI_Start(wbstartstruct_t *info) {}
 void StatCopy(wbstartstruct_t *info) {}
-void ST_Start(void) {}
+extern void MD_ResetFace(void);
+void ST_Start(void) { MD_ResetFace(); }
 void HU_Start(void) {}
 void AM_Stop(void) { automapactive = false; }
 boolean I_ConsoleStdout(void) { return false; }

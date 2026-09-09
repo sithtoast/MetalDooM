@@ -16,6 +16,7 @@ typedef struct {
     int bullets, shells, cells, rockets;
     int maxBullets, maxShells, maxCells, maxRockets;
     uint32_t keys, weapons;
+    int weaponGrin;
     int bonusFlash, messageSerial, tick, damageFlash, kills, totalKills;
     char message[128];
 } MD_HUD;

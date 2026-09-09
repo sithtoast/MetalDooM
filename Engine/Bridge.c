@@ -28,6 +28,14 @@ static char *arguments[] = {"MetalDooM", NULL};
 static char lastMessage[128];
 static int messageSerial;
 static int monstersEnabled = 1;
+static int weaponGrinTicks;
+// ST_Start is called for each new level. Keep presentation state out of saves.
+void MD_ResetFace(void) { weaponGrinTicks = 0; }
+static unsigned WeaponMask(void) {
+    unsigned mask = 0;
+    for (int i=0;i<NUMWEAPONS;++i) if (players[0].weaponowned[i]) mask |= 1u<<i;
+    return mask;
+}
 #ifdef MD_TESTING
 void MD_TestMonsters(int enabled) { monstersEnabled = enabled; }
 static mobj_t *testTarget;
@@ -261,7 +269,14 @@ int MD_CombatTick(int forward, int side, int turn, int use, int attack, int weap
     command->buttons = use && players[0].health > 0 ? BT_USE : 0;
     if (attack) command->buttons |= BT_ATTACK;
     if (weapon >= 0 && weapon <= 6) command->buttons |= BT_CHANGE | (weapon << BT_WEAPONSHIFT);
-    if (gameaction == ga_nothing) { P_Ticker(); ++gametic; CaptureMessage(); }
+    if (gameaction == ga_nothing) {
+        unsigned oldWeapons = WeaponMask();
+        if (weaponGrinTicks > 0) --weaponGrinTicks;
+        P_Ticker(); ++gametic; CaptureMessage();
+        // Original status bar: a newly acquired weapon earns a two-second grin.
+        if (players[0].bonuscount && (WeaponMask() & ~oldWeapons)) weaponGrinTicks = 2*TICRATE;
+        if (players[0].health <= 0) weaponGrinTicks = 0;
+    }
     if (gameaction == ga_completed) CompleteLevel();
     guarded = 0; return 1;
 }
@@ -340,6 +355,7 @@ MD_HUD MD_GetHUD(void) {
     MD_HUD hud = {0};
     if (!loaded) return hud;
     player_t *player = &players[0];
+    hud.weaponGrin = weaponGrinTicks > 0;
     hud.health = player->health; hud.armor = player->armorpoints;
     hud.readyWeapon = player->readyweapon;
     ammotype_t ammo = weaponinfo[player->readyweapon].ammo;

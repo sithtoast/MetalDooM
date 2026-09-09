@@ -23,6 +23,7 @@ final class SpriteRenderer {
             + (0...9).flatMap { ["STTNUM\($0)","STYSNUM\($0)"] }
             + (2...7).map { "STGNUM\($0)" }
             + (0...5).map { "STKEYS\($0)" }
+            + (0...4).map { "STFEVL\($0)" }
             + (0...4).flatMap { pain in (0...2).map { "STFST\(pain)\($0)" } }
         for name in names {
             guard let patch = try art.patch(named:name) else { throw PortError("Missing HUD art: \(name).") }
@@ -133,7 +134,7 @@ final class SpriteRenderer {
         number(max(0,state.health),90,3,"STTNUM"); draw("STTPRCNT",90,3)
         number(state.armor,221,3,"STTNUM"); draw("STTPRCNT",221,3)
         let pain = (100-min(100,max(0,state.health)))*5/101
-        let face = state.health <= 0 ? "STFDEAD0" : "STFST\(pain)\((state.tick/20)%3)"
+        let face = state.health <= 0 ? "STFDEAD0" : state.weaponGrin != 0 ? "STFEVL\(pain)" : "STFST\(pain)\((state.tick/20)%3)"
         draw(face,143,0)
         for i in 0..<6 {
             let owned = state.weapons & (1 << (i+1)) != 0

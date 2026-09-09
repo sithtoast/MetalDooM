@@ -133,7 +133,7 @@ The original engine decoder has not been hardened for deliberately crafted paylo
   horizontal repeat and horizon, with clamping for the optional vertical look;
   extreme pitch and unusual sky-map tricks need further validation.
   Sprite animation is implemented; the pending animations are world textures/flats.
-  The HUD face uses health bands and idle frames, not Doom's complete expression
+  The HUD face uses health bands, idle frames, and the new-weapon grin, not Doom's complete expression
   state machine. Power-up screen effects and fuzz rendering remain pending.
 - Classic binary Doom maps only; no UDMF, Hexen format, extended/compressed nodes,
   Boom/MBF extensions, GZDoom mods, or IWAD+PWAD merging.

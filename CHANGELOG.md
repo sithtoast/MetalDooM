@@ -4,6 +4,13 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 18 — Weapon pickup grin
+
+- Show Doomguy's original two-second grin when acquiring a new weapon, using the
+  matching health-band artwork. Death and level loads clear the expression.
+- Verify that E1M2's raised green armor at the end of the hall can be collected
+  by walking up to the ledge; preserve the original map and pickup rules.
+
 ## Build 17 — Map names and save/load
 
 - Add canonical map names to window titles and status text, such as E1M1: Hangar.
