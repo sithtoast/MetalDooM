@@ -16,7 +16,7 @@ typedef struct {
     int bullets, shells, cells, rockets;
     int maxBullets, maxShells, maxCells, maxRockets;
     uint32_t keys, weapons;
-    int weaponGrin;
+    int weaponGrin, faceIndex;
     int bonusFlash, messageSerial, tick, damageFlash, kills, totalKills;
     char message[128];
 } MD_HUD;
@@ -57,6 +57,7 @@ int MD_ReadSave(const char *path);
 
 #ifdef MD_TESTING
 void MD_TestMonsters(int enabled);
+void MD_TestFaceState(int health, int damage, int attack, int invulnerable, int direction);
 void MD_TestExit(int secret);
 int MD_TestSwitch(int special, float *x,float *y,float *angle,int *side);
 void MD_TestTarget(int type, float distance);
@@ -67,3 +68,8 @@ int MD_TestPlacePlayer(float x, float y, float angle);
 int MD_TestDoor(int ordinal, float *x, float *y, float *angle, int *sector);
 int MD_TestKeyDoor(int key, float *x, float *y, float *angle, int *sector);
 #endif
+
+// Animation source frames, and their current engine translation. Indexes are copied IDs.
+typedef struct { int index, flat; char name[9]; } MD_Material;
+int MD_CopyAnimatedMaterials(MD_Material *output, int capacity);
+int MD_TranslatedMaterial(int index, int flat);

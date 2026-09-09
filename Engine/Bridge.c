@@ -29,15 +29,56 @@ static char *arguments[] = {"MetalDooM", NULL};
 static char lastMessage[128];
 static int messageSerial;
 static int monstersEnabled = 1;
+static void RefreshAnimations(void);
 static int weaponGrinTicks;
+static int faceIndex, faceCount, facePriority, faceOldHealth, faceAttack;
+static unsigned faceRandom;
 // ST_Start is called for each new level. Keep presentation state out of saves.
-void MD_ResetFace(void) { weaponGrinTicks = 0; }
+void MD_ResetFace(void) { weaponGrinTicks = 0; faceIndex=0; faceCount=0; facePriority=0; faceOldHealth=players[0].health; faceAttack=-1; faceRandom=1; }
 static unsigned WeaponMask(void) {
     unsigned mask = 0;
     for (int i=0;i<NUMWEAPONS;++i) if (players[0].weaponowned[i]) mask |= 1u<<i;
     return mask;
 }
+// Native presentation counterpart of st_stuff.c's priorities and tic durations.
+// Uses its own random stream; presentation never consumes gameplay randomness.
+static void UpdateFace(int newWeapon) {
+    player_t *p=&players[0];
+    int health=p->health<0 ? 0 : p->health>100 ? 100 : p->health;
+    int pain=8*((100-health)*5/101);
+    faceRandom=faceRandom*1664525u+1013904223u;
+    if (p->health<=0) { facePriority=9; faceIndex=41; faceCount=1; }
+    if (facePriority<9 && newWeapon) { facePriority=8; faceIndex=pain+6; faceCount=2*TICRATE; }
+    if (facePriority<8 && p->damagecount && !(facePriority==7 && faceIndex%8==5 && faceCount>0)) {
+        facePriority=7; faceCount=TICRATE;
+        // Correct vanilla's reversed subtraction so large damage actually shows OUCH.
+        if (faceOldHealth-p->health>20) faceIndex=pain+5;
+        else if (p->attacker && p->attacker!=p->mo) {
+            angle_t angle=R_PointToAngle2(p->mo->x,p->mo->y,p->attacker->x,p->attacker->y);
+            angle_t delta=angle-p->mo->angle;
+            faceIndex=pain+((delta<ANG45 || delta>ANG270+ANG45) ? 7 : delta>ANG180 ? 3 : 4);
+        } else { facePriority=6; faceIndex=pain+7; }
+    }
+    if (facePriority<6) {
+        if (p->attackdown) {
+            if (faceAttack<0) faceAttack=2*TICRATE;
+            else if (--faceAttack==0) { facePriority=5; faceIndex=pain+7; faceCount=1; faceAttack=1; }
+        } else faceAttack=-1;
+    }
+    if (facePriority<5 && ((p->cheats & CF_GODMODE) || p->powers[pw_invulnerability])) {
+        facePriority=4; faceIndex=40; faceCount=1;
+    }
+    if (!faceCount) { facePriority=0; faceIndex=pain+(faceRandom>>16)%3; faceCount=TICRATE/2; }
+    --faceCount; faceOldHealth=p->health;
+}
 #ifdef MD_TESTING
+void MD_TestFaceState(int health,int damage,int attack,int invulnerable,int direction) {
+    player_t *p=&players[0]; p->health=health; p->damagecount=damage;
+    p->attackdown=attack; p->powers[pw_invulnerability]=invulnerable;
+    static mobj_t attacker; p->attacker=NULL;
+    if(direction) { attacker.x=p->mo->x; attacker.y=p->mo->y+direction*64*FRACUNIT; p->mo->angle=0; p->attacker=&attacker; }
+    UpdateFace(0);
+}
 void MD_TestMonsters(int enabled) { monstersEnabled = enabled; }
 static mobj_t *testTarget;
 void MD_TestTarget(int type, float distance) {
@@ -108,7 +149,7 @@ int MD_Continue(void) {
     if (setjmp(errorBoundary)) { guarded = 0; return 0; }
     // Unlike G_InitNew, this preserves the surviving player's inventory.
     G_DoWorldDone();
-    P_Ticker(); ++gametic;
+    P_Ticker(); ++gametic; UpdateFace(0);
     progress = (MD_Progress){.episode=gameepisode,.map=gamemap,.commercial=gamemode == commercial};
     lastMessage[0] = 0; ++messageSerial;
     memset(&players[0].cmd,0,sizeof(players[0].cmd));
@@ -183,6 +224,7 @@ int MD_ReadSave(const char *path) {
     }
     memset(&players[0].cmd,0,sizeof(players[0].cmd));
     players[0].attackdown=players[0].usedown=false;
+    MD_ResetFace(); UpdateFace(0); RefreshAnimations();
     lastMessage[0]=0;++messageSerial;
     progress=(MD_Progress){.episode=gameepisode,.map=gamemap,.commercial=gamemode==commercial};
     gameaction=ga_nothing;S_Start();guarded=0;return 1;
@@ -256,7 +298,7 @@ int MD_LoadSkill(const char *path, int episode, int map, int skill) {
     // Original thinkers now drive monsters, weapons, projectiles and pickups.
     lastMessage[0] = 0; messageSerial = 0;
     memset(&players[0].cmd,0,sizeof(players[0].cmd));
-    P_Ticker(); ++gametic;
+    P_Ticker(); ++gametic; UpdateFace(0);
     CaptureMessage();
     loaded = 1; guarded = 0; errorText[0] = 0;
     return 1;
@@ -286,6 +328,7 @@ int MD_CombatTick(int forward, int side, int turn, int use, int attack, int weap
         // Original status bar: a newly acquired weapon earns a two-second grin.
         if (players[0].bonuscount && (WeaponMask() & ~oldWeapons)) weaponGrinTicks = 2*TICRATE;
         if (players[0].health <= 0) weaponGrinTicks = 0;
+        UpdateFace(players[0].bonuscount && (WeaponMask() & ~oldWeapons));
     }
     if (gameaction == ga_completed) CompleteLevel();
     guarded = 0; return 1;
@@ -365,7 +408,7 @@ MD_HUD MD_GetHUD(void) {
     MD_HUD hud = {0};
     if (!loaded) return hud;
     player_t *player = &players[0];
-    hud.weaponGrin = weaponGrinTicks > 0;
+    hud.weaponGrin = weaponGrinTicks > 0; hud.faceIndex=faceIndex;
     hud.health = player->health; hud.armor = player->armorpoints;
     hud.readyWeapon = player->readyweapon;
     ammotype_t ammo = weaponinfo[player->readyweapon].ammo;
@@ -435,3 +478,31 @@ int MD_TestKeyDoor(int key, float *x, float *y, float *angle, int *sector) {
     return -1;
 }
 #endif
+
+// Layout from pinned p_spec.c; no engine-owned pointers cross the bridge.
+typedef struct { boolean istexture; int picnum,basepic,numpics,speed; } MD_EngineAnim;
+extern MD_EngineAnim anims[], *lastanim;
+int MD_CopyAnimatedMaterials(MD_Material *output,int capacity) {
+    if (!loaded || poisoned) return 0;
+    int count=0;
+    for(MD_EngineAnim *a=anims;a<lastanim;++a) for(int i=a->basepic;i<a->basepic+a->numpics;++i) {
+        if(output && count<capacity) {
+            MD_Material *m=&output[count]; memset(m,0,sizeof(*m)); m->index=i; m->flat=!a->istexture;
+            memcpy(m->name,a->istexture ? textureNames[i] : lumpinfo[firstflat+i]->name,8);
+        }
+        ++count;
+    }
+    return count;
+}
+int MD_TranslatedMaterial(int index,int flat) {
+    if(!loaded || poisoned || index<0 || index>=(flat ? numflats : numtextures)) return -1;
+    return flat ? flattranslation[index] : texturetranslation[index];
+}
+
+static void RefreshAnimations(void) {
+    int time=leveltime>0 ? leveltime-1 : 0;
+    for(MD_EngineAnim *a=anims;a<lastanim;++a) for(int i=a->basepic;i<a->basepic+a->numpics;++i) {
+        int pic=a->basepic+(time/a->speed+i)%a->numpics;
+        if(a->istexture) texturetranslation[i]=pic; else flattranslation[i]=pic;
+    }
+}

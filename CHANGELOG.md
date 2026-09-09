@@ -4,6 +4,16 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 35 — Animated surfaces and Doomguy expressions
+
+- Animate original wall textures and floor/ceiling flats using the engine's frame
+  translations; preload Metal frames and switch textures without rebuilding geometry.
+- Freeze animation with gameplay pause and restore its phase on save loading.
+- Add directional hurt, heavy-damage ouch, sustained-fire and invulnerability faces,
+  retaining idle, pickup grin, health bands and death with tic-based priorities.
+- Correct the original reversed heavy-damage check so ouch appears on large hits.
+  Face state resets on map/save load without consuming gameplay randomness.
+
 ## Build 33 — Developer console
 
 - Open an optional Quake-style console with backtick/tilde; Escape closes it.

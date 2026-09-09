@@ -135,13 +135,14 @@ The original engine decoder has not been hardened for deliberately crafted paylo
   not presented, and Doom II has not been validated.
 - Manual doors have been validated. Other sector actions use upstream logic but
   lifts, crushers, switches, and special-case maps need dedicated validation.
-- Lighting is approximate; world animations, scrolling behavior, and full palette
+- Lighting is approximate; scrolling behavior and full palette
   effects remain (damage/pickup tint is implemented). Sky now follows the classic
   horizontal repeat and horizon, with clamping for the optional vertical look;
   extreme pitch and unusual sky-map tricks need further validation.
-  Sprite animation is implemented; the pending animations are world textures/flats.
-  The HUD face uses health bands, idle frames, and the new-weapon grin, not Doom's complete expression
-  state machine. Power-up screen effects and fuzz rendering remain pending.
+  World textures/flats follow the engine animation tables. The HUD supports idle,
+  weapon grin, directional hurt, heavy-damage ouch, sustained-fire, invulnerability
+  and death expressions across health bands. Power-up screen effects and fuzz
+  rendering remain pending.
 - Classic binary Doom maps only; no UDMF, Hexen format, extended/compressed nodes,
   Boom/MBF extensions, GZDoom mods, or IWAD+PWAD merging.
 - All geometry is submitted each frame. Sector height/light changes rebuild geometry
@@ -216,7 +217,7 @@ restart into E1M2, Quick Load restored the persisted E1M1 save and its map title
 
 ## Next milestones
 
-1. Complete Doomguy expressions, power-up effects, and world texture animation.
+1. Add power-up screen effects and fuzz rendering.
 2. Add intermission background animations, finales, and respawning.
 3. Verify Doom II, longer play sessions, texture effects, and less common sector actions.
 
@@ -278,3 +279,9 @@ resolution and audio settings. `clear` clears output; `close` returns to the gam
 or the paused menu. The console runs only these game commands, never shell code.
 Settings use the same persistence as the Options menu. Window fullscreen remains
 a macOS window state. Parser validation: `bash scripts/test-console.sh`.
+
+Animation/expression validation: `bash scripts/test-presentation.sh /path/to/doom1.WAD`.
+A local visual fixture can be generated with
+`python3 Tests/make_animation_fixture.py /path/to/DOOM.WAD /tmp/doom-animation-check.wad`.
+It replaces E1M1 floors/walls with animated nukage/fire and places invulnerability
+at the start to exercise the god face. The generated IWAD stays outside Git.

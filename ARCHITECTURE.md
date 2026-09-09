@@ -91,8 +91,12 @@ so below-origin artwork is not clipped by the floor. This does not move the engi
 object or change its collision/pickup position. Metal draws the original STBAR, digits, keys, ammo reserves, arms,
 and face patches as a final depth-independent pass. The HUD uses integer scaling
 in a centered 320x32 region below the world viewport. Native text displays temporary
-engine messages and accessible inventory values. Face expressions are an initial
-health-band/idle implementation; the complete original face logic remains pending.
+engine messages and accessible inventory values. The bridge updates a copied face
+index once per gameplay tic with classic priorities/durations and a separate
+presentation random stream. It covers health bands, idle, weapon grin, directional
+hurt, sustained fire, invulnerability and death. The reversed vanilla heavy-damage
+subtraction is corrected; ouch persists for its reaction interval. Face state resets
+on map/save load and is not part of the save payload.
 
 ## Weapons and sound
 
@@ -198,3 +202,13 @@ map and settings APIs. Output is capped at 400 lines and history at 100 entries.
 Opening releases pending gameplay input, blocks GameView input and pauses the
 renderer. Closing restores the prior menu/pause state. Original engine code is
 unchanged; commands do not execute shell code.
+
+## Animated world materials
+
+The bridge enumerates source frames from the pinned engine's p_spec animation table
+and copies translated texture/flat IDs. Metal preloads those frames at map load and
+selects the current translated texture when drawing each batch, preserving geometry
+and UVs. P_UpdateSpecials owns the 8-tic animation clock; pause freezes it. Save
+restoration rebuilds translation tables from the saved level time without ticking
+thinkers or advancing gameplay. The private animation layout is mirrored only in
+Bridge.c against the pinned upstream revision; no engine pointers escape to Swift.

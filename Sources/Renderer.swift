@@ -64,7 +64,7 @@ final class GameView: MTKView {
     }
 }
 
-private struct GPUBatch { let vertices: MTLBuffer, texture: MTLTexture; let count: Int }
+private struct GPUBatch { let vertices: MTLBuffer, texture: MTLTexture; let material: MaterialKey; let count: Int }
 private struct Uniforms { var matrix: simd_float4x4 }
 
 final class Renderer: NSObject, MTKViewDelegate {
@@ -110,6 +110,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
     }
     private var textures: [MaterialKey: MTLTexture] = [:]
+    private var animatedIDs: [MaterialKey:Int32] = [:]
+    private var animatedWalls: [Int32:MTLTexture] = [:], animatedFlats: [Int32:MTLTexture] = [:]
     private var engineReady = false
     private var previousPlayer = MD_Player(), currentPlayer = MD_Player()
     private var accumulator: Double = 0
@@ -234,7 +236,8 @@ final class Renderer: NSObject, MTKViewDelegate {
             }
         }
         var cached: [MaterialKey:MTLTexture] = [:], missing: [String] = []
-        for material in materials {
+        func cacheMaterial(_ material: MaterialKey) throws {
+            if cached[material] != nil { return }
             let source = try art.image(material)
             if source == nil { missing.append(material.name) }
             let pixels = source ?? Art.fallback
@@ -248,6 +251,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             }
             cached[material] = texture
         }
+        for material in materials { try cacheMaterial(material) }
         let loaded = try makeBatches(geometry,textures:cached)
         let skyName: String
         if name.hasPrefix("E2") { skyName = "SKY2" }
@@ -274,6 +278,16 @@ final class Renderer: NSObject, MTKViewDelegate {
             throw PortError(String(cString:MD_LastError()))
         }
         guard MD_SectorCount() == map.sectors.count else { engineReady = false; throw PortError("Engine and Metal sector counts differ.") }
+        var animationIDs: [MaterialKey:Int32]=[:], walls: [Int32:MTLTexture]=[:], flats: [Int32:MTLTexture]=[:]
+        var frames=Array(repeating:MD_Material(),count:Int(MD_CopyAnimatedMaterials(nil,0)))
+        _ = MD_CopyAnimatedMaterials(&frames,Int32(frames.count))
+        for var frame in frames {
+            let frameName=withUnsafePointer(to:&frame.name) { $0.withMemoryRebound(to:CChar.self,capacity:9) { String(cString:$0) } }
+            let key=MaterialKey(name:frameName,flat:frame.flat != 0)
+            try cacheMaterial(key); animationIDs[key]=frame.index
+            if key.flat { flats[frame.index]=cached[key] } else { walls[frame.index]=cached[key] }
+        }
+        animatedIDs=animationIDs; animatedWalls=walls; animatedFlats=flats
         skill=MD_GetSkill()
         progress = MD_GetProgress(); intermission = IntermissionSequence(progress); intermissionTime = 0; lastGeometryTick = -1
         intermissionArt = loadedIntermission
@@ -310,8 +324,13 @@ final class Renderer: NSObject, MTKViewDelegate {
                   let buffer = device.makeBuffer(bytes:batch.vertices,length:batch.vertices.count*MemoryLayout<WorldVertex>.stride,options:.storageModeShared) else {
                 throw PortError("Unable to update moving sector geometry (\(batch.material.name)).")
             }
-            return GPUBatch(vertices:buffer,texture:texture,count:batch.vertices.count)
+            return GPUBatch(vertices:buffer,texture:texture,material:batch.material,count:batch.vertices.count)
         }
+    }
+    private func animatedTexture(_ batch: GPUBatch) -> MTLTexture {
+        guard let index=animatedIDs[batch.material] else { return batch.texture }
+        let translated=MD_TranslatedMaterial(index,batch.material.flat ? 1 : 0)
+        return (batch.material.flat ? animatedFlats[translated] : animatedWalls[translated]) ?? batch.texture
     }
     private func uploadSkyGeometry(_ geometry: Geometry) throws {
         skyVertexCount = geometry.skyVertices.count
@@ -396,7 +415,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                 encoder.setRenderPipelineState(pipeline)
             }
             for batch in batches {
-                encoder.setVertexBuffer(batch.vertices,offset:0,index:0); encoder.setFragmentTexture(batch.texture,index:0)
+                encoder.setVertexBuffer(batch.vertices,offset:0,index:0); encoder.setFragmentTexture(animatedTexture(batch),index:0)
                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:batch.count)
             }
             if let sprites, engineReady {
