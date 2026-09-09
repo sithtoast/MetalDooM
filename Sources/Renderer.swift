@@ -3,6 +3,7 @@ import MetalKit
 import simd
 
 final class GameView: MTKView {
+    var inputBlocked = false
     var keys = Set<UInt16>()
     private var movementQueued = Set<UInt16>()
     var mouseMotion = SIMD2<Float>.zero
@@ -28,7 +29,7 @@ final class GameView: MTKView {
     func consumeWeapon() -> Int32 { let value = weaponQueued; weaponQueued = -1; return value }
     override var acceptsFirstResponder: Bool { true }
     override func keyDown(with event: NSEvent) {
-        if event.isARepeat { return }
+        if inputBlocked || event.isARepeat { return }
         if event.keyCode == 36 { continueQueued = true }
         if event.keyCode == 3 { attackQueued = true } // F: keyboard fire
         let slots: [UInt16:Int32] = [18:0,19:1,20:2,21:3,23:4,22:5,26:6]
@@ -43,6 +44,7 @@ final class GameView: MTKView {
         let result = keys.union(movementQueued); movementQueued.removeAll(); return result
     }
     override func mouseDown(with event: NSEvent) {
+        guard !inputBlocked else { return }
         window?.makeFirstResponder(self)
         if !captured {
             captured = true

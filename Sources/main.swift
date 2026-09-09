@@ -19,6 +19,8 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var message: MessageLabel!
     var wad: WAD?
     var menuAudio: SoundPlayer?
+    var console: DeveloperConsole?
+    var consoleVisible = false
     var gameMenu: GameMenu?
     var menuKeyMonitor: Any?
     var musicMenuItem: NSMenuItem?
@@ -59,8 +61,16 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             view.renderScale=CGFloat(UserDefaults.standard.object(forKey:"renderScale") as? Double ?? 1)
             view.preferredFramesPerSecond=UserDefaults.standard.object(forKey:"frameLimit") as? Int ?? 120
             menuKeyMonitor=NSEvent.addLocalMonitorForEvents(matching:.keyDown) { [weak self] event in
-                guard let self, self.window.isKeyWindow, self.window.attachedSheet == nil,
-                      self.gameMenu != nil else { return event }
+                guard let self, self.window.isKeyWindow, self.window.attachedSheet == nil else { return event }
+                let modified = !event.modifierFlags.intersection([.command,.control,.option]).isEmpty
+                if !modified, ["`","~"].contains(event.characters ?? "") {
+                    if !event.isARepeat { self.toggleConsole() }; return nil
+                }
+                if self.consoleVisible {
+                    if event.keyCode == 53 { self.toggleConsole(); return nil }
+                    if self.window.firstResponder === self.view { self.window.makeFirstResponder(self.console?.input) }
+                    return event
+                }
                 return self.gameMenu?.handleKey(event) == true ? nil : event
             }
             let button = NSButton(title:"Open WAD…",target:self,action:#selector(openWAD))
@@ -71,7 +81,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let toolbar = NSStackView(views:[label,spacer,maps,button]); toolbar.spacing = 16
             status = NSTextField(labelWithString:summary); status.font = .monospacedSystemFont(ofSize:11,weight:.regular)
             status.lineBreakMode = .byTruncatingTail
-            let help = NSTextField(labelWithString:"WASD move · Shift run · E / Space use · Click to capture, then fire · F fire · 1–7 weapons · Esc menu · R restart")
+            let help = NSTextField(labelWithString:"WASD move · Shift run · E / Space use · Click to capture, then fire · F fire · 1–7 weapons · Esc menu · ~ console · R restart")
             help.font = .systemFont(ofSize:11); help.textColor = .secondaryLabelColor
             for child in [toolbar,view!,status!,help] { child.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(child) }
             message = MessageLabel(labelWithString:""); message.translatesAutoresizingMaskIntoConstraints = false
@@ -204,7 +214,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     func syncMusicMenu() { musicMenuItem?.state=renderer.musicEnabled ? .on : .off }
     func openGameMenu() {
-        guard gameMenu == nil else { return }
+        guard gameMenu == nil, !consoleVisible else { return }
         view.releaseMouse(); renderer.paused=true; playMenuSound("DSSWTCHN")
         let panel=GameMenu(app:self); gameMenu=panel
         panel.translatesAutoresizingMaskIntoConstraints=false; window.contentView!.addSubview(panel)
@@ -214,8 +224,67 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     func closeGameMenu() {
         guard wad != nil else { return }
-        gameMenu?.removeFromSuperview(); gameMenu=nil; view.releaseMouse(); renderer.paused=false
-        window.makeFirstResponder(view)
+        gameMenu?.removeFromSuperview(); gameMenu=nil; view.releaseMouse(); renderer.paused=consoleVisible
+        window.makeFirstResponder(consoleVisible ? console?.input : view)
+    }
+    func toggleConsole() {
+        if consoleVisible {
+            console?.removeFromSuperview(); consoleVisible=false; view.inputBlocked=false; gameMenu?.isHidden=false
+            view.releaseMouse(); renderer.paused = gameMenu != nil
+            window.makeFirstResponder(gameMenu ?? view)
+            return
+        }
+        view.releaseMouse(); view.inputBlocked=true; renderer.paused=true; gameMenu?.isHidden=true
+        if console == nil {
+            let panel=DeveloperConsole(frame:.zero)
+            panel.execute={ [weak self] in self?.executeConsole($0) ?? "" }
+            panel.close={ [weak self] in self?.toggleConsole() }
+            console=panel
+        }
+        guard let panel=console else { return }
+        consoleVisible=true; panel.translatesAutoresizingMaskIntoConstraints=false
+        window.contentView!.addSubview(panel)
+        NSLayoutConstraint.activate([panel.topAnchor.constraint(equalTo:view.topAnchor),
+            panel.leadingAnchor.constraint(equalTo:view.leadingAnchor),panel.trailingAnchor.constraint(equalTo:view.trailingAnchor),
+            panel.heightAnchor.constraint(equalTo:view.heightAnchor,multiplier:0.55)])
+        window.makeFirstResponder(panel.input)
+    }
+    func executeConsole(_ text: String) -> String {
+        do {
+            switch try ConsoleCommand.parse(text) {
+            case .simple(let name):
+                switch name {
+                case "help": return "help / clear / status / maps / map <name> / restart / close\nvolume <0–1> / musicvolume <0–1> / music on|off\nrender_scale <50|75|100> / fps <35|60|120> / fullscreen on|off\nMap and restart begin a fresh level; save your progress first."
+                case "clear": console?.clear(); return ""
+                case "close": toggleConsole(); return ""
+                case "maps": return wad?.maps.joined(separator:"  ") ?? "No WAD loaded."
+                case "restart":
+                    guard wad != nil else { throw ConsoleError("No WAD loaded.") }
+                    try renderer.reset(); return "Level restarted."
+                default:
+                    let size=view.drawableSize
+                    return "\(appTitle)\n\(wad?.gameName ?? "No WAD") — \(summary)\n\(renderer.playerStatus)\nGPU: \(renderer.device.name)\nRender: \(Int(size.width))x\(Int(size.height)) at \(Int(view.renderScale*100))%; limit \(view.preferredFramesPerSecond) FPS\nEffects: \(renderer.effectsVolume); music: \(renderer.musicVolume) (\(renderer.musicEnabled ? "on" : "off"))"
+                }
+            case .map(let name):
+                guard let wad else { throw ConsoleError("No WAD loaded.") }
+                guard wad.maps.contains(name) else { throw ConsoleError("Map \(name) is not in this WAD. Type maps.") }
+                let result=try renderer.load(wad:wad,map:name)
+                maps.selectItem(withTitle:name); describe(name,result)
+                return "Loaded \(wad.mapTitle(name)). Missing textures: \(result.missing.isEmpty ? "none" : result.missing.joined(separator:", "))"
+            case .number(let name, let value):
+                switch name {
+                case "volume": renderer.effectsVolume=value
+                case "musicvolume": renderer.musicVolume=value
+                case "fps": view.preferredFramesPerSecond=Int(value); UserDefaults.standard.set(Int(value),forKey:"frameLimit")
+                default: view.renderScale=CGFloat(value/100); UserDefaults.standard.set(Double(value/100),forKey:"renderScale")
+                }
+                gameMenu?.updateResolutionText(); return "\(name) = \(value)"
+            case .toggle(let name, let enabled):
+                if name=="music" { renderer.musicEnabled=enabled; syncMusicMenu() }
+                else if window.styleMask.contains(.fullScreen) != enabled { window.toggleFullScreen(nil) }
+                return "\(name) \(enabled ? "on" : "off")"
+            }
+        } catch { return "Error: \(error)" }
     }
     func applyWindowSize(_ size: NSSize) {
         guard !window.styleMask.contains(.fullScreen) else { return }

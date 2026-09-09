@@ -251,3 +251,30 @@ music/effects volume levels persist.
 Launch the app by opening `~/Dev/MetalDooM/build/MetalDooM.app` in Finder. Save and
 quit an older running build first. If no WAD is open, choose Open WAD and select
 your IWAD; for example `~/Downloads/The_Ultimate_Doom/DOOM.WAD`.
+
+## Developer console
+
+Press backtick/tilde (`~`) to open the console; Escape or the same key closes it.
+Gameplay pauses while it is open. Up/Down recalls command history; Tab completes
+command names. Output and history remain available until the app exits.
+
+Type `help` for commands. Examples:
+
+```text
+maps
+map E1M2
+status
+volume 0.7
+musicvolume 0.5
+music on
+render_scale 75
+fps 60
+fullscreen on
+```
+
+`map` and `restart` start a fresh level, so save progress first. Map names must
+exist in the loaded WAD. `status` reports the game, map, player state, GPU, render
+resolution and audio settings. `clear` clears output; `close` returns to the game
+or the paused menu. The console runs only these game commands, never shell code.
+Settings use the same persistence as the Options menu. Window fullscreen remains
+a macOS window state. Parser validation: `bash scripts/test-console.sh`.

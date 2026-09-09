@@ -4,6 +4,15 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 33 — Developer console
+
+- Open an optional Quake-style console with backtick/tilde; Escape closes it.
+  Gameplay pauses, mouse capture is released, and an existing menu is restored on close.
+- Add command history, Tab completion, bounded scrollback, help and clear commands.
+- Support map listing/loading, restart, renderer/game diagnostics, effects/music
+  volumes, music enablement, render scale, frame limit and fullscreen.
+- Validate command arguments before applying settings; console errors remain inline.
+
 ## Build 31 — Classic save, load and options
 
 - Give all six save/load slots original Doom borders, bitmap names and the animated

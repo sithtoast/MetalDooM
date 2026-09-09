@@ -188,3 +188,13 @@ gameplay is paused. It follows effects volume and pauses on focus loss.
 MD_LoadSkill validates and passes difficulty to original G_InitNew. MD_GetSkill
 synchronizes the host after save restoration. Six per-WAD slot paths are separate
 from quick saves, and optional container titles preserve backward compatibility.
+
+## Developer console
+
+DeveloperConsole is an AppKit overlay with selectable scrollback, a text-field
+command editor, session history and command-name completion. ConsoleCommand parses
+and validates a bounded command set before App dispatches to existing renderer,
+map and settings APIs. Output is capped at 400 lines and history at 100 entries.
+Opening releases pending gameplay input, blocks GameView input and pauses the
+renderer. Closing restores the prior menu/pause state. Original engine code is
+unchanged; commands do not execute shell code.
