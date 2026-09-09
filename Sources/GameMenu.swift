@@ -156,7 +156,7 @@ final class GameMenu: NSView {
     }
     private func options() {
         canvas("Options",art:[("M_OPTTTL",108,15)],items:[
-            .init(title:"Sound Volume",patch:"M_SVOL",x:60,y:64,action:{ [weak self] in self?.audioOptions() }),
+            .init(title:"Sound Volume",patch:"",x:60,y:64,action:{ [weak self] in self?.audioOptions() }),
             .init(title:"Display",patch:"",x:60,y:96,action:{ [weak self] in self?.displayOptions() }),
             .init(title:"Back",patch:"",x:60,y:128,action:{ [weak self] in self?.main() })
         ],labels:[("ENTER SELECT   ESC BACK",48,180)],back:{ [weak self] in self?.main() })

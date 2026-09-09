@@ -69,8 +69,9 @@ private struct GPUBatch { let vertices: MTLBuffer, texture: MTLTexture; let mate
 private struct Uniforms { var matrix: simd_float4x4 }
 
 final class Renderer: NSObject, MTKViewDelegate {
-    let device: MTLDevice, queue: MTLCommandQueue, pipeline: MTLRenderPipelineState, skyPipeline: MTLRenderPipelineState, skySurfacePipeline: MTLRenderPipelineState, spritePipeline: MTLRenderPipelineState, tintPipeline: MTLRenderPipelineState, depth: MTLDepthStencilState
+    let device: MTLDevice, queue: MTLCommandQueue, pipeline: MTLRenderPipelineState, skyPipeline: MTLRenderPipelineState, skySurfacePipeline: MTLRenderPipelineState, spritePipeline: MTLRenderPipelineState, tintPipeline: MTLRenderPipelineState, fuzzPipeline: MTLRenderPipelineState, depth: MTLDepthStencilState, fuzzDepth: MTLDepthStencilState
     private var batches: [GPUBatch] = []
+    private var sceneSnapshot: MTLTexture?
     private var sky: MTLTexture?
     private var skyGeometry: MTLBuffer?
     private var skyVertexCount = 0
@@ -153,20 +154,34 @@ final class Renderer: NSObject, MTKViewDelegate {
             Out o; o.position = matrix * v[id].position; o.uv = v[id].uvLight.xy;
             o.world = v[id].position.xyz; o.light = v[id].uvLight.z; o.distance = o.position.w; o.fullbright = v[id].uvLight.w; return o;
         }
-        fragment float4 worldFragment(Out in [[stage_in]], bool front [[front_facing]], texture2d<float> tex [[texture(0)]]) {
+        float3 powerColor(float3 rgb, float4 power) {
+            if (power.x > 0) return float3(floor((1.0-dot(rgb,float3(0.299,0.587,0.114)))*31.0)/31.0);
+            return rgb;
+        }
+        fragment float4 worldFragment(Out in [[stage_in]], bool front [[front_facing]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]]) {
             if (in.fullbright > 0.5 && !front) discard_fragment();
             constexpr sampler s(coord::normalized, address::repeat, filter::nearest);
             float4 c = tex.sample(s, in.uv / float2(tex.get_width(),tex.get_height()));
             if (c.a < 0.5) discard_fragment();
-            float shade = in.light * clamp(1.0 - in.distance / 3200.0, 0.3, 1.0);
-            return float4(c.rgb * shade, 1.0);
+            float shade = (power.x>0 || power.y>0) ? 1.0 : in.light * clamp(1.0 - in.distance / 3200.0, 0.3, 1.0);
+            return float4(powerColor(c.rgb * shade,power), 1.0);
         }
-        fragment float4 spriteFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]]) {
+        fragment float4 spriteFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]]) {
             constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::nearest);
             float4 c = tex.sample(s,in.uv / float2(tex.get_width(),tex.get_height()));
             if (c.a < 0.5) discard_fragment();
-            float shade = in.fullbright > 0.5 ? 1.0 : in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
-            return float4(c.rgb*shade,1.0);
+            float shade = (in.fullbright > 0.5 || power.x>0 || power.y>0) ? 1.0 : in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
+            return float4(powerColor(c.rgb*shade,power),1.0);
+        }
+        fragment float4 fuzzFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]],
+                texture2d<float, access::read> scene [[texture(1)]], constant float4 &power [[buffer(2)]]) {
+            constexpr sampler s(coord::normalized,address::clamp_to_edge,filter::nearest);
+            if(tex.sample(s,in.uv/float2(tex.get_width(),tex.get_height())).a<0.5) discard_fragment();
+            float step=max(1.0,float(scene.get_width())/320.0);
+            uint seed=uint(floor(in.position.x/step))+uint(floor(in.position.y/step))*3+uint(power.z)*7;
+            float shift=((seed*1103515245u+12345u)&0x100u) ? step:-step;
+            uint2 pixel=uint2(clamp(in.position.xy+float2(0,shift),float2(0),float2(scene.get_width()-1,scene.get_height()-1)));
+            return float4(scene.read(pixel).rgb*0.65,1);
         }
         float4 skyColor(float3 direction, texture2d<float> tex) {
             float angle = atan2(-direction.z,direction.x);
@@ -178,9 +193,9 @@ final class Renderer: NSObject, MTKViewDelegate {
             return float4(tex.sample(s,uv).rgb,1);
         }
         fragment float4 skySurfaceFragment(Out in [[stage_in]], bool front [[front_facing]],
-                    constant float4 &eye [[buffer(0)]], texture2d<float> tex [[texture(0)]]) {
+                    constant float4 &eye [[buffer(0)]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]]) {
             if (in.fullbright > 0.5 && !front) discard_fragment();
-            return skyColor(in.world-eye.xyz,tex);
+            return float4(powerColor(skyColor(in.world-eye.xyz,tex).rgb,power),1);
         }
         struct SkyOut { float4 position [[position]]; float2 uv; };
         vertex SkyOut skyVertex(uint id [[vertex_id]]) {
@@ -189,11 +204,11 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         fragment float4 tintFragment(SkyOut in [[stage_in]], constant float4 &color [[buffer(0)]]) { return color; }
         fragment float4 skyFragment(SkyOut in [[stage_in]], constant float4 &camera [[buffer(0)]],
-                                    texture2d<float> tex [[texture(0)]]) {
+                                    texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]]) {
             float x = (in.uv.x*2.0-1.0)*camera.z*0.57735027;
             float y = (in.uv.y*2.0-1.0)*0.57735027;
             float f = cos(camera.y)-y*sin(camera.y), h = sin(camera.y)+y*cos(camera.y);
-            return skyColor(float3(cos(camera.x)*f+sin(camera.x)*x,h,-sin(camera.x)*f+cos(camera.x)*x),tex);
+            return float4(powerColor(skyColor(float3(cos(camera.x)*f+sin(camera.x)*x,h,-sin(camera.x)*f+cos(camera.x)*x),tex).rgb,power),1);
         }
         """
         let library = try device.makeLibrary(source:shader,options:nil)
@@ -207,6 +222,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         skySurfacePipeline = try device.makeRenderPipelineState(descriptor:descriptor)
         descriptor.fragmentFunction = library.makeFunction(name:"spriteFragment")
         spritePipeline = try device.makeRenderPipelineState(descriptor:descriptor)
+        descriptor.fragmentFunction = library.makeFunction(name:"fuzzFragment")
+        fuzzPipeline = try device.makeRenderPipelineState(descriptor:descriptor)
         descriptor.vertexFunction = library.makeFunction(name:"skyVertex")
         descriptor.fragmentFunction = library.makeFunction(name:"skyFragment")
         skyPipeline = try device.makeRenderPipelineState(descriptor:descriptor)
@@ -218,6 +235,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         let state = MTLDepthStencilDescriptor(); state.depthCompareFunction = .less; state.isDepthWriteEnabled = true
         guard let depth = device.makeDepthStencilState(descriptor:state) else { throw PortError("Cannot create Metal depth state.") }
         self.depth = depth
+        state.isDepthWriteEnabled=false;state.depthCompareFunction = .lessEqual
+        guard let fuzzDepth=device.makeDepthStencilState(descriptor:state) else { throw PortError("Cannot create fuzz depth state.") };self.fuzzDepth=fuzzDepth
         super.init()
     }
     func load(wad: WAD, map name: String, continuing: Bool = false, restorePath: String? = nil, demo: String? = nil) throws -> (triangles:Int,missing:[String]) {
@@ -387,10 +406,15 @@ final class Renderer: NSObject, MTKViewDelegate {
             if let error = buffer.error { fputs("Metal command error: \(error)\n",stderr) }
             semaphore.signal()
         }
-        guard let encoder = command.makeRenderCommandEncoder(descriptor:pass) else { inFlight.signal(); return }
+        pass.depthAttachment.storeAction = .store
+        guard var encoder = command.makeRenderCommandEncoder(descriptor:pass) else { inFlight.signal(); return }
+        var power=SIMD4<Float>(hud.fixedColorMap==32 ? 1:0,hud.fixedColorMap==1 ? 1:0,Float(hud.tick),0)
+        var noPower=SIMD4<Float>.zero
+        encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
         encoder.setRenderPipelineState(pipeline); encoder.setDepthStencilState(depth); encoder.setCullMode(.none); encoder.setFrontFacing(.counterClockwise)
         if progress.phase != 0, let intermissionArt {
             encoder.setRenderPipelineState(spritePipeline)
+            encoder.setFragmentBytes(&noPower,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
             intermissionArt.draw(encoder:encoder,state:progress,sequence:intermission,width:max(1,view.drawableSize.width),height:max(1,view.drawableSize.height))
         } else if map != nil {
             let width = max(1,view.drawableSize.width), height = max(1,view.drawableSize.height)
@@ -426,16 +450,39 @@ final class Renderer: NSObject, MTKViewDelegate {
                 encoder.setRenderPipelineState(spritePipeline)
                 do { try sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw) }
                 catch { engineReady = false; DispatchQueue.main.async { [weak self] in self?.onError?(error) } }
+                if sprites.hasFuzz || hud.invisibility>128 || (hud.invisibility&8) != 0 {
+                    if sceneSnapshot?.width != Int(width) || sceneSnapshot?.height != Int(height) {
+                        let d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:view.colorPixelFormat,width:Int(width),height:Int(height),mipmapped:false)
+                        d.storageMode = .private;d.usage = .shaderRead;sceneSnapshot=device.makeTexture(descriptor:d)
+                    }
+                    if let snapshot=sceneSnapshot {
+                        encoder.endEncoding()
+                        if let blit=command.makeBlitCommandEncoder() {
+                            blit.copy(from:drawable.texture,sourceSlice:0,sourceLevel:0,sourceOrigin:MTLOrigin(x:0,y:0,z:0),sourceSize:MTLSize(width:Int(width),height:Int(height),depth:1),to:snapshot,destinationSlice:0,destinationLevel:0,destinationOrigin:MTLOrigin(x:0,y:0,z:0));blit.endEncoding()
+                        }
+                        pass.colorAttachments[0].loadAction = .load;pass.depthAttachment.loadAction = .load
+                        guard let resumed=command.makeRenderCommandEncoder(descriptor:pass) else { command.commit();return }
+                        encoder=resumed;encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:worldHeight,znear:0,zfar:1))
+                        encoder.setFrontFacing(.counterClockwise);encoder.setCullMode(.none)
+                        encoder.setVertexBytes(&uniform,length:MemoryLayout<Uniforms>.stride,index:1)
+                        encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
+                        encoder.setFragmentTexture(snapshot,index:1);encoder.setRenderPipelineState(fuzzPipeline);encoder.setDepthStencilState(fuzzDepth)
+                        try? sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw,fuzz:true)
+                        sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,fuzz:true)
+                    }
+                }
+                encoder.setRenderPipelineState(spritePipeline)
                 sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight)
-                if hud.damageFlash > 0 || hud.bonusFlash > 0 {
-                    var tint: SIMD4<Float> = hud.damageFlash > 0
-                        ? SIMD4(1,0,0,min(0.45,Float(hud.damageFlash)/80))
-                        : SIMD4(1,0.8,0.1,min(0.15,Float(hud.bonusFlash)/160))
+                if hud.damageFlash > 0 || hud.bonusFlash > 0 || hud.suitFlash != 0 || hud.berserkFlash>0 {
+                    var tint: SIMD4<Float> = max(hud.damageFlash,hud.berserkFlash)>0
+                        ? SIMD4(1,0,0,min(0.45,Float(max(hud.damageFlash,hud.berserkFlash))/80))
+                        : hud.bonusFlash>0 ? SIMD4(1,0.8,0.1,min(0.15,Float(hud.bonusFlash)/160)) : SIMD4(0,1,0,0.18)
                     encoder.setRenderPipelineState(tintPipeline)
                     encoder.setFragmentBytes(&tint,length:MemoryLayout<SIMD4<Float>>.stride,index:0)
                     encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:3)
                     encoder.setRenderPipelineState(spritePipeline)
                 }
+                encoder.setFragmentBytes(&noPower,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
                 sprites.drawHUD(encoder:encoder,state:hud,width:width,height:height)
             }
         }

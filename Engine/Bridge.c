@@ -31,6 +31,7 @@ static char lastMessage[128];
 static int messageSerial;
 static int monstersEnabled = 1;
 static void RefreshAnimations(void);
+static void RevealMap(void);
 static int weaponGrinTicks;
 static byte *nativeDemo;
 static int nativeDemoSize, nativeDemoOffset;
@@ -343,6 +344,7 @@ int MD_CombatTick(int forward, int side, int turn, int use, int attack, int weap
         if (players[0].bonuscount && (WeaponMask() & ~oldWeapons)) weaponGrinTicks = 2*TICRATE;
         if (players[0].health <= 0) weaponGrinTicks = 0;
         UpdateFace(players[0].bonuscount && (WeaponMask() & ~oldWeapons));
+        if(gametic%5==0) RevealMap();
     }
     if (nativeDemo && (gameaction!=ga_nothing || players[0].playerstate==PST_REBORN)) { MD_StopDemo(); gameaction=ga_nothing; }
     else if (gameaction == ga_completed) CompleteLevel();
@@ -394,7 +396,7 @@ int MD_CopyThings(MD_Thing *output, int capacity, float cameraX, float cameraY) 
                 (float)object->subsector->sector->lightlevel/255.0f,
                 (float)object->floorz/FRACUNIT,
                 lump, frame->flip[rotation], (object->frame & FF_FULLBRIGHT) != 0,
-                mobjinfo[object->type].doomednum
+                mobjinfo[object->type].doomednum, !!(object->flags & MF_SHADOW)
             };
         }
         ++count;
@@ -412,7 +414,8 @@ int MD_CopyWeaponSprites(MD_WeaponSprite *output, int capacity) {
         if (output && count < capacity) output[count] = (MD_WeaponSprite){
             (float)psp->sx/FRACUNIT,(float)psp->sy/FRACUNIT,
             fminf(1,(float)player->mo->subsector->sector->lightlevel/255.0f + player->extralight*0.125f),
-            firstspritelump+frame->lump[0],frame->flip[0],(psp->state->frame & FF_FULLBRIGHT) != 0
+            firstspritelump+frame->lump[0],frame->flip[0],(psp->state->frame & FF_FULLBRIGHT) != 0,
+            player->powers[pw_invisibility]>128 || (player->powers[pw_invisibility]&8)
         };
         ++count;
     }
@@ -424,6 +427,10 @@ MD_HUD MD_GetHUD(void) {
     if (!loaded) return hud;
     player_t *player = &players[0];
     hud.weaponGrin = weaponGrinTicks > 0; hud.faceIndex=faceIndex;
+    hud.fixedColorMap=player->fixedcolormap;
+    hud.suitFlash=player->powers[pw_ironfeet]>128 || (player->powers[pw_ironfeet]&8);
+    hud.berserkFlash=player->powers[pw_strength] ? 12-(player->powers[pw_strength]>>6):0;
+    hud.allmap=player->powers[pw_allmap]!=0;hud.invisibility=player->powers[pw_invisibility];
     hud.health = player->health; hud.armor = player->armorpoints;
     hud.readyWeapon = player->readyweapon;
     ammotype_t ammo = weaponinfo[player->readyweapon].ammo;
@@ -573,4 +580,35 @@ int MD_Cheat(const char *name) {
     }
     if(!message) return 0;
     p->message=(char *)message;CaptureMessage();UpdateFace(0);return 1;
+}
+
+// Approximate first-person exploration using original sector sight tests. The
+// hardware renderer does not run R_StoreWallRange, which normally sets ML_MAPPED.
+static void RevealMap(void) {
+    player_t *p=&players[0]; if(!p->mo) return;
+    double angle=p->mo->angle*(2*M_PI/4294967296.0),fx=cos(angle),fy=sin(angle);
+    for(int i=0;i<numlines;i++) {
+        line_t *l=&lines[i];if(l->flags & (ML_MAPPED|ML_DONTDRAW)) continue;
+        double x=((double)l->v1->x+l->v2->x)/2,y=((double)l->v1->y+l->v2->y)/2;
+        double dx=x-p->mo->x,dy=y-p->mo->y,distance=hypot(dx,dy);
+        if(distance>4096.0*FRACUNIT || dx*fx+dy*fy < -32.0*FRACUNIT) continue;
+        if(distance>4*FRACUNIT) { x-=dx/distance*4*FRACUNIT;y-=dy/distance*4*FRACUNIT; }
+        mobj_t target={0};target.x=x;target.y=y;target.z=p->mo->z;target.height=p->mo->height;
+        target.subsector=R_PointInSubsector(target.x,target.y);
+        if(P_CheckSight(p->mo,&target)) l->flags|=ML_MAPPED;
+    }
+}
+int MD_CopyMapLines(MD_MapLine *output,int capacity) {
+    if(!loaded || poisoned) return 0;
+    for(int i=0;output && i<numlines && i<capacity;i++) {
+        line_t *l=&lines[i];int kind=0;
+        if(l->flags & ML_DONTDRAW) kind=-1;
+        else if(!l->backsector || (l->flags & ML_SECRET)) kind=1;
+        else if(l->special==39 || l->special==97) kind=4;
+        else if(l->frontsector->floorheight!=l->backsector->floorheight) kind=2;
+        else if(l->frontsector->ceilingheight!=l->backsector->ceilingheight) kind=3;
+        output[i]=(MD_MapLine){(float)l->v1->x/FRACUNIT,(float)l->v1->y/FRACUNIT,
+            (float)l->v2->x/FRACUNIT,(float)l->v2->y/FRACUNIT,kind,!!(l->flags & ML_MAPPED)};
+    }
+    return numlines;
 }

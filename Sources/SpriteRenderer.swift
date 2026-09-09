@@ -48,12 +48,13 @@ final class SpriteRenderer {
         }
         return GPUPatch(texture:texture,width:Float(image.width),height:Float(image.height),left:Float(patch.left),top:Float(patch.top))
     }
-    func drawWorld(encoder: MTLRenderCommandEncoder, camera: SIMD2<Float>, yaw: Float) throws {
+    var hasFuzz: Bool { things.contains { $0.shadow != 0 } }
+    func drawWorld(encoder: MTLRenderCommandEncoder, camera: SIMD2<Float>, yaw: Float, fuzz: Bool=false) throws {
         let count = Int(MD_CopyThings(nil,0,camera.x,camera.y))
         if things.count != count { things = [MD_Thing](repeating:MD_Thing(),count:count) }
         if count > 0 { _ = things.withUnsafeMutableBufferPointer { MD_CopyThings($0.baseAddress,Int32(count),camera.x,camera.y) } }
         let right = SIMD3(sin(yaw),0,cos(yaw))
-        for thing in things {
+        for thing in things where (thing.shadow != 0)==fuzz {
             guard let patch = patches[Int(thing.lump)] else { throw PortError("Missing sprite frame \(thing.lump).") }
             let center = SIMD3(thing.x,thing.z,-thing.y)
             let left = center-right*patch.left
@@ -75,7 +76,7 @@ final class SpriteRenderer {
             encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:6)
         }
     }
-    func drawWeapon(encoder: MTLRenderCommandEncoder, width: Double, height: Double) {
+    func drawWeapon(encoder: MTLRenderCommandEncoder, width: Double, height: Double, fuzz: Bool=false) {
         var frames = [MD_WeaponSprite](repeating:MD_WeaponSprite(),count:2)
         let count = frames.withUnsafeMutableBufferPointer { MD_CopyWeaponSprites($0.baseAddress,2) }
         encoder.setDepthStencilState(hudDepth)
@@ -84,7 +85,7 @@ final class SpriteRenderer {
         // Match the classic 320x168 view: the weapon is centered and clipped at
         // the status bar. Widescreen adds space beside it, not a stretched gun.
         let scale = Float(height/168), originX = (Float(width)-320*scale)/2
-        for frame in frames.prefix(Int(count)) {
+        for frame in frames.prefix(Int(count)) where (frame.shadow != 0)==fuzz {
             guard let patch = patches[Int(frame.lump)] else { continue }
             let x0 = originX+(frame.x-patch.left)*scale
             let y0 = (frame.y-patch.top-16)*scale

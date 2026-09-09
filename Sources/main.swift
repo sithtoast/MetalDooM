@@ -19,6 +19,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var message: MessageLabel!
     var wad: WAD?
     var menuAudio: SoundPlayer?
+    var automapView: AutomapView?
     var attractActive=false, attractDemo=false, attractIndex=0, attractElapsed=0.0
     var attractTimer: Timer?
     var titleScreen: AttractScreen?
@@ -61,7 +62,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             view = GameView(frame:.zero,device:MTLCreateSystemDefaultDevice())
             view.colorPixelFormat = .bgra8Unorm; view.depthStencilPixelFormat = .depth32Float
             view.clearColor = MTLClearColor(red:0,green:0,blue:0,alpha:1)
-            view.preferredFramesPerSecond = 120; view.framebufferOnly = true
+            view.preferredFramesPerSecond = 120; view.framebufferOnly = false
             renderer = try Renderer(view:view); view.delegate = renderer
             view.onEscape = { [weak self] in self?.openGameMenu() }
             view.onBlockedClick = { [weak self] in if self?.attractActive==true && self?.consoleVisible==false { self?.openGameMenu() } }
@@ -79,6 +80,8 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     return event
                 }
                 if self.gameMenu == nil, !modified {
+                    if let map=self.automapView, map.handle(event) { return nil }
+                    if event.keyCode==48 && !self.attractActive { if !event.isARepeat { self.toggleAutomap() };return nil }
                     if self.attractActive { if !event.isARepeat { self.openGameMenu() };return nil }
                     if !event.isARepeat, self.typeCheat(event.characters ?? "") { return nil }
                 }
@@ -92,7 +95,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let toolbar = NSStackView(views:[label,spacer,maps,button]); toolbar.spacing = 16
             status = NSTextField(labelWithString:summary); status.font = .monospacedSystemFont(ofSize:11,weight:.regular)
             status.lineBreakMode = .byTruncatingTail
-            let help = NSTextField(labelWithString:"WASD move · Shift run · E / Space use · Click to capture, then fire · F fire · 1–7 weapons · Esc menu · ~ console · R restart")
+            let help = NSTextField(labelWithString:"WASD move · Shift run · E / Space use · Click to capture, then fire · F fire · 1–7 weapons · Esc menu · Tab map · ~ console · R restart")
             help.font = .systemFont(ofSize:11); help.textColor = .secondaryLabelColor
             for child in [toolbar,view!,status!,help] { child.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(child) }
             message = MessageLabel(labelWithString:""); message.translatesAutoresizingMaskIntoConstraints = false
@@ -109,12 +112,13 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             ])
             renderer.onFrame = { [weak self] fps in
                 guard let self else { return }
+                self.layoutAutomap()
                 self.status.stringValue = "\(self.summary) · \(self.renderer.playerStatus) · \(Int(fps)) FPS"
                 self.message.stringValue = self.renderer.pickupMessage; self.message.isHidden = self.message.stringValue.isEmpty
             }
             renderer.onMapChanged = { [weak self] name in
                 guard let self else { return }
-                self.maps.selectItem(withTitle:name); self.summary = self.wad?.mapTitle(name) ?? name
+                self.closeAutomap();self.maps.selectItem(withTitle:name); self.summary = self.wad?.mapTitle(name) ?? name
                 self.updateTitle(map:name)
             }
             renderer.onError = { [weak self] error in self?.show(error) }
@@ -196,7 +200,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.title = "\(appTitle) — \(wad.gameName) — \(wad.url.lastPathComponent) — \(wad.mapTitle(name))"
     }
     func describe(_ name: String, _ result: (triangles:Int,missing:[String])) {
-        updateTitle(map:name)
+        closeAutomap();updateTitle(map:name)
         summary = wad?.mapTitle(name) ?? name
         if !result.missing.isEmpty { summary += " · \(result.missing.count) missing textures" }
         status.stringValue = summary

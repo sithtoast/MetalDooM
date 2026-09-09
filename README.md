@@ -143,8 +143,8 @@ The original engine decoder has not been hardened for deliberately crafted paylo
   extreme pitch and unusual sky-map tricks need further validation.
   World textures/flats follow the engine animation tables. The HUD supports idle,
   weapon grin, directional hurt, heavy-damage ouch, sustained-fire, invulnerability
-  and death expressions across health bands. Power-up screen effects and fuzz
-  rendering remain pending.
+  and death expressions across health bands. Power-up scene effects and spectre/weapon
+  fuzz are implemented as Metal approximations rather than exact palette/software output.
 - Classic binary Doom maps only; no UDMF, Hexen format, extended/compressed nodes,
   Boom/MBF extensions, GZDoom mods, or IWAD+PWAD merging.
 - All geometry is submitted each frame. Sector height/light changes rebuild geometry
@@ -219,7 +219,7 @@ restart into E1M2, Quick Load restored the persisted E1M1 save and its map title
 
 ## Next milestones
 
-1. Add power-up screen effects and fuzz rendering.
+1. Refine palette fidelity, automap exploration and visibility culling.
 2. Add intermission background animations, finales, and respawning.
 3. Verify Doom II, longer play sessions, texture effects, and less common sector actions.
 
@@ -317,6 +317,26 @@ During gameplay, type these codes without opening the console:
 Console aliases are `god`, `noclip`, `give all`, and `give ammo`; the classic codes
 except `idclev` also work there (use `map` to warp). Cheats are disabled in attract
 mode and on Nightmare. Weapon grants respect the loaded game's available weapons.
-Automap presentation and some power-up visual effects remain pending; `idbeholda`
-sets the engine map power but cannot display an automap yet. `idmus` and `iddt` are
-not connected. Validate with `bash scripts/test-cheats-demos.sh /path/to/DOOM.WAD`.
+`idbeholda` reveals otherwise unexplored automap walls in gray. `idmus` and `iddt`
+are not connected. Validate with `bash scripts/test-cheats-demos.sh /path/to/DOOM.WAD`.
+
+## Automap and power-up presentation
+
+Tab opens/closes the north-up automap. Gameplay continues: WASD moves, arrows pan,
++/- (or the mouse wheel) zoom, F toggles player follow, and 0 fits the level. Escape
+closes the map before opening the menu. The HUD remains visible. Red walls, brown
+floor changes, yellow ceiling changes and green teleport lines distinguish features;
+unexplored map-power lines appear gray. Hidden lines stay hidden and secret doors
+look like walls. Explored flags are retained by saves. Visibility uses original
+sector sight tests around forward-facing line midpoints, an approximation of Doom's
+software-renderer discovery behavior.
+
+Invulnerability uses inverse grayscale, night vision removes scene dimming, the
+radiation suit adds green, and berserk adds a fading red tint. Expiry blinking follows
+the engine's timers. Spectres and the invisible weapon sample a displaced, darkened
+scene through their sprite masks; they retain depth occlusion. These are Metal
+approximations; exact COLORMAP/palette output and software fuzz patterns differ.
+
+Validation: `bash scripts/test-effects-map.sh /path/to/doom1.WAD`. Options rows use
+consistent bitmap text; the Ultimate menu caption uses tighter letter masks to
+exclude stray title-background pixels.

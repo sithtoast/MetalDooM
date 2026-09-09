@@ -23,6 +23,7 @@ final class AttractScreen: NSView {
 extension App {
     func beginAttract() {
         guard wad != nil else { return }
+        closeAutomap()
         gameMenu?.removeFromSuperview();gameMenu=nil
         if consoleVisible { toggleConsole() }
         MD_StopDemo();attractActive=true;attractDemo=false;attractIndex=0;cheatBuffer=""

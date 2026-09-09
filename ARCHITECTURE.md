@@ -244,3 +244,33 @@ sampling. The lower title logo is not copied because the character obscures it.
 Missing or differently sized artwork falls back to M_DOOM. No generated game artwork
 is shipped. GameMenu reserves extra header space for the composite and ClassicMenuCanvas
 renders a small version/build footer separately from bitmap menu labels.
+
+## Power-up shaders and fuzz
+
+MD_HUD copies fixedcolormap, suit/berserk state, invisibility duration and map power.
+World/sky/sprite fragments share inverse-grayscale and full-bright power uniforms;
+HUD fragments receive neutral uniforms. Existing scene tints include suit and berserk.
+These are RGB approximations, not exact PLAYPAL/COLORMAP remapping.
+
+Shadow flags are copied for world sprites and weapon frames. Opaque geometry and
+sprites render first; a Metal blit copies their color buffer into a private texture.
+A second render pass loads color/depth and draws shadow masks using displaced,
+darkened scene samples with depth testing but no depth writes. Weapons/HUD finish
+the frame. The fuzz phase follows gameplay tics, so pause freezes its pattern.
+MTKView framebufferOnly is disabled for the snapshot blit. Spectres use original
+MF_SHADOW; the weapon follows the original invisibility expiry blink condition.
+
+## Native automap
+
+AutomapView overlays the world portion of GameView while preserving the status bar
+and live simulation. It redraws at 30 Hz, reads copied line/player snapshots, and
+supports follow, fit, zoom, pan and close controls through the local key monitor.
+Movement keys still reach gameplay; map controls and mouse clicks do not fire.
+Map titles sit at the upper right to avoid pickup messages.
+
+Because the hardware renderer never calls R_StoreWallRange, the bridge approximates
+exploration every five gameplay tics with original P_CheckSight tests to nearby,
+forward-facing line midpoints. Only ML_MAPPED changes; it is already included in
+native save archives. Map snapshots classify hidden/secret walls, floor/ceiling
+changes and teleport lines. The map power reveals unmapped non-hidden lines in gray.
+Full software automap discovery, thing markers, rotation and IDDT remain separate work.

@@ -4,6 +4,16 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 44 — Power-up effects, fuzz and automap
+
+- Add invulnerability inverse grayscale, night vision, suit and berserk scene tints,
+  with power-up expiry blinking driven by the original engine.
+- Render spectres and invisible weapons with depth-tested background fuzz sampling.
+- Add the Tab automap with live gameplay, explored lines, player follow, pan, zoom,
+  fit and map-power reveal. Save/load retains exploration; the HUD stays visible.
+- Make Sound Volume match the other Options row text and tighten Ultimate logo
+  letter masks to remove background pixels. Keep map titles clear of pickup messages.
+
 ## Build 40 — Ultimate Doom menu header
 
 - Build a transparent Ultimate Doom menu logo from the loaded WAD's gold title

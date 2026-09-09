@@ -9,7 +9,7 @@ typedef struct {
 typedef struct { float floor, ceiling, light; } MD_Sector;
 typedef struct {
     float x, y, z, light, floorZ;
-    int lump, flip, fullbright, doomedType;
+    int lump, flip, fullbright, doomedType, shadow;
 } MD_Thing;
 typedef struct {
     int health, armor, readyAmmo, readyWeapon;
@@ -17,6 +17,7 @@ typedef struct {
     int maxBullets, maxShells, maxCells, maxRockets;
     uint32_t keys, weapons;
     int weaponGrin, faceIndex;
+    int fixedColorMap, suitFlash, berserkFlash, allmap, invisibility;
     int bonusFlash, messageSerial, tick, damageFlash, kills, totalKills;
     char message[128];
 } MD_HUD;
@@ -28,7 +29,7 @@ int MD_GetSkill(void);
 int MD_Tick(int forward, int side, int turn, int use);
 // weapon is a classic number-key slot 0...6, or -1 for no change.
 int MD_CombatTick(int forward, int side, int turn, int use, int attack, int weapon);
-typedef struct { float x, y, light; int lump, flip, fullbright; } MD_WeaponSprite;
+typedef struct { float x, y, light; int lump, flip, fullbright, shadow; } MD_WeaponSprite;
 int MD_CopyWeaponSprites(MD_WeaponSprite *output, int capacity);
 // Fixed native voice slots; lump -1 stops that voice. No engine pointers escape.
 typedef struct { int channel, lump; float volume, pan; } MD_SoundEvent;
@@ -78,3 +79,6 @@ int MD_Cheat(const char *name);
 int MD_StartDemo(const char *name);
 int MD_DemoPlaying(void);
 void MD_StopDemo(void);
+
+typedef struct { float x1,y1,x2,y2; int kind,mapped; } MD_MapLine;
+int MD_CopyMapLines(MD_MapLine *output,int capacity);
