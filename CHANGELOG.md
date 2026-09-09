@@ -4,6 +4,14 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 48 — Clean exit with a loaded WAD
+
+- Stop the title/demo timer, input monitor, rendering and audio before window
+  teardown, both when closing the window and when quitting the app.
+- Disable AppKit's automatic window release so Swift retains valid window ownership.
+- Add loaded-WAD shutdown checks covering title/gameplay closure, Quit cleanup,
+  repeated shutdown and late timer callbacks.
+
 ## Build 47 — Doom II core validation and MIDI pitch reset
 
 - Reset MIDI pitch bend and controllers between songs and on loop restart to

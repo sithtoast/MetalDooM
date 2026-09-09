@@ -279,3 +279,13 @@ forward-facing line midpoints. Only ML_MAPPED changes; it is already included in
 native save archives. Map snapshots classify hidden/secret walls, floor/ceiling
 changes and teleport lines. The map power reveals unmapped non-hidden lines in gray.
 Full software automap discovery, thing markers, rotation and IDDT remain separate work.
+
+## Application shutdown
+
+The Swift-owned main window disables AppKit release-on-close. Window closure and
+application termination share idempotent cleanup: cancel attract mode and its
+timer, release input, detach/pause the Metal view, pause audio, and remove the key
+monitor. Attract callbacks check shutdown state before accessing window state.
+Ending attract mode also invalidates its timer during normal gameplay transitions.
+`test-shutdown.sh` drains the run loop after loaded-WAD closure and checks that
+late callbacks and repeated cleanup are harmless.

@@ -22,7 +22,7 @@ final class AttractScreen: NSView {
 
 extension App {
     func beginAttract() {
-        guard wad != nil else { return }
+        guard !shuttingDown, wad != nil else { return }
         closeAutomap()
         gameMenu?.removeFromSuperview();gameMenu=nil
         if consoleVisible { toggleConsole() }
@@ -33,6 +33,7 @@ extension App {
         }
     }
     func endAttract() {
+        attractTimer?.invalidate(); attractTimer=nil
         attractActive=false;attractDemo=false;MD_StopDemo();titleScreen?.removeFromSuperview();titleScreen=nil
         titleMusic?.update(active:false);titleMusic=nil;view.inputBlocked=consoleVisible
     }
@@ -49,7 +50,7 @@ extension App {
         } catch { console?.append("Title: \(error)");endAttract();openGameMenu() }
     }
     func advanceAttract() {
-        guard attractActive else { return }
+        guard !shuttingDown, attractActive else { return }
         let active=NSApp.isActive && window.isKeyWindow && window.attachedSheet==nil && gameMenu==nil && !consoleVisible
         titleMusic?.enabled=renderer.musicEnabled;titleMusic?.volume=renderer.musicVolume
         titleMusic?.update(active:active && !attractDemo)

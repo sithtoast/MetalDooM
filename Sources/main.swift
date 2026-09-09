@@ -22,6 +22,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var automapView: AutomapView?
     var attractActive=false, attractDemo=false, attractIndex=0, attractElapsed=0.0
     var attractTimer: Timer?
+    private(set) var shuttingDown = false
     var titleScreen: AttractScreen?
     var titleMusic: MusicPlayer?
     var cheatBuffer=""
@@ -57,6 +58,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSApp.mainMenu = menu
             window = NSWindow(contentRect:NSRect(x:0,y:0,width:1100,height:760),styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)
             window.title = "\(appTitle) — Gameplay Preview"; window.minSize = NSSize(width:720,height:640)
+            window.isReleasedWhenClosed = false
             window.delegate = self; window.acceptsMouseMovedEvents = true
             let root = NSView(); window.contentView = root
             view = GameView(frame:.zero,device:MTLCreateSystemDefaultDevice())
@@ -69,7 +71,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             view.renderScale=CGFloat(UserDefaults.standard.object(forKey:"renderScale") as? Double ?? 1)
             view.preferredFramesPerSecond=UserDefaults.standard.object(forKey:"frameLimit") as? Int ?? 120
             menuKeyMonitor=NSEvent.addLocalMonitorForEvents(matching:.keyDown) { [weak self] event in
-                guard let self, self.window.isKeyWindow, self.window.attachedSheet == nil else { return event }
+                guard let self, !self.shuttingDown, self.window.isKeyWindow, self.window.attachedSheet == nil else { return event }
                 let modified = !event.modifierFlags.intersection([.command,.control,.option]).isEmpty
                 if !modified, ["`","~"].contains(event.characters ?? "") {
                     if !event.isARepeat { self.toggleConsole() }; return nil
@@ -320,7 +322,26 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func windowDidExitFullScreen(_ notification: Notification) { gameMenu?.refreshDisplay(); view.updateResolution() }
     func windowDidResignKey(_ notification: Notification) { view.releaseMouse(); renderer.pauseAudio(); try? menuAudio?.setActive(false) }
     func applicationWillResignActive(_ notification: Notification) { view.releaseMouse(); renderer.pauseAudio(); try? menuAudio?.setActive(false) }
-    func applicationWillTerminate(_ notification: Notification) { view?.releaseMouse(); if let menuKeyMonitor { NSEvent.removeMonitor(menuKeyMonitor) } }
+    // Both the close button and Quit must stop callbacks before AppKit tears down
+    // the window. This may be called twice during last-window termination.
+    private func shutdown() {
+        guard !shuttingDown else { return }
+        shuttingDown = true
+        endAttract()
+        view?.releaseMouse()
+        view?.inputBlocked = true
+        view?.isPaused = true
+        view?.delegate = nil
+        renderer?.paused = true
+        renderer?.pauseAudio()
+        try? menuAudio?.setActive(false)
+        if let menuKeyMonitor { NSEvent.removeMonitor(menuKeyMonitor); self.menuKeyMonitor = nil }
+    }
+    func windowWillClose(_ notification: Notification) {
+        guard let closing = notification.object as? NSWindow, closing === window else { return }
+        shutdown()
+    }
+    func applicationWillTerminate(_ notification: Notification) { shutdown() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }
 
