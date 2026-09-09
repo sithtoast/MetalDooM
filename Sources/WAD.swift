@@ -40,6 +40,14 @@ struct WAD {
     let signature: String
     let lumps: [Lump]
     let maps: [String]
+    // Match the engine's map-based game detection; filenames may be renamed.
+    var gameName: String {
+        if maps.contains("MAP01") { return "Doom II" }
+        if maps.contains("E4M1") { return "The Ultimate Doom" }
+        if maps.contains("E2M1") { return "Doom" }
+        if maps.contains("E1M1") { return "Doom (Shareware)" }
+        return "Doom"
+    }
     init(url: URL) throws {
         self.url = url.standardizedFileURL
         let b = Bytes(data: try Data(contentsOf: url))

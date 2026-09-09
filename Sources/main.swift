@@ -69,7 +69,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             renderer.onMapChanged = { [weak self] name in
                 guard let self else { return }
                 self.maps.selectItem(withTitle:name); self.summary = name
-                self.window.title = "\(appTitle) — \(self.wad?.url.lastPathComponent ?? "Doom") — \(name)"
+                self.updateTitle(map:name)
             }
             renderer.onError = { [weak self] error in self?.show(error) }
             window.center(); window.makeKeyAndOrderFront(nil); window.makeFirstResponder(view); NSApp.activate(ignoringOtherApps:true)
@@ -95,7 +95,6 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let result = try renderer.load(wad:candidate,map:selected)
             wad = candidate; maps.removeAllItems(); maps.addItems(withTitles:candidate.maps); maps.selectItem(withTitle:selected); maps.isEnabled = true
             describe(selected,result)
-            window.title = "\(appTitle) — \(url.lastPathComponent) — \(selected)"
             window.makeFirstResponder(view)
         } catch { show(error) }
     }
@@ -105,8 +104,12 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         do { describe(name,try renderer.load(wad:wad,map:name)); window.makeFirstResponder(view) }
         catch { show(error) }
     }
+    func updateTitle(map name: String) {
+        guard let wad else { return }
+        window.title = "\(appTitle) — \(wad.gameName) — \(wad.url.lastPathComponent) — \(name)"
+    }
     func describe(_ name: String, _ result: (triangles:Int,missing:[String])) {
-        window.title = "\(appTitle) — \(name)"
+        updateTitle(map:name)
         summary = name
         if !result.missing.isEmpty { summary += " · \(result.missing.count) missing textures" }
         status.stringValue = summary
