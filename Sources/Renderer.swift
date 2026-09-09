@@ -12,6 +12,15 @@ final class GameView: MTKView {
     var attackQueued = false, mouseFire = false
     var weaponQueued: Int32 = -1
     var continueQueued = false
+    var onEscape: (() -> Void)?
+    var renderScale: CGFloat = 1 { didSet { updateResolution() } }
+    func updateResolution() {
+        autoResizeDrawable=false
+        let scale=(window?.backingScaleFactor ?? 2)*renderScale
+        drawableSize=CGSize(width:max(1,(bounds.width*scale).rounded()),height:max(1,(bounds.height*scale).rounded()))
+    }
+    override func layout() { super.layout(); updateResolution() }
+    override func viewDidChangeBackingProperties() { super.viewDidChangeBackingProperties(); updateResolution() }
     func consumeAttack() -> Int32 {
         let fire = attackQueued || mouseFire || keys.contains(3)
         attackQueued = false; return fire ? 1 : 0
@@ -26,7 +35,7 @@ final class GameView: MTKView {
         if let slot = slots[event.keyCode] { weaponQueued = slot }
         if [0,1,2,13,123,124,125,126].contains(Int(event.keyCode)) { movementQueued.insert(event.keyCode) }
         if event.keyCode == 14 || event.keyCode == 49 { useQueued = true }
-        if event.keyCode == 53 { releaseMouse() } else { keys.insert(event.keyCode) }
+        if event.keyCode == 53 { releaseMouse(); onEscape?() } else { keys.insert(event.keyCode) }
     }
     override func keyUp(with event: NSEvent) { keys.remove(event.keyCode) }
     override func flagsChanged(with event: NSEvent) { running = event.modifierFlags.contains(.shift) }
@@ -68,6 +77,14 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var sprites: SpriteRenderer?
     private var sound: SoundPlayer?
     private var music: MusicPlayer?
+    var paused = false { didSet { if paused { pauseAudio() } } }
+    var skill: Int32 = 2
+    var effectsVolume: Float = Float(UserDefaults.standard.object(forKey:"effectsVolume") as? Double ?? 0.7) {
+        didSet { sound?.volume=effectsVolume; UserDefaults.standard.set(Double(effectsVolume),forKey:"effectsVolume") }
+    }
+    var musicVolume: Float = Float(UserDefaults.standard.object(forKey:"musicVolume") as? Double ?? 0.7) {
+        didSet { music?.volume=musicVolume; UserDefaults.standard.set(Double(musicVolume),forKey:"musicVolume") }
+    }
     var musicEnabled = !UserDefaults.standard.bool(forKey:"musicMuted") {
         didSet { music?.enabled=musicEnabled; UserDefaults.standard.set(!musicEnabled,forKey:"musicMuted") }
     }
@@ -249,18 +266,19 @@ final class Renderer: NSObject, MTKViewDelegate {
         let loadedMusic = try MusicPlayer(wad:wad,map:name)
         let episode = name.hasPrefix("E") ? Int(String(name.dropFirst().prefix(1))) ?? 1 : 1
         let number = name.hasPrefix("MAP") ? Int(name.dropFirst(3)) ?? 1 : Int(name.suffix(1)) ?? 1
-        let result = restorePath.map { MD_ReadSave($0) } ?? (continuing ? MD_Continue() : MD_Load(wad.url.path,Int32(episode),Int32(number)))
+        let result = restorePath.map { MD_ReadSave($0) } ?? (continuing ? MD_Continue() : MD_LoadSkill(wad.url.path,Int32(episode),Int32(number),skill))
         guard result != 0 else {
             if MD_SectorCount() == 0 { engineReady = false }
             throw PortError(String(cString:MD_LastError()))
         }
         guard MD_SectorCount() == map.sectors.count else { engineReady = false; throw PortError("Engine and Metal sector counts differ.") }
+        skill=MD_GetSkill()
         progress = MD_GetProgress(); intermission = IntermissionSequence(progress); intermissionTime = 0; lastGeometryTick = -1
         intermissionArt = loadedIntermission
         textureHeights = heights
         self.map = map; self.wad = wad; textures = cached; batches = loaded; sky = loadedSky; sprites = loadedSprites; pitch = 0
-        music?.update(active:false); music=loadedMusic; music?.enabled=musicEnabled
-        sound = loadedSound; sound?.drain()
+        music?.update(active:false); music=loadedMusic; music?.enabled=musicEnabled; music?.volume=musicVolume
+        sound = loadedSound; sound?.volume=effectsVolume; sound?.drain()
         hud = MD_GetHUD(); messageSerial = hud.messageSerial; messageUntil = hud.messageSerial > 0 ? hud.tick+140 : 0
         currentPlayer = MD_GetPlayer(); previousPlayer = currentPlayer
         position = SIMD2(currentPlayer.x,currentPlayer.y); yaw = currentPlayer.angle; eyeZ = currentPlayer.eyeZ
@@ -269,9 +287,9 @@ final class Renderer: NSObject, MTKViewDelegate {
         try syncGeometry()
         return (geometry.triangleCount,Array(Set(missing)).sorted())
     }
-    func saveGame(to url: URL) throws {
+    func saveGame(to url: URL, title: String? = nil) throws {
         guard engineReady, let wad, let map else { throw PortError("Open a WAD before saving.") }
-        try SaveStore.write(to:url,wad:wad,map:map.name,pitch:pitch)
+        try SaveStore.write(to:url,wad:wad,map:map.name,pitch:pitch,title:title)
         notice = "Game saved"; noticeUntil = CACurrentMediaTime()+3
     }
     func loadGame(from url: URL) throws {
@@ -402,7 +420,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     }
     private func update(view: GameView, delta: Double) throws {
         guard engineReady else { return }
-        guard NSApp.isActive, view.window?.isKeyWindow == true, view.window?.attachedSheet == nil else {
+        guard !paused, NSApp.isActive, view.window?.isKeyWindow == true, view.window?.attachedSheet == nil else {
             try sound?.setActive(false); music?.update(active:false)
             accumulator = 0; pendingTurn = 0; previousPlayer = currentPlayer; return
         }

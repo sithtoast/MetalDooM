@@ -4,6 +4,18 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 23 — Pause menu, display options and save slots
+
+- Escape opens a paused menu with Doom artwork; mouse and keyboard navigation
+  support Resume, New Game, Options, Save/Load, Open WAD and Quit.
+- New Game offers available episodes and all five original difficulty settings.
+  Restart retains difficulty; loading restores the saved difficulty.
+- Add six named save slots per WAD, separate from quick saves, preserving old saves.
+- Add window-size presets, fullscreen, 50/75/100% render scale, actual pixel-size
+  readout, and 35/60/120 FPS caps. Fullscreen uses the current desktop display mode.
+- Add independent persistent music/effects volume controls, using Apple's native
+  DLS synth on a separate mixer for music.
+
 ## Build 21 — Native WAD music
 
 - Play and loop original level, intermission and completion music using Apple's

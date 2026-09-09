@@ -29,8 +29,18 @@ import Foundation
         let player = MD_GetPlayer(), inventory = MD_GetHUD(), objects = things()
         let sectors = (0..<MD_SectorCount()).map { MD_GetSector($0) }
         let switchBefore = MD_GetSide(side)
-        try SaveStore.write(to:file,wad:wad,map:"E1M1",pitch:0.25)
+        try SaveStore.write(to:file,wad:wad,map:"E1M1",pitch:0.25,title:"Validation slot")
         let originalFile = try Data(contentsOf:file)
+        let named=try SaveStore.read(from:file,wad:wad); precondition(named.title=="Validation slot")
+        var legacy=try PropertyListSerialization.propertyList(from:originalFile,format:nil) as! [String:Any]
+        legacy.removeValue(forKey:"title")
+        try PropertyListSerialization.data(fromPropertyList:legacy,format:.binary,options:0).write(to:file)
+        let old=try SaveStore.read(from:file,wad:wad); precondition(old.title==nil)
+        try originalFile.write(to:file)
+        let slot0=try SaveStore.slotURL(wad:wad,slot:0), slot1=try SaveStore.slotURL(wad:wad,slot:1)
+        let other=try SaveStore.slotURL(wad:wrongWAD,slot:0), quick=try SaveStore.quickURL(wad:wad)
+        precondition(Set([slot0,slot1,other,quick]).count==4)
+        print("PASS: named save metadata, legacy saves without names, and separate slot/quick-save/WAD paths")
         precondition(MD_Load(wad.url.path,1,2) != 0);tick(50)
         let save = try SaveStore.read(from:file,wad:wad);precondition(save.pitch == 0.25)
         try save.payload.write(to:raw)
@@ -48,7 +58,7 @@ import Foundation
         var rejected=false
         do { _ = try SaveStore.read(from:file,wad:wrongWAD) } catch { rejected=true };precondition(rejected)
         var badPayload=save.payload;badPayload[100] ^= 1
-        let bad=SavedGame(format:save.format,version:save.version,wadSHA256:save.wadSHA256,map:save.map,savedAt:save.savedAt,pitch:save.pitch,payload:badPayload,payloadSHA256:save.payloadSHA256)
+        let bad=SavedGame(format:save.format,version:save.version,wadSHA256:save.wadSHA256,map:save.map,title:save.title,savedAt:save.savedAt,pitch:save.pitch,payload:badPayload,payloadSHA256:save.payloadSHA256)
         try PropertyListEncoder().encode(bad).write(to:file)
         rejected=false;do { _ = try SaveStore.read(from:file,wad:wad) } catch {rejected=true};precondition(rejected)
         try originalFile.prefix(100).write(to:file)

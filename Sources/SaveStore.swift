@@ -4,6 +4,7 @@ import CryptoKit
 
 struct SavedGame: Codable {
     let format: String, version: Int, wadSHA256: String, map: String
+    let title: String?
     let savedAt: Date, pitch: Float
     let payload: Data, payloadSHA256: String
 }
@@ -16,13 +17,20 @@ enum SaveStore {
         try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
         return folder.appendingPathComponent("\(try wadDigest(wad)).mdsave")
     }
+    static func slotURL(wad: WAD, slot: Int) throws -> URL {
+        guard (0..<6).contains(slot) else { throw PortError("Invalid save slot.") }
+        let quick=try quickURL(wad:wad)
+        let folder=quick.deletingPathExtension().appendingPathExtension("slots")
+        try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
+        return folder.appendingPathComponent("slot-\(slot+1).mdsave")
+    }
     static func temporaryURL() -> URL { FileManager.default.temporaryDirectory.appendingPathComponent("MetalDooM-\(UUID().uuidString).payload") }
-    static func write(to url: URL, wad: WAD, map: String, pitch: Float) throws {
+    static func write(to url: URL, wad: WAD, map: String, pitch: Float, title: String? = nil) throws {
         guard url.standardizedFileURL.resolvingSymlinksInPath() != wad.url.resolvingSymlinksInPath() else { throw PortError("Choose a save file, not the WAD itself.") }
         let temporary = temporaryURL(); defer { try? FileManager.default.removeItem(at:temporary) }
         guard MD_WriteSave(temporary.path) != 0 else { throw PortError(String(cString:MD_LastError())) }
         let payload = try Data(contentsOf:temporary)
-        let save = SavedGame(format:"MetalDooM Save",version:1,wadSHA256:try wadDigest(wad),map:map,savedAt:Date(),pitch:pitch,payload:payload,payloadSHA256:digest(payload))
+        let save = SavedGame(format:"MetalDooM Save",version:1,wadSHA256:try wadDigest(wad),map:map,title:title,savedAt:Date(),pitch:pitch,payload:payload,payloadSHA256:digest(payload))
         let encoder = PropertyListEncoder(); encoder.outputFormat = .binary
         // Replace the destination only after the entire archive and container succeed.
         try encoder.encode(save).write(to:url,options:.atomic)

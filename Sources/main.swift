@@ -18,6 +18,9 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var maps: NSPopUpButton!
     var message: MessageLabel!
     var wad: WAD?
+    var gameMenu: GameMenu?
+    var menuKeyMonitor: Any?
+    var musicMenuItem: NSMenuItem?
     var summary = "Open a Doom WAD to explore a map"
     func applicationDidFinishLaunching(_ notification: Notification) {
         do {
@@ -38,11 +41,12 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let audioItem=NSMenuItem(), audioMenu=NSMenu(title:"Audio")
             audioItem.submenu=audioMenu; menu.addItem(audioItem)
             let musicItem=audioMenu.addItem(withTitle:"Music",action:#selector(toggleMusic(_:)),keyEquivalent:"m")
+            musicMenuItem=musicItem
             musicItem.target=self; musicItem.keyEquivalentModifierMask=[.command,.shift]
             musicItem.state=UserDefaults.standard.bool(forKey:"musicMuted") ? .off : .on
             NSApp.mainMenu = menu
             window = NSWindow(contentRect:NSRect(x:0,y:0,width:1100,height:760),styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)
-            window.title = "\(appTitle) — Gameplay Preview"; window.minSize = NSSize(width:720,height:480)
+            window.title = "\(appTitle) — Gameplay Preview"; window.minSize = NSSize(width:720,height:640)
             window.delegate = self; window.acceptsMouseMovedEvents = true
             let root = NSView(); window.contentView = root
             view = GameView(frame:.zero,device:MTLCreateSystemDefaultDevice())
@@ -50,6 +54,14 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             view.clearColor = MTLClearColor(red:0,green:0,blue:0,alpha:1)
             view.preferredFramesPerSecond = 120; view.framebufferOnly = true
             renderer = try Renderer(view:view); view.delegate = renderer
+            view.onEscape = { [weak self] in self?.openGameMenu() }
+            view.renderScale=CGFloat(UserDefaults.standard.object(forKey:"renderScale") as? Double ?? 1)
+            view.preferredFramesPerSecond=UserDefaults.standard.object(forKey:"frameLimit") as? Int ?? 120
+            menuKeyMonitor=NSEvent.addLocalMonitorForEvents(matching:.keyDown) { [weak self] event in
+                guard let self, self.window.isKeyWindow, self.window.attachedSheet == nil,
+                      self.gameMenu != nil else { return event }
+                return self.gameMenu?.handleKey(event) == true ? nil : event
+            }
             let button = NSButton(title:"Open WAD…",target:self,action:#selector(openWAD))
             maps = NSPopUpButton(); maps.target = self; maps.action = #selector(changeMap); maps.isEnabled = false
             let label = NSTextField(labelWithString:"METALDOOM   /   GAMEPLAY PREVIEW")
@@ -58,7 +70,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let toolbar = NSStackView(views:[label,spacer,maps,button]); toolbar.spacing = 16
             status = NSTextField(labelWithString:summary); status.font = .monospacedSystemFont(ofSize:11,weight:.regular)
             status.lineBreakMode = .byTruncatingTail
-            let help = NSTextField(labelWithString:"WASD move · Shift run · E / Space use · Click to capture, then fire · F fire · 1–7 weapons · Esc release · R restart")
+            let help = NSTextField(labelWithString:"WASD move · Shift run · E / Space use · Click to capture, then fire · F fire · 1–7 weapons · Esc menu · R restart")
             help.font = .systemFont(ofSize:11); help.textColor = .secondaryLabelColor
             for child in [toolbar,view!,status!,help] { child.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(child) }
             message = MessageLabel(labelWithString:""); message.translatesAutoresizingMaskIntoConstraints = false
@@ -84,6 +96,9 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 self.updateTitle(map:name)
             }
             renderer.onError = { [weak self] error in self?.show(error) }
+            let sizes=[NSSize(width:960,height:720),NSSize(width:1100,height:760),NSSize(width:1280,height:720),NSSize(width:1600,height:900),NSSize(width:1920,height:1080)]
+            let preset=UserDefaults.standard.object(forKey:"windowPreset") as? Int ?? 1
+            applyWindowSize(sizes[min(4,max(0,preset))])
             window.center(); window.makeKeyAndOrderFront(nil); window.makeFirstResponder(view); NSApp.activate(ignoringOtherApps:true)
             let arguments = CommandLine.arguments
             if let index = arguments.firstIndex(of:"-iwad"), index+1 < arguments.count {
@@ -92,6 +107,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             if let index = arguments.firstIndex(of:"-warp"), index+1 < arguments.count {
                 maps.selectItem(withTitle:arguments[index+1].uppercased()); changeMap()
             }
+            if wad == nil { openGameMenu() }
         } catch { show(error) }
     }
     @objc func quickSaveGame() {
@@ -143,7 +159,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let result = try renderer.load(wad:candidate,map:selected)
             wad = candidate; maps.removeAllItems(); maps.addItems(withTitles:candidate.maps); maps.selectItem(withTitle:selected); maps.isEnabled = true
             describe(selected,result)
-            window.makeFirstResponder(view)
+            if gameMenu != nil { gameMenu?.main() } else { window.makeFirstResponder(view) }
         } catch { show(error) }
     }
     @objc func changeMap() {
@@ -167,7 +183,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         view.releaseMouse()
         let alert = NSAlert(); alert.messageText = appTitle
         let date = Bundle.main.object(forInfoDictionaryKey:"MetalDooMBuildDate") as? String ?? "Unknown"
-        alert.informativeText = "Native Apple Silicon / Metal gameplay preview.\nBuilt: \(date)\n\nChocolate Doom combat, monsters, pickups, doors, Metal weapon sprites, and native sound effects. Level exits, classic intermission stats, inventory carryover, and live switch textures. Native save/load and quick saves are available in File. Music and original finale sequences remain pending.\n\nGPL-2.0-or-later. Includes Chocolate Doom code by id Software, Simon Howard, and contributors."
+        alert.informativeText = "Native Apple Silicon / Metal gameplay preview.\nBuilt: \(date)\n\nChocolate Doom combat, monsters, pickups, doors, Metal weapon sprites, and native sound effects. Level exits, classic intermission stats, inventory carryover, and live switch textures. Native save/load and quick saves are available in File. Native music, pause menus, named save slots, display options and audio levels are available. Original finale sequences remain pending.\n\nGPL-2.0-or-later. Includes Chocolate Doom code by id Software, Simon Howard, and contributors."
         alert.runModal()
     }
     func show(_ error: Error) {
@@ -175,11 +191,36 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let alert = NSAlert(); alert.messageText = "MetalDooM"; alert.informativeText = String(describing:error); alert.runModal()
     }
     @objc func toggleMusic(_ sender: NSMenuItem) {
-        renderer.musicEnabled.toggle(); sender.state=renderer.musicEnabled ? .on : .off
+        renderer.musicEnabled.toggle(); syncMusicMenu()
     }
+    func syncMusicMenu() { musicMenuItem?.state=renderer.musicEnabled ? .on : .off }
+    func openGameMenu() {
+        guard gameMenu == nil else { return }
+        view.releaseMouse(); renderer.paused=true
+        let panel=GameMenu(app:self); gameMenu=panel
+        panel.translatesAutoresizingMaskIntoConstraints=false; window.contentView!.addSubview(panel)
+        NSLayoutConstraint.activate([panel.centerXAnchor.constraint(equalTo:window.contentView!.centerXAnchor),
+            panel.centerYAnchor.constraint(equalTo:window.contentView!.centerYAnchor)])
+        window.makeFirstResponder(panel)
+    }
+    func closeGameMenu() {
+        guard wad != nil else { return }
+        gameMenu?.removeFromSuperview(); gameMenu=nil; view.releaseMouse(); renderer.paused=false
+        window.makeFirstResponder(view)
+    }
+    func applyWindowSize(_ size: NSSize) {
+        guard !window.styleMask.contains(.fullScreen) else { return }
+        let available=(window.screen ?? NSScreen.main)?.visibleFrame.size ?? size
+        window.setContentSize(NSSize(width:min(size.width,available.width),height:min(size.height,available.height-32)))
+        window.center(); window.contentView?.layoutSubtreeIfNeeded(); view?.updateResolution()
+        gameMenu?.updateResolutionText()
+    }
+    func windowDidResize(_ notification: Notification) { view?.updateResolution(); gameMenu?.updateResolutionText() }
+    func windowDidEnterFullScreen(_ notification: Notification) { gameMenu?.main(); view.updateResolution() }
+    func windowDidExitFullScreen(_ notification: Notification) { gameMenu?.main(); view.updateResolution() }
     func windowDidResignKey(_ notification: Notification) { view.releaseMouse(); renderer.pauseAudio() }
     func applicationWillResignActive(_ notification: Notification) { view.releaseMouse(); renderer.pauseAudio() }
-    func applicationWillTerminate(_ notification: Notification) { view?.releaseMouse() }
+    func applicationWillTerminate(_ notification: Notification) { view?.releaseMouse(); if let menuKeyMonitor { NSEvent.removeMonitor(menuKeyMonitor) } }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }
 

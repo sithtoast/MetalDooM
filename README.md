@@ -46,7 +46,7 @@ releases; independent checkouts do not share a global numbering sequence.
 | Click the viewport | Capture mouse; subsequent clicks/hold fire |
 | F | Fire (also works without mouse capture) |
 | 1–7 | Classic weapon slots; 1 fist/chainsaw, 2 pistol, 3 shotgun, etc. |
-| Escape | Release mouse |
+| Escape | Pause/open menu; back from submenus; resume from main menu |
 | R | Restart map with fresh starting inventory |
 | Return / Enter | Intermission: skip counting, show destination, then skip the four-second map display |
 | Command-O | Choose IWAD (restart first to change loaded IWAD) |
@@ -110,7 +110,7 @@ The original engine decoder has not been hardened for deliberately crafted paylo
 - Metal held-weapon/muzzle-flash overlays, number-key switching, damage/pickup tint,
   and an accessible kill count.
 - Original WAD music converted from MUS to MIDI in memory and played by Apple's
-  native MIDI player, using the built-in General MIDI bank. Level, intermission
+  native sequencer and DLS synth, using the built-in General MIDI bank. Level, intermission
   and completion tracks loop; episode 4 uses the original reused tracks.
   Audio → Music (Cmd–Shift–M) toggles music and remembers the setting. Music pauses
   on focus loss and during file dialogs. Loading a save restarts its level track;
@@ -121,13 +121,14 @@ The original engine decoder has not been hardened for deliberately crafted paylo
 
 ## Current limitations
 
-- Doom menus, demos, and networking are not connected.
+- Demos and networking are not connected. The pause menu uses original Doom artwork
+  with native controls; it is not the original software-drawn menu implementation.
 - Sound positioning is sampled when an effect starts; continuous repositioning,
   original priority/pitch variation, PC-speaker sounds, and audio-device changes
   need further work. Native output has been validated through offline mixing;
   physical speaker output has not been independently recorded.
 - Progression uses original completion/load-level functions rather than the full
-  G_Ticker loop. Death requires R (fresh inventory). Menus, demos, networking, and
+  G_Ticker loop. Death requires R (fresh inventory). Demos, networking, and
   original finale/story sequences are not connected. Episode endings show final
   stats; choose another episode with the map selector.
 - Intermission background animation remains. Doom II story breaks are
@@ -165,6 +166,7 @@ bash scripts/test-input.sh
 bash scripts/test-combat.sh "$HOME/Downloads/doom1.WAD"
 bash scripts/test-audio.sh "$HOME/Downloads/doom1.WAD"
 bash scripts/test-music.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD"
+bash scripts/test-menu-engine.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD"
 bash scripts/test-progression.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD"
 bash scripts/test-save.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD" "$HOME/Downloads/doom1.WAD"
 bash scripts/test.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD"
@@ -214,7 +216,7 @@ restart into E1M2, Quick Load restored the persisted E1M1 save and its map title
 
 ## Next milestones
 
-1. Add Doom menus and refine the save-slot experience.
+1. Complete Doomguy expressions, power-up effects, and world texture animation.
 2. Add intermission background animations, finales, and respawning.
 3. Verify Doom II, longer play sessions, texture effects, and less common sector actions.
 
@@ -224,3 +226,22 @@ See [CHANGELOG.md](CHANGELOG.md) for the build-by-build history.
 
 Intermission regression checks: `bash scripts/test-intermission.sh` covers original
 counter timing, sound cues, skipping, map timeout, episode endings and secret markers.
+
+## Pause menu and options
+
+Escape pauses simulation, intermission timing, and audio. The menu supports mouse
+buttons, Up/Down/Enter on the main page, and Tab through native controls. New Game
+offers the episodes present in the WAD and all five original difficulty settings.
+Restart retains difficulty, and loading restores the difficulty saved in the slot.
+
+Save Game and Load Game expose six named slots per WAD, separate from Quick Save.
+A save name and timestamp identify each slot; choosing an occupied slot replaces
+it. Earlier saves without names remain compatible. File menu import/export and
+quick-save shortcuts are still available.
+
+Options offers window sizes from 960×720 to 1920×1080 macOS points (clamped to
+the screen), fullscreen, 50/75/100% Metal render scale, and 35/60/120 FPS limits.
+The pixel dimensions shown reflect the actual drawable, including Retina scaling.
+Fullscreen uses the current desktop display mode; it does not switch the monitor's
+resolution. Window preset, render scale, frame limit, music enablement, and separate
+music/effects volume levels persist.

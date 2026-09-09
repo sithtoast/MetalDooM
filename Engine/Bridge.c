@@ -221,7 +221,10 @@ void I_Error(const char *format, ...) {
 }
 const char *MD_LastError(void) { return errorText; }
 
-int MD_Load(const char *path, int episode, int map) {
+int MD_GetSkill(void) { return gameskill; }
+int MD_Load(const char *path, int episode, int map) { return MD_LoadSkill(path,episode,map,2); }
+int MD_LoadSkill(const char *path, int episode, int map, int skill) {
+    if (skill < 0 || skill > 4) { snprintf(errorText,sizeof(errorText),"Invalid difficulty."); return 0; }
     if (poisoned) { snprintf(errorText,sizeof(errorText),"Engine encountered an error. Restart MetalDooM before loading another map."); return 0; }
     if (!path || strlen(path) >= sizeof(loadedPath)) { snprintf(errorText,sizeof(errorText),"Invalid IWAD path."); return 0; }
     if (initialized && strcmp(path,loadedPath)) {
@@ -248,7 +251,7 @@ int MD_Load(const char *path, int episode, int map) {
     memset(playeringame,0,sizeof(playeringame)); playeringame[0] = true;
     nomonsters = !monstersEnabled; precache = false; netgame = false; deathmatch = 0;
     gametic = 0;
-    G_InitNew(sk_medium,episode,map);
+    G_InitNew((skill_t)skill,episode,map);
     progress = (MD_Progress){.episode=gameepisode,.map=gamemap,.commercial=gamemode == commercial};
     // Original thinkers now drive monsters, weapons, projectiles and pickups.
     lastMessage[0] = 0; messageSerial = 0;

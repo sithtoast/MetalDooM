@@ -163,12 +163,24 @@ loading and rejection of bad native headers before live state changes.
 `MUS.swift` translates bounded MUS scores into type-0 MIDI at 70 ticks per beat
 (140 ticks per second), following the pinned upstream converter's event mapping.
 Conversion state is local; MIDI lumps pass through to Apple's parser.
-`MusicPlayer.swift` owns AVMIDIPlayer on the main thread, with the built-in macOS
-General MIDI sound bank. The renderer selects level/intermission/completion tracks
+`MusicPlayer.swift` owns an AVAudioSequencer and Apple DLS synth on an independent
+AVAudioEngine mixer, with the built-in macOS General MIDI sound bank. The renderer selects level/intermission/completion tracks
 and pauses music alongside gameplay. Duration-based polling loops the score because
-the native player can continue advancing after the last MIDI event. No completion
+the sequencer can continue advancing after the last MIDI event. No completion
 callback retains the player or races a subsequent track selection.
 
 MusicValidation loads every music lump in the supplied WAD into AVMIDIPlayer, then
 checks native position advance, pause/resume, mute, selection, and a short synthetic
 score's loop. It also checks malformed MUS data and percussion/controller mapping.
+
+## Pause menu, settings and slots
+
+GameMenu uses original menu patches in accessible AppKit controls. Renderer.paused
+gates the same update path as focus loss, freezing gameplay and intermission while
+rendering the paused scene. Escape releases pending gameplay input before opening.
+Native popups/sliders select display and mixer settings; GameView sizes its Metal
+drawable explicitly using backing scale and render scale.
+
+MD_LoadSkill validates and passes difficulty to original G_InitNew. MD_GetSkill
+synchronizes the host after save restoration. Six per-WAD slot paths are separate
+from quick saves, and optional container titles preserve backward compatibility.

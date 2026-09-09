@@ -1,24 +1,30 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import AVFoundation
 
-// Main-thread owner. AVMIDIPlayer uses macOS's built-in General MIDI sound bank.
+// Main-thread sequencer with Apple's DLS synth and an independent volume mixer.
 final class MusicPlayer {
     private let wad: WAD
-    private var player: AVMIDIPlayer?
+    let engine=AVAudioEngine()
+    private let synth=AVAudioUnitMIDIInstrument(audioComponentDescription:AudioComponentDescription(
+        componentType:kAudioUnitType_MusicDevice,componentSubType:kAudioUnitSubType_DLSSynth,
+        componentManufacturer:kAudioUnitManufacturer_Apple,componentFlags:0,componentFlagsMask:0))
+    private var sequencer: AVAudioSequencer?
     private(set) var trackName = ""
     private(set) var loopCount = 0
     private var active = false
-    private var started = false
-    private var pausedPosition = 0.0
     var enabled = true { didSet { if !enabled { pause() } } }
-    var position: Double { player?.currentPosition ?? 0 }
-    var duration: Double { player?.duration ?? 0 }
-    var isPlaying: Bool { player?.isPlaying ?? false }
+    var volume: Float { get { engine.mainMixerNode.outputVolume } set { engine.mainMixerNode.outputVolume=max(0,min(1,newValue)) } }
+    var position: Double { sequencer?.currentPositionInSeconds ?? 0 }
+    var duration: Double { sequencer?.tracks.map(\.lengthInSeconds).max() ?? 0 }
+    var isPlaying: Bool { sequencer?.isPlaying ?? false }
     init(wad: WAD, map: String) throws {
         self.wad=wad
+        engine.attach(synth); engine.connect(synth,to:engine.mainMixerNode,format:nil)
+        engine.mainMixerNode.outputVolume=0.7
+        engine.prepare()
         try select(Self.levelTrack(map))
     }
-    deinit { player?.stop() }
+    deinit { sequencer?.stop(); engine.stop() }
     static func levelTrack(_ map: String) -> String {
         if map.hasPrefix("MAP"), let number=Int(map.dropFirst(3)), (1...32).contains(number) {
             let tracks=["RUNNIN","STALKS","COUNTD","BETWEE","DOOM","THE_DA","SHAWN","DDTBLU","IN_CIT","DEAD", "STLKS2","THEDA2","DOOM2","DDTBL2","RUNNI2","DEAD2","STLKS3","ROMERO","SHAWN2","MESSAG","COUNT2","DDTBL3","AMPIE","THEDA3","ADRIAN","MESSG2","ROMER2","TENSE","SHAWN3","OPENIN","EVIL","ULTIMA"]
@@ -35,27 +41,32 @@ final class MusicPlayer {
     }
     func select(_ name: String) throws {
         guard let lump=wad.lump(name) else { throw PortError("Missing music: \(name).") }
-        let next=try AVMIDIPlayer(data:MUS.midi(lump.data),soundBankURL:nil)
+        let next=AVAudioSequencer(audioEngine:engine)
+        try next.load(from:MUS.midi(lump.data),options:.smf_ChannelsToTracks)
+        for track in next.tracks { track.destinationAudioUnit=synth }
+        guard next.tracks.contains(where:{$0.lengthInSeconds>0}) else { throw PortError("Empty music: \(name).") }
+        pause(); sequencer=next; trackName=name; loopCount=0
+        try engine.start()
         next.prepareToPlay()
-        guard next.duration > 0 else { throw PortError("Empty music: \(name).") }
-        player?.stop(); player=next; trackName=name; pausedPosition=0; loopCount=0; started=false
         update(active:active)
     }
     private func pause() {
-        guard let player, player.isPlaying else { return }
-        pausedPosition=player.currentPosition; player.stop(); started=false
+        sequencer?.stop(); engine.pause()
     }
     func update(active: Bool) {
         self.active=active
-        guard active && enabled else { pause(); return }
-        guard let player else { return }
-        // The native player can keep running beyond the final MIDI event, so
-        // loop at the score duration rather than waiting for isPlaying to clear.
-        if player.currentPosition >= player.duration || (started && !player.isPlaying) {
-            player.stop(); pausedPosition=0; started=false; loopCount += 1
+        guard active && enabled else { if engine.isRunning { pause() }; return }
+        guard let sequencer else { return }
+        do {
+            if !engine.isRunning { try engine.start() }
+            if position >= duration {
+                sequencer.stop(); sequencer.currentPositionInSeconds=0; loopCount += 1
+            }
+            if !sequencer.isPlaying { try sequencer.start() }
+        } catch {
+            pause()
+            // Device failures must not terminate the gameplay simulation.
+            fputs("Music playback: \(error)\n",stderr)
         }
-        guard !player.isPlaying else { return }
-        player.currentPosition=pausedPosition
-        player.play(nil); started=true
     }
 }

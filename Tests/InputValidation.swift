@@ -29,6 +29,14 @@ import MetalKit
         view.releaseMouse(); precondition(view.consumeAttack() == 0)
         view.keyDown(with:event(.keyDown,36)); view.keyUp(with:event(.keyUp,36))
         precondition(view.continueQueued); view.releaseMouse(); precondition(!view.continueQueued)
+        var menuOpened=false; view.onEscape={ menuOpened=true }
+        view.keyDown(with:event(.keyDown,13)); view.keyDown(with:event(.keyDown,3))
+        view.keyDown(with:event(.keyDown,53)); precondition(menuOpened && view.consumeMovement().isEmpty && view.consumeAttack()==0)
+        menuOpened=false; view.keyDown(with:event(.keyDown,53,true)); precondition(!menuOpened)
+        view.frame=NSRect(x:0,y:0,width:800,height:600); view.renderScale=1
+        let full=view.drawableSize; view.renderScale=0.5
+        precondition(view.drawableSize.width==full.width/2 && view.drawableSize.height==full.height/2)
+        print("PASS: Escape opens menu once and clears gameplay input; render scale changes real drawable dimensions")
         print("PASS: fire taps/holds and weapon selection survive tics and clear on focus release")
         print("PASS: native brief taps survive one tic, holds persist, use queues, and focus release clears input")
     }

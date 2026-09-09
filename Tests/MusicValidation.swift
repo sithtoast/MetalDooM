@@ -40,7 +40,22 @@ import AVFoundation
         player.enabled=true; player.update(active:true); precondition(player.isPlaying)
         try player.select("D_INTER"); precondition(player.trackName=="D_INTER" && player.isPlaying)
         try player.select("D_E1M2"); precondition(player.trackName=="D_E1M2" && player.isPlaying)
-        player.update(active:false)
+        let lock=NSLock(); var peak: Float=0
+        player.engine.mainMixerNode.installTap(onBus:0,bufferSize:1024,format:nil) { buffer,_ in
+            var value: Float=0
+            if let channels=buffer.floatChannelData {
+                for channel in 0..<Int(buffer.format.channelCount) {
+                    for i in 0..<Int(buffer.frameLength) { value=max(value,abs(channels[channel][i])) }
+                }
+            }
+            lock.lock(); peak=max(peak,value); lock.unlock()
+        }
+        player.volume=1; advance(0.5)
+        lock.lock(); let audible=peak; lock.unlock(); precondition(audible>0.0001)
+        player.volume=0; advance(0.2); lock.lock(); peak=0; lock.unlock(); advance(0.3)
+        lock.lock(); let silent=peak; lock.unlock(); precondition(silent<0.000001)
+        player.engine.mainMixerNode.removeTap(onBus:0); player.update(active:false)
+        print("PASS: actual native synth mixer output is nonzero at full volume and silent at zero")
         // Tiny synthetic WAD tests natural end looping without waiting for a song.
         var file=Data("IWAD".utf8)
         func le(_ n: Int) -> Data { Data([UInt8(n&255),UInt8((n>>8)&255),UInt8((n>>16)&255),UInt8((n>>24)&255)]) }

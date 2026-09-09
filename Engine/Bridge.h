@@ -23,6 +23,8 @@ typedef struct {
 
 // Single main-thread engine instance. One IWAD per process; maps may be restarted.
 int MD_Load(const char *wadPath, int episode, int map);
+int MD_LoadSkill(const char *wadPath, int episode, int map, int skill);
+int MD_GetSkill(void);
 int MD_Tick(int forward, int side, int turn, int use);
 // weapon is a classic number-key slot 0...6, or -1 for no change.
 int MD_CombatTick(int forward, int side, int turn, int use, int attack, int weapon);
