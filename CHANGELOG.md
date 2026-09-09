@@ -4,6 +4,17 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 31 — Classic save, load and options
+
+- Give all six save/load slots original Doom borders, bitmap names and the animated
+  skull. Type a name in the slot; Enter saves and Escape cancels the edit.
+- Extend the classic presentation to display and audio options, including original
+  volume thermometers and keyboard/mouse adjustment.
+- Play original menu opening, movement, selection, adjustment and back sounds through
+  a separate mixer while gameplay is paused, respecting effects volume and focus loss.
+- Honor artwork offsets so slot borders align with their text. Existing saves remain
+  compatible.
+
 ## Build 28 — Original-style Doom menus
 
 - Draw the main, episode and difficulty menus with original artwork, 320×200

@@ -9,8 +9,8 @@ final class SoundPlayer {
     private let format = AVAudioFormat(standardFormatWithSampleRate:44100,channels:1)!
     var volume: Float { get { engine.mainMixerNode.outputVolume } set { engine.mainMixerNode.outputVolume=max(0,min(1,newValue)) } }
     private(set) var scheduledSounds = 0
-    init(wad: WAD, offline: Bool = false) throws {
-        for (index,lump) in wad.lumps.enumerated() where lump.name.hasPrefix("DS") {
+    init(wad: WAD, offline: Bool = false, onlyLumps: Set<String>? = nil) throws {
+        for (index,lump) in wad.lumps.enumerated() where lump.name.hasPrefix("DS") && (onlyLumps == nil || onlyLumps!.contains(lump.name)) {
             if let buffer = try Self.decode(lump.bytes,format:format) { buffers[index] = buffer }
         }
         for voice in voices { engine.attach(voice); engine.connect(voice,to:engine.mainMixerNode,format:format) }

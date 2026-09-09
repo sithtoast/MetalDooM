@@ -23,6 +23,24 @@ import AVFoundation
         precondition(peak > 0.01 && peak <= 1,"Invalid rendered peak: \(peak)")
         try sound.setActive(false); precondition(!sound.engine.isRunning)
         try sound.setActive(true); precondition(sound.engine.isRunning)
+        let menuNames: Set<String>=["DSPSTOP","DSSTNMOV","DSPISTOL","DSSWTCHN","DSSWTCHX"]
+        let menu=try SoundPlayer(wad:wad,offline:true,onlyLumps:menuNames)
+        try menu.setActive(true)
+        let menuBuffer=AVAudioPCMBuffer(pcmFormat:menu.engine.manualRenderingFormat,frameCapacity:4096)!
+        for name in menuNames.sorted() {
+            let index=wad.lumps.lastIndex(where:{$0.name==name})!
+            menu.play(MD_SoundEvent(channel:0,lump:Int32(index),volume:0.7,pan:0))
+            var peak: Float=0
+            for _ in 0..<12 {
+                if try menu.engine.renderOffline(4096,to:menuBuffer) == .success {
+                    for channel in 0..<Int(menuBuffer.format.channelCount) {
+                        for i in 0..<Int(menuBuffer.frameLength) { peak=max(peak,abs(menuBuffer.floatChannelData![channel][i])) }
+                    }
+                }
+            }
+            precondition(peak>0.001,"Silent menu sound: \(name)")
+        }
+        print("PASS: all five original menu sounds produce native PCM on an independent menu mixer")
         let mono = AVAudioFormat(standardFormatWithSampleRate:44100,channels:1)!
         let invalid = Bytes(data:Data([3,0,0,0,64,0,0,0]))
         var rejected = false

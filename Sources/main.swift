@@ -18,6 +18,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var maps: NSPopUpButton!
     var message: MessageLabel!
     var wad: WAD?
+    var menuAudio: SoundPlayer?
     var gameMenu: GameMenu?
     var menuKeyMonitor: Any?
     var musicMenuItem: NSMenuItem?
@@ -193,10 +194,18 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func toggleMusic(_ sender: NSMenuItem) {
         renderer.musicEnabled.toggle(); syncMusicMenu()
     }
+    func playMenuSound(_ name: String) {
+        guard let wad, let index=wad.lumps.lastIndex(where:{$0.name==name}) else { return }
+        do {
+            if menuAudio == nil { menuAudio=try SoundPlayer(wad:wad,onlyLumps:["DSPSTOP","DSSTNMOV","DSPISTOL","DSSWTCHN","DSSWTCHX"]) }
+            menuAudio?.volume=renderer.effectsVolume; try menuAudio?.setActive(true)
+            menuAudio?.play(MD_SoundEvent(channel:0,lump:Int32(index),volume:0.7,pan:0))
+        } catch { fputs("Menu sound: \(error)\n",stderr) }
+    }
     func syncMusicMenu() { musicMenuItem?.state=renderer.musicEnabled ? .on : .off }
     func openGameMenu() {
         guard gameMenu == nil else { return }
-        view.releaseMouse(); renderer.paused=true
+        view.releaseMouse(); renderer.paused=true; playMenuSound("DSSWTCHN")
         let panel=GameMenu(app:self); gameMenu=panel
         panel.translatesAutoresizingMaskIntoConstraints=false; window.contentView!.addSubview(panel)
         NSLayoutConstraint.activate([panel.centerXAnchor.constraint(equalTo:window.contentView!.centerXAnchor),
@@ -216,10 +225,10 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         gameMenu?.updateResolutionText()
     }
     func windowDidResize(_ notification: Notification) { view?.updateResolution(); gameMenu?.updateResolutionText() }
-    func windowDidEnterFullScreen(_ notification: Notification) { gameMenu?.main(); view.updateResolution() }
-    func windowDidExitFullScreen(_ notification: Notification) { gameMenu?.main(); view.updateResolution() }
-    func windowDidResignKey(_ notification: Notification) { view.releaseMouse(); renderer.pauseAudio() }
-    func applicationWillResignActive(_ notification: Notification) { view.releaseMouse(); renderer.pauseAudio() }
+    func windowDidEnterFullScreen(_ notification: Notification) { gameMenu?.refreshDisplay(); view.updateResolution() }
+    func windowDidExitFullScreen(_ notification: Notification) { gameMenu?.refreshDisplay(); view.updateResolution() }
+    func windowDidResignKey(_ notification: Notification) { view.releaseMouse(); renderer.pauseAudio(); try? menuAudio?.setActive(false) }
+    func applicationWillResignActive(_ notification: Notification) { view.releaseMouse(); renderer.pauseAudio(); try? menuAudio?.setActive(false) }
     func applicationWillTerminate(_ notification: Notification) { view?.releaseMouse(); if let menuKeyMonitor { NSEvent.removeMonitor(menuKeyMonitor) } }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }

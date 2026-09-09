@@ -8,6 +8,7 @@ final class GameMenu: NSView {
     private var menuWidth: NSLayoutConstraint!
     private var classic: ClassicMenuCanvas?
     private var decoder: Art?
+    private var origins: [String:CGPoint] = [:]
     private var images: [String:NSImage] = [:]
     private var chosenMap="E1M1"
     private var mainButtons: [NSButton] = []
@@ -52,6 +53,7 @@ final class GameMenu: NSView {
         guard let wad=app.wad else { return nil }
         if decoder == nil { decoder=try? Art(wad:wad) }
         guard let decoder, let patch=try? decoder.patch(named:name) else { return nil }
+        origins[name]=CGPoint(x:patch.left,y:patch.top)
         let pixels=patch.image
         guard let rep=NSBitmapImageRep(bitmapDataPlanes:nil,pixelsWide:pixels.width,pixelsHigh:pixels.height,
             bitsPerSample:8,samplesPerPixel:4,hasAlpha:true,isPlanar:false,colorSpaceName:.deviceRGB,bytesPerRow:pixels.width*4,bitsPerPixel:32),let data=rep.bitmapData else { return nil }
@@ -71,12 +73,14 @@ final class GameMenu: NSView {
     }
     @objc private func invoke(_ sender: NSButton) { actions[sender.tag]() }
     private func back() { button("Back — Esc") { [weak self] in self?.main() } }
-    private func canvas(_ title: String, art: [(String,CGFloat,CGFloat)], items: [ClassicMenuCanvas.Item], selected: Int=0, back: @escaping () -> Void) {
+    private func canvas(_ title: String, art: [(String,CGFloat,CGFloat)], items: [ClassicMenuCanvas.Item], selected: Int=0, labels: [(String,CGFloat,CGFloat)]=[], back: @escaping () -> Void) {
         reset(title)
         for child in stack.arrangedSubviews { stack.removeArrangedSubview(child); child.removeFromSuperview() }
         layer?.backgroundColor=NSColor.clear.cgColor; layer?.borderWidth=0; menuWidth.constant=640
         let canvas=ClassicMenuCanvas(); canvas.image={ [weak self] in self?.image($0) }
-        canvas.artwork=art; canvas.items=items; canvas.selected=selected; canvas.onBack=back
+        canvas.patchOrigin={ [weak self] in self?.origins[$0] ?? .zero }
+        canvas.artwork=art; canvas.items=items; canvas.selected=selected; canvas.onBack=back; canvas.labels=labels
+        canvas.onSound={ [weak self] in self?.app.playMenuSound($0) }
         canvas.translatesAutoresizingMaskIntoConstraints=false
         stack.addArrangedSubview(canvas)
         NSLayoutConstraint.activate([canvas.widthAnchor.constraint(equalTo:stack.widthAnchor),canvas.heightAnchor.constraint(equalTo:canvas.widthAnchor,multiplier:0.75)])
@@ -141,79 +145,95 @@ final class GameMenu: NSView {
             app.closeGameMenu()
         } catch { app.renderer.skill=old; app.show(error) }
     }
-    private func row(_ title: String,_ control: NSView) {
-        let label=NSTextField(labelWithString:title); label.widthAnchor.constraint(equalToConstant:110).isActive=true
-        let row=NSStackView(views:[label,control]); row.spacing=12; stack.addArrangedSubview(row)
-    }
     private func options() {
-        reset("Options")
-        let sizes=NSPopUpButton(); sizes.addItems(withTitles:["960 × 720","1100 × 760","1280 × 720","1600 × 900","1920 × 1080"])
-        let current=UserDefaults.standard.object(forKey:"windowPreset") as? Int ?? 1; sizes.selectItem(at:min(4,max(0,current)))
-        sizes.target=self; sizes.action=#selector(windowSize(_:)); sizes.isEnabled = !app.window.styleMask.contains(.fullScreen)
-        row("Window size",sizes)
-        let fullscreen=NSButton(checkboxWithTitle:"Fullscreen",target:self,action:#selector(fullscreen(_:)))
-        fullscreen.state=app.window.styleMask.contains(.fullScreen) ? .on : .off; stack.addArrangedSubview(fullscreen)
-        let scale=NSPopUpButton(); scale.addItems(withTitles:["50%","75%","100% (native)"])
-        scale.selectItem(at:[CGFloat(0.5),0.75,1].firstIndex(of:app.view.renderScale) ?? 2)
-        scale.target=self; scale.action=#selector(renderScale(_:)); row("Render scale",scale)
-        let fps=NSPopUpButton(); fps.addItems(withTitles:["35 FPS","60 FPS","120 FPS"])
-        fps.selectItem(at:[35,60,120].firstIndex(of:app.view.preferredFramesPerSecond) ?? 2)
-        fps.target=self; fps.action=#selector(frameRate(_:)); row("Frame limit",fps)
-        resolutionLabel=NSTextField(labelWithString:""); stack.addArrangedSubview(resolutionLabel!)
+        canvas("Options",art:[("M_OPTTTL",108,15)],items:[
+            .init(title:"Sound Volume",patch:"M_SVOL",x:60,y:64,action:{ [weak self] in self?.audioOptions() }),
+            .init(title:"Display",patch:"",x:60,y:96,action:{ [weak self] in self?.displayOptions() }),
+            .init(title:"Back",patch:"",x:60,y:128,action:{ [weak self] in self?.main() })
+        ],labels:[("ENTER SELECT   ESC BACK",48,180)],back:{ [weak self] in self?.main() })
+    }
+    private func audioOptions() {
+        canvas("Audio",art:[("M_SVOL",60,25)],items:[
+            .init(title:"Sound effects volume",patch:"M_SFXVOL",x:80,y:64,action:{},
+                adjust:{ [weak self] step in
+                    guard let self else { return }; self.app.renderer.effectsVolume=max(0,min(1,self.app.renderer.effectsVolume+Float(step)/15))
+                },meter:{ [weak self] in self?.app.renderer.effectsVolume ?? 0 }),
+            .init(title:"Music volume",patch:"M_MUSVOL",x:80,y:104,action:{},
+                adjust:{ [weak self] step in
+                    guard let self else { return }; self.app.renderer.musicVolume=max(0,min(1,self.app.renderer.musicVolume+Float(step)/15))
+                },meter:{ [weak self] in self?.app.renderer.musicVolume ?? 0 }),
+            .init(title:"Music",patch:"",x:80,y:144,action:{},value:{ [weak self] in self?.app.renderer.musicEnabled==true ? "ON" : "OFF" },
+                adjust:{ [weak self] _ in self?.app.renderer.musicEnabled.toggle(); self?.app.syncMusicMenu() }),
+            .init(title:"Back",patch:"",x:80,y:164,action:{ [weak self] in self?.options() })
+        ],labels:[("LEFT/RIGHT ADJUST   ESC BACK",40,188)],back:{ [weak self] in self?.options() })
+    }
+    private static let sizes=[NSSize(width:960,height:720),NSSize(width:1100,height:760),NSSize(width:1280,height:720),NSSize(width:1600,height:900),NSSize(width:1920,height:1080)]
+    private func displayOptions(selected: Int=0) {
+        canvas("Display",art:[("M_OPTTTL",108,15)],items:[
+            .init(title:"Window",patch:"",x:48,y:52,enabled:!app.window.styleMask.contains(.fullScreen),action:{},value:{
+                let i=min(4,max(0,UserDefaults.standard.object(forKey:"windowPreset") as? Int ?? 1)), size=Self.sizes[i]
+                return "\(Int(size.width))X\(Int(size.height))"
+            },adjust:{ [weak self] step in
+                guard let self else { return }
+                let i=(min(4,max(0,UserDefaults.standard.object(forKey:"windowPreset") as? Int ?? 1))+step+5)%5
+                UserDefaults.standard.set(i,forKey:"windowPreset"); self.app.applyWindowSize(Self.sizes[i])
+            }),
+            .init(title:"Fullscreen",patch:"",x:48,y:72,action:{},value:{ [weak self] in self?.app.window.styleMask.contains(.fullScreen)==true ? "ON" : "OFF" },
+                adjust:{ [weak self] _ in self?.app.window.toggleFullScreen(nil) }),
+            .init(title:"Render scale",patch:"",x:48,y:92,action:{},value:{ [weak self] in "\(Int((self?.app.view.renderScale ?? 1)*100))%" },
+                adjust:{ [weak self] step in
+                    guard let self else { return }; let values: [CGFloat]=[0.5,0.75,1]
+                    let i=((values.firstIndex(of:self.app.view.renderScale) ?? 2)+step+3)%3
+                    self.app.view.renderScale=values[i]; UserDefaults.standard.set(Double(values[i]),forKey:"renderScale"); self.updateResolutionText()
+                }),
+            .init(title:"Frame limit",patch:"",x:48,y:112,action:{},value:{ [weak self] in "\(self?.app.view.preferredFramesPerSecond ?? 120) FPS" },
+                adjust:{ [weak self] step in
+                    guard let self else { return }; let values=[35,60,120]
+                    let i=((values.firstIndex(of:self.app.view.preferredFramesPerSecond) ?? 2)+step+3)%3
+                    self.app.view.preferredFramesPerSecond=values[i]; UserDefaults.standard.set(values[i],forKey:"frameLimit")
+                }),
+            .init(title:"Back",patch:"",x:48,y:136,action:{ [weak self] in self?.options() })
+        ],selected:selected,labels:[],back:{ [weak self] in self?.options() })
         updateResolutionText()
-        text("Window sizes are macOS points. Fullscreen uses the display's current mode. Render scale changes the Metal pixel resolution.")
-        let music=NSSlider(value:Double(app.renderer.musicVolume),minValue:0,maxValue:1,target:self,action:#selector(musicVolume(_:)))
-        music.setAccessibilityLabel("Music volume"); row("Music volume",music)
-        let effects=NSSlider(value:Double(app.renderer.effectsVolume),minValue:0,maxValue:1,target:self,action:#selector(effectsVolume(_:)))
-        effects.setAccessibilityLabel("Sound effects volume"); row("Effects volume",effects)
-        let enabled=NSButton(checkboxWithTitle:"Music enabled",target:self,action:#selector(musicEnabled(_:)))
-        enabled.state=app.renderer.musicEnabled ? .on : .off; stack.addArrangedSubview(enabled)
-        back()
+    }
+    func refreshDisplay() {
+        if page=="Display" { displayOptions(selected:classic?.selected ?? 0) }
+        else { classic?.needsDisplay=true }
     }
     func updateResolutionText() {
+        guard page=="Display" else { return }
         let size=app.view.drawableSize
-        resolutionLabel?.stringValue="Rendering at \(Int(size.width)) × \(Int(size.height)) pixels"
+        classic?.labels=[("RENDER: \(Int(size.width))X\(Int(size.height)) PIXELS",32,162),
+                         ("WINDOW SIZES IN MACOS POINTS",32,174),("LEFT/RIGHT ADJUST   ESC BACK",32,188)]
+        classic?.needsDisplay=true
     }
-    @objc private func windowSize(_ sender: NSPopUpButton) {
-        let sizes=[NSSize(width:960,height:720),NSSize(width:1100,height:760),NSSize(width:1280,height:720),NSSize(width:1600,height:900),NSSize(width:1920,height:1080)]
-        app.applyWindowSize(sizes[sender.indexOfSelectedItem]); UserDefaults.standard.set(sender.indexOfSelectedItem,forKey:"windowPreset")
-    }
-    @objc private func fullscreen(_ sender: NSButton) { app.window.toggleFullScreen(nil) }
-    @objc private func renderScale(_ sender: NSPopUpButton) {
-        app.view.renderScale=[0.5,0.75,1][sender.indexOfSelectedItem]; UserDefaults.standard.set(Double(app.view.renderScale),forKey:"renderScale"); updateResolutionText()
-    }
-    @objc private func frameRate(_ sender: NSPopUpButton) {
-        app.view.preferredFramesPerSecond=[35,60,120][sender.indexOfSelectedItem]; UserDefaults.standard.set(app.view.preferredFramesPerSecond,forKey:"frameLimit")
-    }
-    @objc private func musicVolume(_ sender: NSSlider) { app.renderer.musicVolume=sender.floatValue }
-    @objc private func effectsVolume(_ sender: NSSlider) { app.renderer.effectsVolume=sender.floatValue }
-    @objc private func musicEnabled(_ sender: NSButton) { app.renderer.musicEnabled=sender.state == .on; app.syncMusicMenu() }
     private func slots(saving: Bool) {
-        reset(saving ? "Save Game" : "Load Game")
         guard let wad=app.wad else { return }
-        if saving {
-            let field=NSTextField(string:app.wad?.mapTitle(app.maps.titleOfSelectedItem ?? "") ?? "Saved game")
-            field.placeholderString="Save name"; field.setAccessibilityLabel("Save name"); slotName=field; row("Name",field)
-            text("Choose a slot to save. Choosing an occupied slot replaces that save.")
-        }
+        var items: [ClassicMenuCanvas.Item]=[]
         for i in 0..<6 {
             do {
                 let url=try SaveStore.slotURL(wad:wad,slot:i)
                 let exists=FileManager.default.fileExists(atPath:url.path)
                 let save=try? SaveStore.read(from:url,wad:wad)
-                let name=save.map { "\($0.title ?? wad.mapTitle($0.map)) — \($0.savedAt.formatted(date:.abbreviated,time:.shortened))" } ?? (exists ? "Unreadable save" : "Empty")
-                button("\(i+1). \(name)",enabled:saving || save != nil) { [weak self] in
+                let name=save.map { $0.title ?? wad.mapTitle($0.map) } ?? (exists ? "UNREADABLE SAVE" : "EMPTY SLOT")
+                items.append(.init(title:name,patch:"",x:80,y:CGFloat(54+i*16),enabled:saving || save != nil,action:{ [weak self] in
                     guard let self else { return }
-                    do {
-                        if saving {
-                            let name=String((self.slotName?.stringValue ?? "Saved game").trimmingCharacters(in:.whitespacesAndNewlines).prefix(80))
-                            try self.app.renderer.saveGame(to:url,title:name.isEmpty ? "Saved game" : name)
-                        } else { try self.app.renderer.loadGame(from:url) }
-                        self.app.closeGameMenu()
-                    } catch { self.app.show(error) }
-                }
-            } catch { text("Slot \(i+1): \(error)") }
+                    if saving {
+                        self.classic?.edit(index:i,text:save?.title ?? "") { [weak self] title in
+                            guard let self else { return }
+                            do { try self.app.renderer.saveGame(to:url,title:title); self.app.closeGameMenu() }
+                            catch { self.app.show(error) }
+                        }
+                    } else {
+                        do { try self.app.renderer.loadGame(from:url); self.app.closeGameMenu() }
+                        catch { self.app.show(error) }
+                    }
+                },slot:true))
+            } catch {
+                items.append(.init(title:"UNAVAILABLE SLOT",patch:"",x:80,y:CGFloat(54+i*16),enabled:false,action:{},slot:true))
+            }
         }
-        back()
+        canvas(saving ? "Save" : "Load",art:[(saving ? "M_SAVEG" : "M_LOADG",72,28)],items:items,
+               labels:[("ENTER SELECT   ESC BACK",48,168)],back:{ [weak self] in self?.main() })
     }
 }

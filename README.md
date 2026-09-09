@@ -122,7 +122,7 @@ The original engine decoder has not been hardened for deliberately crafted paylo
 ## Current limitations
 
 - Demos and networking are not connected. The main, episode and difficulty menus use original Doom artwork and layout
-  with an animated skull. Extended options and save slots use native controls.
+  with an animated skull. Options and save slots use matching bitmap controls.
 - Sound positioning is sampled when an effect starts; continuous repositioning,
   original priority/pitch variation, PC-speaker sounds, and audio-device changes
   need further work. Native output has been validated through offline mixing;
@@ -230,13 +230,15 @@ counter timing, sound cues, skipping, map timeout, episode endings and secret ma
 ## Pause menu and options
 
 Escape pauses simulation, intermission timing, and audio. The menu supports mouse
-buttons, arrows/Enter/Space/Tab on the original-style pages, and Tab through native controls. New Game
+buttons and arrows/Enter/Space/Tab. Left/right adjusts options; original Doom sound
+cues accompany navigation even while gameplay audio is paused. New Game
 offers the episodes present in the WAD and all five original difficulty settings.
 Restart retains difficulty, and loading restores the difficulty saved in the slot.
 
 Save Game and Load Game expose six named slots per WAD, separate from Quick Save.
-A save name and timestamp identify each slot; choosing an occupied slot replaces
-it. Earlier saves without names remain compatible. File menu import/export and
+Choose a save slot, type its bitmap name (up to 24 characters within the border),
+then press Enter to save or Escape to cancel. Backspace edits the name. Saving to
+an occupied slot replaces it. Earlier saves without names remain compatible. File menu import/export and
 quick-save shortcuts are still available.
 
 Options offers window sizes from 960×720 to 1920×1080 macOS points (clamped to

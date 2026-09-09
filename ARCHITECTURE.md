@@ -175,11 +175,15 @@ score's loop. It also checks malformed MUS data and percussion/controller mappin
 
 ## Pause menu, settings and slots
 
-GameMenu uses original menu patches in accessible AppKit controls. Renderer.paused
+GameMenu uses ClassicMenuCanvas for original menu patches, bitmap text, slot borders
+and thermometers, with accessible AppKit button hit targets. Patch offsets are
+preserved; keyboard input supports navigation, adjustment and save-name editing. Renderer.paused
 gates the same update path as focus loss, freezing gameplay and intermission while
 rendering the paused scene. Escape releases pending gameplay input before opening.
-Native popups/sliders select display and mixer settings; GameView sizes its Metal
-drawable explicitly using backing scale and render scale.
+Classic controls select display and mixer settings; GameView sizes its Metal
+drawable explicitly using backing scale and render scale. The app owns a separate
+SoundPlayer decoding only five menu cues, so navigation remains audible while
+gameplay is paused. It follows effects volume and pauses on focus loss.
 
 MD_LoadSkill validates and passes difficulty to original G_InitNew. MD_GetSkill
 synchronizes the host after save restoration. Six per-WAD slot paths are separate
