@@ -13,6 +13,7 @@ Swift owns native input/windowing and direct Metal rendering.
 | Sources/Geometry.swift | Palette/patch decoding and world triangle generation |
 | Sources/Renderer.swift | Fixed tics, interpolation, sector synchronization, Metal resources |
 | Sources/SpriteRenderer.swift | Sprite texture cache, billboard quads, original HUD patch composition |
+| Sources/IntermissionRenderer.swift | Original intermission patches, stats and destination screen |
 | Sources/SoundPlayer.swift | DMX decoding, native AVAudioEngine voices, focus pause |
 | Sources/main.swift | AppKit lifecycle, WAD picker, map selector, cursor/focus handling |
 
@@ -24,8 +25,12 @@ with `G_InitNew`. Native input becomes `ticcmd_t`; original `P_Ticker` runs at 3
 Original player and sector code handles motion, blocking, use traces, doors, and
 hazards. No software world frame is generated. Unused upstream code is dead-stripped.
 
-The full `G_Ticker` state machine is not connected yet. An exit pauses the preview
-and exposes a status message. Monsters, projectiles, pickups, and decorations keep
+The full `G_Ticker` state machine is not connected. A completed exit invokes
+`G_DoCompleted`, snapshots final stats and the engine-selected next map, and pauses
+simulation for the native intermission. `MD_Continue` calls `G_DoWorldDone` to retain
+inventory, then ticks once to initialize the new view height. It does not call
+`G_InitNew`. Normal/secret routing and removal of keys/powers remain upstream rules.
+Episode endings produce a terminal stats summary; original finales are deferred. Monsters, projectiles, pickups, and decorations keep
 their original thinker lifecycles. Native attack/change buttons drive unchanged
 weapon code. A dead player stays dead until R reloads; use is masked after death
 to avoid entering rebirth without G_Ticker. Software HUD and automap hooks are silent.
@@ -43,7 +48,10 @@ changes and absent-map requests preserve the active engine.
 WAD `(x,y)` becomes Metal `(x,height,-y)`. Vertices contain position and texel UV/light
 float4s. Wall art is composited at load time; floors/ceilings are clipped through the
 classic BSP and each leaf's directed seg boundaries. All side materials are cached, including those hidden by closed sectors.
-Engine floor/ceiling height or light changes rebuild geometry using current values.
+Engine floor/ceiling height, light, sidedef texture or offset changes rebuild geometry
+using current values, once per changed tic. The native bridge caches texture names
+from the WAD using the engine's texture indices, without exposing internal texture
+structs. SW1/SW2 counterparts are cached up front so pressing a switch needs no upload.
 Textures persist and submitted buffers are immutable. Metal retains resources used
 by in-flight commands; up to three command buffers may be outstanding.
 
@@ -114,7 +122,13 @@ and restoration on restart. Original WADs are not modified.
 CombatValidation uses test-only isolated targets to check pistol/fist damage,
 ammo, animation/flash, monster attacks, death, reset and empty-ammo fallback.
 AudioValidation renders the original pistol sound offline through AVAudioEngine.
-The full game-state loop should extend the same copied-snapshot boundary.
+ProgressionValidation tests the Ultimate Doom pillar switch and timed reset,
+actual exit use, frozen stats, inventory carryover, key clearing, secret routes,
+episode endings, and loading all 36 maps. Native rendering uses WIMAP/INTERPIC,
+WILV, and WI stats patches. Return is queued independently of use/fire, and entry
+input is cleared to prevent the exit press from skipping the intermission. A short
+entry delay rejects accidental immediate continuation; a second fresh Return
+loads the next map and updates the AppKit title and selector.
 
 Surface regression tests assert E1M1 BRNBIG panels and their UV bounds, sky planes
 and curtains, and floor/ceiling containment with an unused far-away fixture vertex.

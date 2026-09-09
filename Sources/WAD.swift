@@ -88,7 +88,8 @@ struct Node { let origin: SIMD2<Float>, direction: SIMD2<Float>; let right: Int,
 
 struct DoomMap {
     let name: String
-    let points: [SIMD2<Float>], sides: [Side], lines: [Line]
+    let points: [SIMD2<Float>], lines: [Line]
+    var sides: [Side]
     var sectors: [Sector]
     let segs: [Seg], leaves: [Leaf], nodes: [Node]
     let start: SIMD2<Float>, angle: Float

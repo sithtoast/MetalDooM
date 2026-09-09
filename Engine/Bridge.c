@@ -39,6 +39,71 @@ int MD_TestTargetHealth(void) { return testTarget ? testTarget->health : 0; }
 void MD_TestDamagePlayer(int damage) { P_DamageMobj(players[0].mo,NULL,NULL,damage); }
 #endif
 extern spritedef_t *sprites;
+extern int numtextures;
+static char (*textureNames)[9];
+static void CacheTextureNames(void) {
+    textureNames = calloc(numtextures,sizeof(*textureNames));
+    if (!textureNames) I_Error("Cannot allocate native texture names");
+    const char *lumps[] = {"TEXTURE1","TEXTURE2"};
+    for (int k=0;k<2;++k) {
+        int lump=W_CheckNumForName(lumps[k]); if(lump<0) continue;
+        int size=W_LumpLength(lump); byte *data=W_CacheLumpNum(lump,PU_STATIC);
+        if(size<4) I_Error("Invalid texture directory");
+        int32_t raw; memcpy(&raw,data,4); int count=LONG(raw);
+        if(count<0 || count>(size-4)/4) I_Error("Invalid texture count");
+        for(int i=0;i<count;++i) {
+            memcpy(&raw,data+4+i*4,4); int offset=LONG(raw);
+            if(offset<0 || offset>size-8) I_Error("Invalid texture name offset");
+            char name[9]={0}; memcpy(name,data+offset,8);
+            int index=R_CheckTextureNumForName(name);
+            if(index>=0 && index<numtextures) memcpy(textureNames[index],name,9);
+        }
+        W_ReleaseLumpNum(lump);
+    }
+}
+extern void G_DoCompleted(void), G_DoWorldDone(void);
+static MD_Progress progress;
+MD_Progress MD_GetProgress(void) { return progress; }
+static void CompleteLevel(void) {
+    progress = (MD_Progress){.phase=1,.episode=gameepisode,.map=gamemap,
+        .commercial=gamemode == commercial,.kills=players[0].killcount,.maxKills=totalkills,
+        .items=players[0].itemcount,.maxItems=totalitems,.secrets=players[0].secretcount,
+        .maxSecrets=totalsecret,.seconds=leveltime/TICRATE};
+    G_DoCompleted();
+    if (gameaction == ga_victory || (gamemode == commercial && gamemap == 30)) {
+        progress.phase = 2; gameaction = ga_nothing;
+    } else {
+        progress.nextMap = wminfo.next+1; progress.parSeconds = wminfo.partime/TICRATE;
+    }
+}
+int MD_Continue(void) {
+    if (!loaded || poisoned || progress.phase != 1) return 0;
+    char name[16];
+    if (gamemode == commercial) snprintf(name,sizeof(name),"MAP%02d",progress.nextMap);
+    else snprintf(name,sizeof(name),"E%dM%d",gameepisode,progress.nextMap);
+    if (W_CheckNumForName(name) < 0) { snprintf(errorText,sizeof(errorText),"Next map %s is absent.",name); return 0; }
+    guarded = 1;
+    if (setjmp(errorBoundary)) { guarded = 0; return 0; }
+    // Unlike G_InitNew, this preserves the surviving player's inventory.
+    G_DoWorldDone();
+    P_Ticker(); ++gametic;
+    progress = (MD_Progress){.episode=gameepisode,.map=gamemap,.commercial=gamemode == commercial};
+    lastMessage[0] = 0; ++messageSerial;
+    memset(&players[0].cmd,0,sizeof(players[0].cmd));
+    guarded = 0; return 1;
+}
+MD_Side MD_GetSide(int index) {
+    MD_Side result = {0};
+    if (!loaded || index < 0 || index >= numsides) return result;
+    side_t *side = &sides[index]; result.x = (float)side->textureoffset/FRACUNIT; result.y = (float)side->rowoffset/FRACUNIT;
+    int ids[] = {side->toptexture,side->bottomtexture,side->midtexture};
+    char *names[] = {result.upper,result.lower,result.middle};
+    for (int i=0;i<3;++i) {
+        if (ids[i] > 0 && ids[i] < numtextures) { memcpy(names[i],textureNames[ids[i]],8); names[i][8]=0; }
+        else strcpy(names[i],"-");
+    }
+    return result;
+}
 
 static void CaptureMessage(void) {
     if (players[0].message) {
@@ -76,7 +141,7 @@ int MD_Load(const char *path, int episode, int map) {
         gamemission = W_CheckNumForName("MAP01") >= 0 ? doom2 : doom;
         gamemode = gamemission == doom2 ? commercial : W_CheckNumForName("E4M1") >= 0 ? retail : W_CheckNumForName("E2M1") >= 0 ? registered : shareware;
         gameversion = gamemode == retail ? exe_ultimate : exe_doom_1_9;
-        R_InitData(); P_Init();
+        R_InitData(); CacheTextureNames(); P_Init();
         strcpy(loadedPath,path); initialized = 1;
     }
     char mapName[16];
@@ -88,6 +153,7 @@ int MD_Load(const char *path, int episode, int map) {
     nomonsters = !monstersEnabled; precache = false; netgame = false; deathmatch = 0;
     gametic = 0;
     G_InitNew(sk_medium,episode,map);
+    progress = (MD_Progress){.episode=gameepisode,.map=gamemap,.commercial=gamemode == commercial};
     // Original thinkers now drive monsters, weapons, projectiles and pickups.
     lastMessage[0] = 0; messageSerial = 0;
     memset(&players[0].cmd,0,sizeof(players[0].cmd));
@@ -102,6 +168,7 @@ int MD_Tick(int forward, int side, int turn, int use) {
 }
 int MD_CombatTick(int forward, int side, int turn, int use, int attack, int weapon) {
     if (!loaded || poisoned) return 0;
+    if (progress.phase != 0) return 1;
     guarded = 1;
     if (setjmp(errorBoundary)) { guarded = 0; return 0; }
     ticcmd_t *command = &players[0].cmd;
@@ -114,6 +181,7 @@ int MD_CombatTick(int forward, int side, int turn, int use, int attack, int weap
     if (attack) command->buttons |= BT_ATTACK;
     if (weapon >= 0 && weapon <= 6) command->buttons |= BT_CHANGE | (weapon << BT_WEAPONSHIFT);
     if (gameaction == ga_nothing) { P_Ticker(); ++gametic; CaptureMessage(); }
+    if (gameaction == ga_completed) CompleteLevel();
     guarded = 0; return 1;
 }
 MD_Player MD_GetPlayer(void) {
@@ -208,6 +276,16 @@ MD_HUD MD_GetHUD(void) {
 }
 
 #ifdef MD_TESTING
+void MD_TestExit(int secret) { if (secret) G_SecretExitLevel(); else G_ExitLevel(); }
+int MD_TestSwitch(int special,float *x,float *y,float *angle,int *side) {
+    for (int i=0;i<numlines;++i) if (lines[i].special == special) {
+        line_t *line=&lines[i]; float dx=(float)line->dx/FRACUNIT,dy=(float)line->dy/FRACUNIT,len=hypotf(dx,dy);
+        *x=((double)line->v1->x+line->v2->x)/(2*FRACUNIT)+dy/len*32;
+        *y=((double)line->v1->y+line->v2->y)/(2*FRACUNIT)-dx/len*32;
+        *angle=atan2f(dx,-dy); *side=line->sidenum[0]; return i;
+    }
+    return -1;
+}
 int MD_TestPlacePlayer(float x, float y, float angle) {
     if (!loaded) return 0;
     mobj_t *object = players[0].mo;

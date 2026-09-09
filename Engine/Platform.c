@@ -93,6 +93,9 @@ void S_StopSound(mobj_t *origin) {
     }
 }
 void S_ResumeSound(void) {}
+// Native Metal intermission consumes copied stats; no software WI drawing.
+void WI_Start(wbstartstruct_t *info) {}
+void StatCopy(wbstartstruct_t *info) {}
 void ST_Start(void) {}
 void HU_Start(void) {}
 void AM_Stop(void) { automapactive = false; }

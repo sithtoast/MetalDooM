@@ -66,6 +66,11 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 self.status.stringValue = "\(self.summary) · \(self.renderer.playerStatus) · \(Int(fps)) FPS"
                 self.message.stringValue = self.renderer.pickupMessage; self.message.isHidden = self.message.stringValue.isEmpty
             }
+            renderer.onMapChanged = { [weak self] name in
+                guard let self else { return }
+                self.maps.selectItem(withTitle:name); self.summary = name
+                self.window.title = "\(appTitle) — \(self.wad?.url.lastPathComponent ?? "Doom") — \(name)"
+            }
             renderer.onError = { [weak self] error in self?.show(error) }
             window.center(); window.makeKeyAndOrderFront(nil); window.makeFirstResponder(view); NSApp.activate(ignoringOtherApps:true)
             let arguments = CommandLine.arguments
@@ -111,7 +116,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         view.releaseMouse()
         let alert = NSAlert(); alert.messageText = appTitle
         let date = Bundle.main.object(forInfoDictionaryKey:"MetalDooMBuildDate") as? String ?? "Unknown"
-        alert.informativeText = "Native Apple Silicon / Metal gameplay preview.\nBuilt: \(date)\n\nChocolate Doom combat, monsters, pickups, doors, Metal weapon sprites, and native sound effects. Music, saves, intermissions, and level transitions are still pending.\n\nGPL-2.0-or-later. Includes Chocolate Doom code by id Software, Simon Howard, and contributors."
+        alert.informativeText = "Native Apple Silicon / Metal gameplay preview.\nBuilt: \(date)\n\nChocolate Doom combat, monsters, pickups, doors, Metal weapon sprites, and native sound effects. Level exits, classic intermission stats, inventory carryover, and live switch textures. Music, saves, and original finale sequences remain pending.\n\nGPL-2.0-or-later. Includes Chocolate Doom code by id Software, Simon Howard, and contributors."
         alert.runModal()
     }
     func show(_ error: Error) {

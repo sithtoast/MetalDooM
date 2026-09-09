@@ -2,9 +2,9 @@
 
 A native Apple Silicon / Metal source-port project for classic Doom and Doom II.
 
-**Current milestone: playable combat with Metal weapons and native sound effects.**
-Original monsters, firing, damage, deaths, and pickups run in the Doom engine.
-Level transitions, intermissions, music, and saves are still pending.
+**Current milestone: Ultimate Doom level progression and classic intermission stats.**
+Original gameplay and exit routing run in the Doom engine, with Metal world,
+weapon, HUD, and intermission rendering. Music, saves, and original finales remain.
 The world is drawn as triangles by Metal. No software framebuffer, SDL, OpenGL, or
 Vulkan presentation layer is used.
 
@@ -47,7 +47,8 @@ releases; independent checkouts do not share a global numbering sequence.
 | F | Fire (also works without mouse capture) |
 | 1–7 | Classic weapon slots; 1 fist/chainsaw, 2 pistol, 3 shotgun, etc. |
 | Escape | Release mouse |
-| R | Restart map, including doors and player state |
+| R | Restart map with fresh starting inventory |
+| Return / Enter | Intermission: show destination, then press again to start it |
 | Command-O | Choose IWAD (restart first to change loaded IWAD) |
 
 Mouse capture releases and simulation/audio pause on focus loss. Aim uses classic
@@ -73,6 +74,12 @@ Weapon selection requires ownership. R restarts after death; it resets inventory
   key-gated doors, and engine pickup/locked-door messages.
 - Original status-bar artwork drawn by Metal: health, armor, active ammo, ammo
   reserves/capacity, weapons owned, key cards/skulls, and a health-based face.
+- Original normal/secret exit routing, classic intermission artwork and final
+  kills/items/secrets/time/par stats, followed by an Entering screen.
+- Health, armor, weapons, and ammo carry across levels; keys and temporary powers
+  clear through the original finish-level rules. Episode endings stop at a summary.
+- Live upper/middle/lower switch textures, including timed reset, and sidedef offsets
+  synchronized each tic. The Ultimate Doom starting-room pillar switch is verified.
 - Original weapon state machines, ammo consumption, autoaim, melee, hitscan,
   projectiles, monster AI, damage, deaths, and automatic empty-ammo fallback.
 - Metal held-weapon/muzzle-flash overlays, number-key switching, damage/pickup tint,
@@ -88,11 +95,16 @@ Weapon selection requires ownership. R restarts after death; it resets inventory
   original priority/pitch variation, PC-speaker sounds, and audio-device changes
   need further work. Native output has been validated through offline mixing;
   physical speaker output has not been independently recorded.
-- The engine's full game-state loop is pending. Exits stop the preview with a status
-  message; R restarts. Death also requires R. Keys now unlock their matching doors.
+- Progression uses original completion/load-level functions rather than the full
+  G_Ticker loop. Death requires R (fresh inventory). Menus, demos, networking, and
+  original finale/story sequences are not connected. Episode endings show final
+  stats; choose another episode with the map selector.
+- Intermission values appear as final totals. Animated counters, world-map markers,
+  background animation, and intermission music remain. Doom II story breaks are
+  not presented, and Doom II has not been validated.
 - Manual doors have been validated. Other sector actions use upstream logic but
   lifts, crushers, switches, and special-case maps need dedicated validation.
-- Lighting is approximate; world animations, scrolling textures, and full palette
+- Lighting is approximate; world animations, scrolling behavior, and full palette
   effects remain (damage/pickup tint is implemented). Sky now follows the classic
   horizontal repeat and horizon, with clamping for the optional vertical look;
   extreme pitch and unusual sky-map tricks need further validation.
@@ -104,7 +116,7 @@ Weapon selection requires ownership. R restarts after death; it resets inventory
 - All geometry is submitted each frame. Sector height/light changes rebuild geometry
   while retaining textures; visibility culling and selective updates are pending.
 - Fatal engine errors require restarting the app. Malformed-file checks do not mean
-  all upstream parsing has been hardened. Doom II has not yet been tested.
+  all upstream parsing has been hardened.
 
 ## Source and license
 
@@ -122,6 +134,8 @@ bash scripts/test-engine.sh "$HOME/Downloads/doom1.WAD"
 bash scripts/test-input.sh
 bash scripts/test-combat.sh "$HOME/Downloads/doom1.WAD"
 bash scripts/test-audio.sh "$HOME/Downloads/doom1.WAD"
+bash scripts/test-progression.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD"
+bash scripts/test.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD"
 ```
 
 The geometry suite checks an original generated room, sector lookup, malformed WAD
@@ -152,10 +166,17 @@ WAD copies, never the user's original. Generated WADs are excluded from source c
 About 110–120 FPS was observed on an Apple M5 Pro during that check. This is a display
 rate reading, not a GPU benchmark or proof of wider compatibility.
 
+Build 14 validated all 36 Ultimate Doom maps (346 world materials and 764 sprite
+patches). Progression tests use its real pillar and exit switches, verify inventory
+carryover and key clearing, freeze stats between levels, check all four episodes'
+secret-map routes and endings, and load/tick every map. Native checks showed Hangar
+Finished, Entering Nuclear Plant, E1M2's updated selector/title, and the pillar
+switch lighting up. The supplied Ultimate Doom WAD remains external to the project.
+
 ## Next milestones
 
-1. Connect exits/intermissions, full game-state progression, and respawning.
-2. Add music, save/load, and menus.
+1. Add save/load, then music and menus.
+2. Complete intermission animations, finales, and respawning.
 3. Verify Doom II, longer play sessions, texture effects, and less common sector actions.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for module boundaries.

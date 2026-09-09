@@ -11,6 +11,7 @@ final class GameView: MTKView {
     var useQueued = false
     var attackQueued = false, mouseFire = false
     var weaponQueued: Int32 = -1
+    var continueQueued = false
     func consumeAttack() -> Int32 {
         let fire = attackQueued || mouseFire || keys.contains(3)
         attackQueued = false; return fire ? 1 : 0
@@ -19,6 +20,7 @@ final class GameView: MTKView {
     override var acceptsFirstResponder: Bool { true }
     override func keyDown(with event: NSEvent) {
         if event.isARepeat { return }
+        if event.keyCode == 36 { continueQueued = true }
         if event.keyCode == 3 { attackQueued = true } // F: keyboard fire
         let slots: [UInt16:Int32] = [18:0,19:1,20:2,21:3,23:4,22:5,26:6]
         if let slot = slots[event.keyCode] { weaponQueued = slot }
@@ -45,7 +47,7 @@ final class GameView: MTKView {
     }
     override func mouseDragged(with event: NSEvent) { mouseMoved(with:event) }
     func releaseMouse() {
-        attackQueued = false; mouseFire = false; weaponQueued = -1
+        attackQueued = false; mouseFire = false; weaponQueued = -1; continueQueued = false
         keys.removeAll(); movementQueued.removeAll(); mouseMotion = .zero; running = false; useQueued = false
         if captured { captured = false; CGAssociateMouseAndMouseCursorPosition(1); NSCursor.unhide() }
     }
@@ -65,6 +67,12 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var wad: WAD?
     private var sprites: SpriteRenderer?
     private var sound: SoundPlayer?
+    private var intermissionArt: IntermissionRenderer?
+    private var progress = MD_Progress()
+    private var entering = false
+    private var intermissionTime: Double = 0
+    private var lastGeometryTick: Int32 = -1
+    var onMapChanged: ((String) -> Void)?
     func pauseAudio() { try? sound?.setActive(false) }
     private var hud = MD_HUD()
     private var messageSerial: Int32 = 0, messageUntil: Int32 = 0
@@ -92,7 +100,10 @@ final class Renderer: NSObject, MTKViewDelegate {
     var onError: ((Error) -> Void)?
     var playerStatus: String {
         guard engineReady else { return "" }
-        if currentPlayer.exitRequested != 0 { return "Exit reached — next level is not connected yet; R to restart" }
+        if progress.phase != 0 {
+            if progress.phase == 2 { return "Episode complete · Kills \(progress.kills)/\(progress.maxKills) · Items \(progress.items)/\(progress.maxItems) · Secrets \(progress.secrets)/\(progress.maxSecrets) · Choose another map or R to restart" }
+            return "\(entering ? "Entering next level" : "Level complete") · Kills \(progress.kills)/\(progress.maxKills) · Items \(progress.items)/\(progress.maxItems) · Secrets \(progress.secrets)/\(progress.maxSecrets) · Time \(progress.seconds)s · Enter to continue"
+        }
         if currentPlayer.health <= 0 { return "You died — R to restart" }
         let names = ["Blue card","Yellow card","Red card","Blue skull","Yellow skull","Red skull"]
         let keys = names.indices.filter { hud.keys & (1 << $0) != 0 }.map { names[$0] }
@@ -179,16 +190,21 @@ final class Renderer: NSObject, MTKViewDelegate {
         self.depth = depth
         super.init()
     }
-    func load(wad: WAD, map name: String) throws -> (triangles:Int,missing:[String]) {
+    func load(wad: WAD, map name: String, continuing: Bool = false) throws -> (triangles:Int,missing:[String]) {
         guard wad.signature == "IWAD" else { throw PortError("The gameplay prototype requires a standalone Doom IWAD. PWAD merging is not connected yet.") }
         let map = try DoomMap(wad:wad,name:name), art = try Art(wad:wad)
         let heights = try art.textureHeights(), geometry = try Geometry(map:map,textureHeights:heights)
         let loadedSprites = try SpriteRenderer(device:device,wad:wad)
         let loadedSound = try SoundPlayer(wad:wad)
+        let loadedIntermission = try IntermissionRenderer(device:device,wad:wad)
         var materials = Set(geometry.batches.map(\.material))
         for side in map.sides {
             for name in [side.upper,side.lower,side.middle] where name != "-" && !name.isEmpty {
                 materials.insert(MaterialKey(name:name,flat:false))
+                if name.hasPrefix("SW1") || name.hasPrefix("SW2") {
+                    let alternate = (name.hasPrefix("SW1") ? "SW2" : "SW1")+name.dropFirst(3)
+                    if art.definitions[alternate] != nil { materials.insert(MaterialKey(name:alternate,flat:false)) }
+                }
             }
         }
         var cached: [MaterialKey:MTLTexture] = [:], missing: [String] = []
@@ -225,11 +241,13 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         let episode = name.hasPrefix("E") ? Int(String(name.dropFirst().prefix(1))) ?? 1 : 1
         let number = name.hasPrefix("MAP") ? Int(name.dropFirst(3)) ?? 1 : Int(name.suffix(1)) ?? 1
-        guard MD_Load(wad.url.path,Int32(episode),Int32(number)) != 0 else {
+        guard (continuing ? MD_Continue() : MD_Load(wad.url.path,Int32(episode),Int32(number))) != 0 else {
             if MD_SectorCount() == 0 { engineReady = false }
             throw PortError(String(cString:MD_LastError()))
         }
         guard MD_SectorCount() == map.sectors.count else { engineReady = false; throw PortError("Engine and Metal sector counts differ.") }
+        progress = MD_GetProgress(); entering = false; intermissionTime = 0; lastGeometryTick = -1
+        intermissionArt = loadedIntermission
         textureHeights = heights
         self.map = map; self.wad = wad; textures = cached; batches = loaded; sky = loadedSky; sprites = loadedSprites; pitch = 0
         sound = loadedSound; sound?.drain()
@@ -260,8 +278,20 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
     }
     private func syncGeometry() throws {
-        guard var map else { return }
+        guard var map, lastGeometryTick != currentPlayer.tick else { return }
+        lastGeometryTick = currentPlayer.tick
         var changed = false
+        func name<T>(_ tuple: T) -> String {
+            var value = tuple
+            return withUnsafePointer(to:&value) { $0.withMemoryRebound(to:CChar.self,capacity:9) { String(cString:$0).uppercased() } }
+        }
+        for index in map.sides.indices {
+            let state = MD_GetSide(Int32(index)), old = map.sides[index]
+            let upper = name(state.upper), lower = name(state.lower), middle = name(state.middle)
+            if old.x != state.x || old.y != state.y || old.upper != upper || old.lower != lower || old.middle != middle {
+                map.sides[index] = Side(sector:old.sector,x:state.x,y:state.y,upper:upper,lower:lower,middle:middle); changed = true
+            }
+        }
         for index in map.sectors.indices {
             let state = MD_GetSector(Int32(index)), old = map.sectors[index]
             if state.floor != old.floor || state.ceiling != old.ceiling || state.light != old.light {
@@ -292,7 +322,10 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         guard let encoder = command.makeRenderCommandEncoder(descriptor:pass) else { inFlight.signal(); return }
         encoder.setRenderPipelineState(pipeline); encoder.setDepthStencilState(depth); encoder.setCullMode(.none); encoder.setFrontFacing(.counterClockwise)
-        if map != nil {
+        if progress.phase != 0, let intermissionArt {
+            encoder.setRenderPipelineState(spritePipeline)
+            intermissionArt.draw(encoder:encoder,state:progress,entering:entering,width:max(1,view.drawableSize.width),height:max(1,view.drawableSize.height))
+        } else if map != nil {
             let width = max(1,view.drawableSize.width), height = max(1,view.drawableSize.height)
             let worldHeight = max(1,height-SpriteRenderer.hudHeight(width:width))
             encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:worldHeight,znear:0,zfar:1))
@@ -351,6 +384,21 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         try sound?.setActive(true)
         if view.keys.remove(15) != nil { view.releaseMouse(); try reset(); return }
+        if progress.phase != 0 {
+            intermissionTime += delta
+            if view.continueQueued {
+                view.continueQueued = false
+                if intermissionTime >= 0.3 && progress.phase == 1 {
+                    if !entering { entering = true; intermissionTime = 0 }
+                    else if let wad {
+                        let name = progress.commercial != 0 ? String(format:"MAP%02d",progress.nextMap) : "E\(progress.episode)M\(progress.nextMap)"
+                        view.releaseMouse(); _ = try load(wad:wad,map:name,continuing:true); onMapChanged?(name)
+                    }
+                }
+            }
+            return
+        }
+        view.continueQueued = false
         pendingTurn -= view.mouseMotion.x*0.0025
         pitch = (pitch-view.mouseMotion.y*0.0025).clamped(-1.2,1.2); view.mouseMotion = .zero
         accumulator += delta
@@ -376,7 +424,11 @@ final class Renderer: NSObject, MTKViewDelegate {
             guard MD_CombatTick(forward,side,turn,use,view.consumeAttack(),view.consumeWeapon()) != 0 else { throw PortError(String(cString:MD_LastError())) }
             sound?.drain()
             currentPlayer = MD_GetPlayer(); accumulator -= step
-            hud = MD_GetHUD()
+            hud = MD_GetHUD(); progress = MD_GetProgress()
+            if progress.phase != 0 {
+                view.releaseMouse(); accumulator = 0; intermissionTime = 0; messageUntil = 0
+                break
+            }
             if hud.messageSerial != messageSerial { messageSerial = hud.messageSerial; messageUntil = hud.tick+140 }
         }
         try syncGeometry()

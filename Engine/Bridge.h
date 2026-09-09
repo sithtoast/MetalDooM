@@ -38,9 +38,20 @@ const char *MD_LastError(void);
 // The lump index addresses the single loaded IWAD's directory.
 int MD_CopyThings(MD_Thing *output, int capacity, float cameraX, float cameraY);
 MD_HUD MD_GetHUD(void);
+typedef struct { float x,y; char upper[9],lower[9],middle[9]; } MD_Side;
+MD_Side MD_GetSide(int index);
+// phase 0 = playing, 1 = intermission, 2 = episode/game complete.
+typedef struct {
+    int phase, episode, map, nextMap, commercial;
+    int kills, maxKills, items, maxItems, secrets, maxSecrets, seconds, parSeconds;
+} MD_Progress;
+MD_Progress MD_GetProgress(void);
+int MD_Continue(void);
 
 #ifdef MD_TESTING
 void MD_TestMonsters(int enabled);
+void MD_TestExit(int secret);
+int MD_TestSwitch(int special, float *x,float *y,float *angle,int *side);
 void MD_TestTarget(int type, float distance);
 int MD_TestTargetHealth(void);
 void MD_TestDamagePlayer(int damage);
