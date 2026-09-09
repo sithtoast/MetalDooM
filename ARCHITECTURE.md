@@ -1,18 +1,19 @@
 # Architecture
 
-Chocolate Doom is authoritative for player movement, collision, and sector state.
+Chocolate Doom is authoritative for movement, combat, inventory, and sector state.
 Swift owns native input/windowing and direct Metal rendering.
 
 | File | Responsibility |
 | --- | --- |
 | Engine/Bridge.h, Bridge.c | Initialize/restart, tic commands, player/sector/thing/HUD snapshots, error boundary |
-| Engine/Platform.c | Memory arena, argument lookup, silent audio/HUD host hooks |
+| Engine/Platform.c | Memory arena, argument lookup, copied sound-event queue, HUD host hooks |
 | Engine/NativeHeaders.h | Native endian/input declarations replacing SDL platform headers |
 | Engine/sources.txt | Explicit list of compiled upstream files |
 | Sources/WAD.swift | Bounded binary reads, classic map records, BSP lookup |
 | Sources/Geometry.swift | Palette/patch decoding and world triangle generation |
 | Sources/Renderer.swift | Fixed tics, interpolation, sector synchronization, Metal resources |
 | Sources/SpriteRenderer.swift | Sprite texture cache, billboard quads, original HUD patch composition |
+| Sources/SoundPlayer.swift | DMX decoding, native AVAudioEngine voices, focus pause |
 | Sources/main.swift | AppKit lifecycle, WAD picker, map selector, cursor/focus handling |
 
 ## Engine boundary
@@ -24,9 +25,10 @@ Original player and sector code handles motion, blocking, use traces, doors, and
 hazards. No software world frame is generated. Unused upstream code is dead-stripped.
 
 The full `G_Ticker` state machine is not connected yet. An exit pauses the preview
-and exposes a status message. Monsters are disabled; pickups and decorations now
-keep their original thinker lifecycles. Upstream movement, item, and door code is
-not modified. Audio, software status-bar startup, and automap hooks are silent.
+and exposes a status message. Monsters, projectiles, pickups, and decorations keep
+their original thinker lifecycles. Native attack/change buttons drive unchanged
+weapon code. A dead player stays dead until R reloads; use is masked after death
+to avoid entering rebirth without G_Ticker. Software HUD and automap hooks are silent.
 The bridge copies inventory values and captures/clears engine player messages after
 each tic, with a serial so repeated pickups of the same type still renew the notice.
 
@@ -48,8 +50,9 @@ by in-flight commands; up to three command buffers may be outstanding.
 Camera position, angle, and eye height interpolate between engine tics. Moving
 sector geometry currently advances at tic rate. The accumulator is bounded after
 stalls and cleared while inactive, so focus recovery does not fast-forward gameplay.
-Use and brief movement taps are queued until a tic consumes them. The earlier Swift approximation of
-player collision has been removed.
+Use, movement, fire taps, and weapon selections queue until a tic consumes them.
+Held fire remains active until release; focus loss clears every pending input.
+The first viewport click captures the mouse without shooting.
 
 ## Sprites and HUD
 
@@ -69,6 +72,22 @@ in a centered 320x32 region below the world viewport. Native text displays tempo
 engine messages and accessible inventory values. Face expressions are an initial
 health-band/idle implementation; the complete original face logic remains pending.
 
+## Weapons and sound
+
+Copied psprite snapshots contain the engine weapon and muzzle-flash frames, their
+320x200 coordinates, lighting and flip. Metal draws them over the world with depth
+disabled, scaled to a centered 320x168 view above the HUD. Damage/pickup tints draw
+between the weapon and HUD. Weapon bobbing, raise/lower and firing timing stay in C.
+
+Sound host hooks resolve original S_sfx/DS lump names and emit bounded commands to
+16 native voice slots. Only C stores origin pointers; Swift receives scalar slot,
+lump, gain and pan values. Restart emits stops for all voices. SoundPlayer strips
+DMX padding, converts unsigned PCM to 44.1 kHz float buffers, and caches samples.
+AVAudioPlayerNode instances feed a native mixer; focus loss pauses the engine.
+This follows Apple's [player-node buffer scheduling](https://developer.apple.com/documentation/avfaudio/avaudioplayernode).
+Pan/attenuation are sampled on emission; voice allocation and resampling are native
+approximations, not bit-exact DMX behavior. Music and route-change recovery remain.
+
 ## Validation boundaries
 
 `Tests/EngineValidation.c` uses placement helpers excluded from normal builds to
@@ -80,5 +99,7 @@ relocates items and the player while preserving map geometry and specials. Tests
 verify item removal, inventory changes, animated frame changes, key-gated doors,
 and restoration on restart. Original WADs are not modified.
 
-Future combat rendering and the full game-state loop should extend this interface,
-keeping engine pointers private and the simulation authoritative.
+CombatValidation uses test-only isolated targets to check pistol/fist damage,
+ammo, animation/flash, monster attacks, death, reset and empty-ammo fallback.
+AudioValidation renders the original pistol sound offline through AVAudioEngine.
+The full game-state loop should extend the same copied-snapshot boundary.

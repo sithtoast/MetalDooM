@@ -25,6 +25,19 @@ static char errorText[1024], loadedPath[4096];
 static char *arguments[] = {"MetalDooM", NULL};
 static char lastMessage[128];
 static int messageSerial;
+static int monstersEnabled = 1;
+#ifdef MD_TESTING
+void MD_TestMonsters(int enabled) { monstersEnabled = enabled; }
+static mobj_t *testTarget;
+void MD_TestTarget(int type, float distance) {
+    mobj_t *p = players[0].mo;
+    double angle = (double)p->angle * (2*M_PI/4294967296.0);
+    testTarget = P_SpawnMobj(p->x+cos(angle)*distance*FRACUNIT,p->y+sin(angle)*distance*FRACUNIT,ONFLOORZ,(mobjtype_t)type);
+    testTarget->angle = p->angle+ANG180;
+}
+int MD_TestTargetHealth(void) { return testTarget ? testTarget->health : 0; }
+void MD_TestDamagePlayer(int damage) { P_DamageMobj(players[0].mo,NULL,NULL,damage); }
+#endif
 extern spritedef_t *sprites;
 
 static void CaptureMessage(void) {
@@ -72,11 +85,10 @@ int MD_Load(const char *path, int episode, int map) {
     if (W_CheckNumForName(mapName) < 0) { snprintf(errorText,sizeof(errorText),"Map %s is absent from the loaded IWAD.",mapName); guarded = 0; return 0; }
     consoleplayer = displayplayer = 0;
     memset(playeringame,0,sizeof(playeringame)); playeringame[0] = true;
-    nomonsters = true; precache = false; netgame = false; deathmatch = 0;
+    nomonsters = !monstersEnabled; precache = false; netgame = false; deathmatch = 0;
     gametic = 0;
     G_InitNew(sk_medium,episode,map);
-    // Pickups and decorations keep their original thinker/state lifecycle.
-    // nomonsters remains enabled until weapons and combat presentation land.
+    // Original thinkers now drive monsters, weapons, projectiles and pickups.
     lastMessage[0] = 0; messageSerial = 0;
     memset(&players[0].cmd,0,sizeof(players[0].cmd));
     P_Ticker(); ++gametic;
@@ -86,6 +98,9 @@ int MD_Load(const char *path, int episode, int map) {
 }
 
 int MD_Tick(int forward, int side, int turn, int use) {
+    return MD_CombatTick(forward,side,turn,use,0,-1);
+}
+int MD_CombatTick(int forward, int side, int turn, int use, int attack, int weapon) {
     if (!loaded || poisoned) return 0;
     guarded = 1;
     if (setjmp(errorBoundary)) { guarded = 0; return 0; }
@@ -94,7 +109,10 @@ int MD_Tick(int forward, int side, int turn, int use) {
     command->forwardmove = (signed char)(forward < -50 ? -50 : forward > 50 ? 50 : forward);
     command->sidemove = (signed char)(side < -40 ? -40 : side > 40 ? 40 : side);
     command->angleturn = (short)turn;
-    command->buttons = use ? BT_USE : 0;
+    // R reloads the map; do not enter PS_REBORN without the full G_Ticker loop.
+    command->buttons = use && players[0].health > 0 ? BT_USE : 0;
+    if (attack) command->buttons |= BT_ATTACK;
+    if (weapon >= 0 && weapon <= 6) command->buttons |= BT_CHANGE | (weapon << BT_WEAPONSHIFT);
     if (gameaction == ga_nothing) { P_Ticker(); ++gametic; CaptureMessage(); }
     guarded = 0; return 1;
 }
@@ -152,6 +170,23 @@ int MD_CopyThings(MD_Thing *output, int capacity, float cameraX, float cameraY) 
     return count;
 }
 
+int MD_CopyWeaponSprites(MD_WeaponSprite *output, int capacity) {
+    if (!loaded) return 0;
+    player_t *player = &players[0]; int count = 0;
+    for (int i=0; i<NUMPSPRITES; ++i) {
+        pspdef_t *psp = &player->psprites[i];
+        if (!psp->state) continue;
+        spriteframe_t *frame = &sprites[psp->state->sprite].spriteframes[psp->state->frame & FF_FRAMEMASK];
+        if (output && count < capacity) output[count] = (MD_WeaponSprite){
+            (float)psp->sx/FRACUNIT,(float)psp->sy/FRACUNIT,
+            fminf(1,(float)player->mo->subsector->sector->lightlevel/255.0f + player->extralight*0.125f),
+            firstspritelump+frame->lump[0],frame->flip[0],(psp->state->frame & FF_FULLBRIGHT) != 0
+        };
+        ++count;
+    }
+    return count;
+}
+
 MD_HUD MD_GetHUD(void) {
     MD_HUD hud = {0};
     if (!loaded) return hud;
@@ -166,6 +201,7 @@ MD_HUD MD_GetHUD(void) {
     hud.maxCells = player->maxammo[am_cell]; hud.maxRockets = player->maxammo[am_misl];
     for (int i=0; i<NUMCARDS; ++i) if (player->cards[i]) hud.keys |= 1u<<i;
     for (int i=0; i<NUMWEAPONS; ++i) if (player->weaponowned[i]) hud.weapons |= 1u<<i;
+    hud.damageFlash = player->damagecount; hud.kills = player->killcount; hud.totalKills = totalkills;
     hud.bonusFlash = player->bonuscount; hud.messageSerial = messageSerial; hud.tick = gametic;
     snprintf(hud.message,sizeof(hud.message),"%s",lastMessage);
     return hud;

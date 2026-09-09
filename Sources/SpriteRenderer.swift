@@ -74,6 +74,31 @@ final class SpriteRenderer {
             encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:6)
         }
     }
+    func drawWeapon(encoder: MTLRenderCommandEncoder, width: Double, height: Double) {
+        var frames = [MD_WeaponSprite](repeating:MD_WeaponSprite(),count:2)
+        let count = frames.withUnsafeMutableBufferPointer { MD_CopyWeaponSprites($0.baseAddress,2) }
+        encoder.setDepthStencilState(hudDepth)
+        var matrix = matrix_identity_float4x4
+        encoder.setVertexBytes(&matrix,length:MemoryLayout<simd_float4x4>.stride,index:1)
+        // Match the classic 320x168 view: the weapon is centered and clipped at
+        // the status bar. Widescreen adds space beside it, not a stretched gun.
+        let scale = Float(height/168), originX = (Float(width)-320*scale)/2
+        for frame in frames.prefix(Int(count)) {
+            guard let patch = patches[Int(frame.lump)] else { continue }
+            let x0 = originX+(frame.x-patch.left)*scale
+            let y0 = (frame.y-patch.top-16)*scale
+            let x1 = x0+patch.width*scale, y1 = y0+patch.height*scale
+            let u0: Float = frame.flip != 0 ? patch.width : 0, u1: Float = frame.flip != 0 ? 0 : patch.width
+            func vertex(_ x: Float, _ y: Float, _ u: Float, _ v: Float) -> WorldVertex {
+                WorldVertex(position:SIMD4(x/Float(width)*2-1,1-y/Float(height)*2,0,1),uvLight:SIMD4(u,v,max(0.12,frame.light),Float(frame.fullbright)))
+            }
+            let a = vertex(x0,y1,u0,patch.height), b = vertex(x1,y1,u1,patch.height)
+            let c = vertex(x1,y0,u1,0), d = vertex(x0,y0,u0,0)
+            encoder.setVertexBytes([a,b,c,a,c,d],length:MemoryLayout<WorldVertex>.stride*6,index:0)
+            encoder.setFragmentTexture(patch.texture,index:0)
+            encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:6)
+        }
+    }
     static func hudHeight(width: Double) -> Double { 32*max(1,floor(width/320)) }
     func drawHUD(encoder: MTLRenderCommandEncoder, state: MD_HUD, width: Double, height: Double) {
         encoder.setDepthStencilState(hudDepth)

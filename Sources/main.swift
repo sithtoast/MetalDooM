@@ -46,7 +46,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let toolbar = NSStackView(views:[label,spacer,maps,button]); toolbar.spacing = 16
             status = NSTextField(labelWithString:summary); status.font = .monospacedSystemFont(ofSize:11,weight:.regular)
             status.lineBreakMode = .byTruncatingTail
-            let help = NSTextField(labelWithString:"WASD move · Shift run · E / Space use · Click to look · Esc release · R restart")
+            let help = NSTextField(labelWithString:"WASD move · Shift run · E / Space use · Click to capture, then fire · F fire · 1–7 weapons · Esc release · R restart")
             help.font = .systemFont(ofSize:11); help.textColor = .secondaryLabelColor
             for child in [toolbar,view!,status!,help] { child.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(child) }
             message = MessageLabel(labelWithString:""); message.translatesAutoresizingMaskIntoConstraints = false
@@ -111,15 +111,15 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         view.releaseMouse()
         let alert = NSAlert(); alert.messageText = appTitle
         let date = Bundle.main.object(forInfoDictionaryKey:"MetalDooMBuildDate") as? String ?? "Unknown"
-        alert.informativeText = "Native Apple Silicon / Metal gameplay preview.\nBuilt: \(date)\n\nChocolate Doom movement, doors, pickups, keys, and a Metal-rendered status bar. Monsters, combat, sound, saves, and level transitions are still pending.\n\nGPL-2.0-or-later. Includes Chocolate Doom code by id Software, Simon Howard, and contributors."
+        alert.informativeText = "Native Apple Silicon / Metal gameplay preview.\nBuilt: \(date)\n\nChocolate Doom combat, monsters, pickups, doors, Metal weapon sprites, and native sound effects. Music, saves, intermissions, and level transitions are still pending.\n\nGPL-2.0-or-later. Includes Chocolate Doom code by id Software, Simon Howard, and contributors."
         alert.runModal()
     }
     func show(_ error: Error) {
         view?.releaseMouse()
         let alert = NSAlert(); alert.messageText = "Unable to load MetalDooM"; alert.informativeText = String(describing:error); alert.runModal()
     }
-    func windowDidResignKey(_ notification: Notification) { view.releaseMouse() }
-    func applicationWillResignActive(_ notification: Notification) { view.releaseMouse() }
+    func windowDidResignKey(_ notification: Notification) { view.releaseMouse(); renderer.pauseAudio() }
+    func applicationWillResignActive(_ notification: Notification) { view.releaseMouse(); renderer.pauseAudio() }
     func applicationWillTerminate(_ notification: Notification) { view?.releaseMouse() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }

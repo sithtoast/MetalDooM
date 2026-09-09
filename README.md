@@ -2,8 +2,9 @@
 
 A native Apple Silicon / Metal source-port project for classic Doom and Doom II.
 
-**Current milestone: visible pickups, decorations, keys, and a classic Metal HUD.**
-This is a gameplay preview; monsters, combat, audio, and level transitions are pending.
+**Current milestone: playable combat with Metal weapons and native sound effects.**
+Original monsters, firing, damage, deaths, and pickups run in the Doom engine.
+Level transitions, intermissions, music, and saves are still pending.
 The world is drawn as triangles by Metal. No software framebuffer, SDL, OpenGL, or
 Vulkan presentation layer is used.
 
@@ -42,13 +43,16 @@ releases; independent checkouts do not share a global numbering sequence.
 | Left / right | Turn |
 | Shift | Run |
 | E / Space | Use a door or switch |
-| Click the viewport | Capture mouse for looking |
+| Click the viewport | Capture mouse; subsequent clicks/hold fire |
+| F | Fire (also works without mouse capture) |
+| 1–7 | Classic weapon slots; 1 fist/chainsaw, 2 pistol, 3 shotgun, etc. |
 | Escape | Release mouse |
 | R | Restart map, including doors and player state |
 | Command-O | Choose IWAD (restart first to change loaded IWAD) |
 
-Mouse capture releases and simulation pauses on focus loss. Looking up/down is a
-preview camera feature, not a decision about classic gameplay rules.
+Mouse capture releases and simulation/audio pause on focus loss. Aim uses classic
+Doom horizontal targeting and vertical autoaim; looking up/down is cosmetic.
+Weapon selection requires ownership. R restarts after death; it resets inventory.
 
 ## Implemented
 
@@ -65,19 +69,27 @@ preview camera feature, not a decision about classic gameplay rules.
   key-gated doors, and engine pickup/locked-door messages.
 - Original status-bar artwork drawn by Metal: health, armor, active ammo, ammo
   reserves/capacity, weapons owned, key cards/skulls, and a health-based face.
-- Map switching/restarting, focus pause, and queued movement/use taps between tics.
+- Original weapon state machines, ammo consumption, autoaim, melee, hitscan,
+  projectiles, monster AI, damage, deaths, and automatic empty-ammo fallback.
+- Metal held-weapon/muzzle-flash overlays, number-key switching, damage/pickup tint,
+  and an accessible kill count.
+- Native AVAudioEngine sound effects decoded from the IWAD's DMX samples, with
+  16 voices, distance attenuation, stereo pan, and focus pause/resume.
+- Map switching/restarting, focus pause, and queued movement/use/fire/weapon taps.
 
 ## Current limitations
 
-- Monsters remain disabled. Combat, the held weapon view, audio, saves, Doom menus,
-  demos, and networking are not connected. Weapon pickups can change the engine's
-  selected weapon/ammo, but firing and manual weapon selection are still pending.
+- Music, saves, Doom menus, demos, and networking are not connected.
+- Sound positioning is sampled when an effect starts; continuous repositioning,
+  original priority/pitch variation, PC-speaker sounds, and audio-device changes
+  need further work. Native output has been validated through offline mixing;
+  physical speaker output has not been independently recorded.
 - The engine's full game-state loop is pending. Exits stop the preview with a status
   message; R restarts. Death also requires R. Keys now unlock their matching doors.
 - Manual doors have been validated. Other sector actions use upstream logic but
   lifts, crushers, switches, and special-case maps need dedicated validation.
 - Lighting and sky projection are approximate; sky occlusion, texture pegging,
-  masked middle walls, animations, scrolling textures, and palette effects remain.
+  masked middle walls, animations, scrolling textures, and full palette effects remain (damage/pickup tint is implemented).
   Sprite animation is implemented; the pending animations are world textures/flats.
   The HUD face uses health bands and idle frames, not Doom's complete expression
   state machine. Power-up screen effects and fuzz rendering remain pending.
@@ -102,6 +114,8 @@ world-rendering function is needed by the native presentation path.
 bash scripts/test.sh "$HOME/Downloads/doom1.WAD"
 bash scripts/test-engine.sh "$HOME/Downloads/doom1.WAD"
 bash scripts/test-input.sh
+bash scripts/test-combat.sh "$HOME/Downloads/doom1.WAD"
+bash scripts/test-audio.sh "$HOME/Downloads/doom1.WAD"
 ```
 
 The geometry suite checks an original generated room, sector lookup, malformed WAD
@@ -112,12 +126,18 @@ health/armor/ammo collection, sprite removal/animation, red-key collection and
 locked-door access, and inventory/item reset. Patch tests cover transparent gaps,
 signed origins, malformed columns, all 483 sprite patches, and HUD artwork. The
 input test delivers key-down/up before a tic and checks tap retention, holds,
-queued use, and focus-release cleanup.
+queued use/fire/weapon changes, and focus-release cleanup. Combat tests cover
+pistol ammo/damage/kills, weapon/flash animation, fist attacks, ownership checks,
+monster attacks/player death, restart, and empty-ammo fallback. Native audio tests
+use AVAudioEngine offline rendering to check original pistol PCM, pause/resume,
+and malformed DMX rejection; they require access to macOS audio services.
 Engine placement helpers exist only in the test build.
 
 Validated: all nine maps and 138 world materials in the supplied shareware WAD;
 engine movement/door/pickup tests; native visual sprites, status bar, collection,
 locked-door messages, red-key HUD indicator, and passage through the unlocked door.
+Build 11 additionally showed pistol rendering, enemy death, ammo/health changes,
+and switching to the fist in the native combat fixture.
 Visual fixtures change only THINGS records in temporary
 WAD copies, never the user's original. Generated WADs are excluded from source control.
 About 110–120 FPS was observed on an Apple M5 Pro during that check. This is a display
@@ -125,9 +145,8 @@ rate reading, not a GPU benchmark or proof of wider compatibility.
 
 ## Next milestones
 
-1. Draw the held weapon, connect firing/weapon selection, and enable monsters/combat.
-2. Connect exits/intermissions, full game-state progression, and respawning.
-3. Add native audio/music, save/load, and menus.
-4. Verify Doom II, longer play sessions, texture effects, and less common sector actions.
+1. Connect exits/intermissions, full game-state progression, and respawning.
+2. Add music, save/load, and menus.
+3. Verify Doom II, longer play sessions, texture effects, and less common sector actions.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for module boundaries.

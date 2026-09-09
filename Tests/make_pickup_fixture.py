@@ -16,7 +16,7 @@ assert source.resolve() != output.resolve(), 'Do not overwrite the original WAD'
 data = bytearray(source.read_bytes())
 count, directory = struct.unpack_from('<ii',data,4)
 lumps = [struct.unpack_from('<ii8s',data,directory+i*16) for i in range(count)]
-map_name = b'E1M1' if mode == 'pickups' else b'E1M2'
+map_name = b'E1M1' if mode in ('pickups','combat') else b'E1M2'
 index = next(i for i,e in enumerate(lumps) if e[2].rstrip(b'\0') == map_name)
 things, size, _ = lumps[index+1]
 
@@ -32,6 +32,9 @@ if mode == 'pickups':
     relocate(1,1056,-3616,90)
     for kind,y in [(2014,-3560),(2015,-3504),(2007,-3448)]:
         relocate(kind,1056,y)
+elif mode == 'combat':
+    relocate(1,1056,-3616,90)
+    relocate(3004,1056,-3488,270)
 elif mode == 'key-door':
     lines, length, _ = lumps[index+2]
     vertices, _, _ = lumps[index+4]
@@ -52,6 +55,6 @@ elif mode == 'key-door':
     else:
         raise ValueError('No red door')
 else:
-    raise ValueError('Expected pickups or key-door')
+    raise ValueError('Expected pickups, combat, or key-door')
 output.write_bytes(data)
 print(f'{mode}: {map_name.decode()} fixture saved to {output}')

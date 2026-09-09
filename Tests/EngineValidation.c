@@ -77,6 +77,7 @@ static void validatePickups(const char *wad) {
 
 int main(int argc, char **argv) {
     assert(argc == 2);
+    MD_TestMonsters(0);
     if (!MD_Load(argv[1],1,1)) { fprintf(stderr,"%s\n",MD_LastError()); return 1; }
     MD_Player start = MD_GetPlayer();
     printf("Spawn: %.2f %.2f eye %.2f angle %.3f sector %d\n",start.x,start.y,start.eyeZ,start.angle,start.sector);

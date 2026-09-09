@@ -20,6 +20,14 @@ import MetalKit
         view.keyDown(with:event(.keyDown,14)); view.keyUp(with:event(.keyUp,14)); precondition(view.useQueued)
         view.keyDown(with:event(.keyDown,0)); view.releaseMouse()
         precondition(view.consumeMovement().isEmpty && !view.useQueued)
+        view.keyDown(with:event(.keyDown,3)); view.keyUp(with:event(.keyUp,3))
+        precondition(view.consumeAttack() == 1 && view.consumeAttack() == 0)
+        view.keyDown(with:event(.keyDown,3))
+        precondition(view.consumeAttack() == 1 && view.consumeAttack() == 1)
+        view.keyDown(with:event(.keyDown,19)); view.keyUp(with:event(.keyUp,19))
+        precondition(view.consumeWeapon() == 1 && view.consumeWeapon() == -1)
+        view.releaseMouse(); precondition(view.consumeAttack() == 0)
+        print("PASS: fire taps/holds and weapon selection survive tics and clear on focus release")
         print("PASS: native brief taps survive one tic, holds persist, use queues, and focus release clears input")
     }
 }

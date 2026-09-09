@@ -9,9 +9,19 @@ final class GameView: MTKView {
     var captured = false
     var running = false
     var useQueued = false
+    var attackQueued = false, mouseFire = false
+    var weaponQueued: Int32 = -1
+    func consumeAttack() -> Int32 {
+        let fire = attackQueued || mouseFire || keys.contains(3)
+        attackQueued = false; return fire ? 1 : 0
+    }
+    func consumeWeapon() -> Int32 { let value = weaponQueued; weaponQueued = -1; return value }
     override var acceptsFirstResponder: Bool { true }
     override func keyDown(with event: NSEvent) {
         if event.isARepeat { return }
+        if event.keyCode == 3 { attackQueued = true } // F: keyboard fire
+        let slots: [UInt16:Int32] = [18:0,19:1,20:2,21:3,23:4,22:5,26:6]
+        if let slot = slots[event.keyCode] { weaponQueued = slot }
         if [0,1,2,13,123,124,125,126].contains(Int(event.keyCode)) { movementQueued.insert(event.keyCode) }
         if event.keyCode == 14 || event.keyCode == 49 { useQueued = true }
         if event.keyCode == 53 { releaseMouse() } else { keys.insert(event.keyCode) }
@@ -27,13 +37,15 @@ final class GameView: MTKView {
             captured = true
             CGAssociateMouseAndMouseCursorPosition(0)
             NSCursor.hide()
-        }
+        } else { mouseFire = true; attackQueued = true }
     }
+    override func mouseUp(with event: NSEvent) { mouseFire = false }
     override func mouseMoved(with event: NSEvent) {
         if captured { mouseMotion += SIMD2(Float(event.deltaX),Float(event.deltaY)) }
     }
     override func mouseDragged(with event: NSEvent) { mouseMoved(with:event) }
     func releaseMouse() {
+        attackQueued = false; mouseFire = false; weaponQueued = -1
         keys.removeAll(); movementQueued.removeAll(); mouseMotion = .zero; running = false; useQueued = false
         if captured { captured = false; CGAssociateMouseAndMouseCursorPosition(1); NSCursor.unhide() }
     }
@@ -43,12 +55,14 @@ private struct GPUBatch { let vertices: MTLBuffer, texture: MTLTexture; let coun
 private struct Uniforms { var matrix: simd_float4x4 }
 
 final class Renderer: NSObject, MTKViewDelegate {
-    let device: MTLDevice, queue: MTLCommandQueue, pipeline: MTLRenderPipelineState, skyPipeline: MTLRenderPipelineState, spritePipeline: MTLRenderPipelineState, depth: MTLDepthStencilState
+    let device: MTLDevice, queue: MTLCommandQueue, pipeline: MTLRenderPipelineState, skyPipeline: MTLRenderPipelineState, spritePipeline: MTLRenderPipelineState, tintPipeline: MTLRenderPipelineState, depth: MTLDepthStencilState
     private var batches: [GPUBatch] = []
     private var sky: MTLTexture?
     private var map: DoomMap?
     private var wad: WAD?
     private var sprites: SpriteRenderer?
+    private var sound: SoundPlayer?
+    func pauseAudio() { try? sound?.setActive(false) }
     private var hud = MD_HUD()
     private var messageSerial: Int32 = 0, messageUntil: Int32 = 0
     var pickupMessage: String {
@@ -79,7 +93,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         if currentPlayer.health <= 0 { return "You died — R to restart" }
         let names = ["Blue card","Yellow card","Red card","Blue skull","Yellow skull","Red skull"]
         let keys = names.indices.filter { hud.keys & (1 << $0) != 0 }.map { names[$0] }
-        return "Health \(hud.health) · Armor \(hud.armor) · Ammo \(hud.readyAmmo >= 0 ? String(hud.readyAmmo) : "—") · Keys: \(keys.isEmpty ? "none" : keys.joined(separator:", "))"
+        return "Kills \(hud.kills)/\(hud.totalKills) · Health \(hud.health) · Armor \(hud.armor) · Ammo \(hud.readyAmmo >= 0 ? String(hud.readyAmmo) : "—") · Keys: \(keys.isEmpty ? "none" : keys.joined(separator:", "))"
     }
     var renderedFrames = 0
     init(view: GameView) throws {
@@ -114,6 +128,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             float2 p = float2((id << 1) & 2, id & 2);
             SkyOut o; o.position = float4(p*2.0-1.0,0.999999,1.0); o.uv = p; return o;
         }
+        fragment float4 tintFragment(SkyOut in [[stage_in]], constant float4 &color [[buffer(0)]]) { return color; }
         fragment float4 skyFragment(SkyOut in [[stage_in]], constant float4 &camera [[buffer(0)]],
                                     texture2d<float> tex [[texture(0)]]) {
             float x = (in.uv.x*2.0-1.0)*camera.z*0.57735027;
@@ -138,6 +153,11 @@ final class Renderer: NSObject, MTKViewDelegate {
         descriptor.vertexFunction = library.makeFunction(name:"skyVertex")
         descriptor.fragmentFunction = library.makeFunction(name:"skyFragment")
         skyPipeline = try device.makeRenderPipelineState(descriptor:descriptor)
+        descriptor.fragmentFunction = library.makeFunction(name:"tintFragment")
+        descriptor.colorAttachments[0].isBlendingEnabled = true
+        descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        tintPipeline = try device.makeRenderPipelineState(descriptor:descriptor)
         let state = MTLDepthStencilDescriptor(); state.depthCompareFunction = .less; state.isDepthWriteEnabled = true
         guard let depth = device.makeDepthStencilState(descriptor:state) else { throw PortError("Cannot create Metal depth state.") }
         self.depth = depth
@@ -147,6 +167,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         guard wad.signature == "IWAD" else { throw PortError("The gameplay prototype requires a standalone Doom IWAD. PWAD merging is not connected yet.") }
         let map = try DoomMap(wad:wad,name:name), geometry = try Geometry(map:map), art = try Art(wad:wad)
         let loadedSprites = try SpriteRenderer(device:device,wad:wad)
+        let loadedSound = try SoundPlayer(wad:wad)
         var materials = Set(geometry.batches.map(\.material))
         for side in map.sides {
             for name in [side.upper,side.lower,side.middle] where name != "-" && !name.isEmpty {
@@ -193,6 +214,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         guard MD_SectorCount() == map.sectors.count else { engineReady = false; throw PortError("Engine and Metal sector counts differ.") }
         self.map = map; self.wad = wad; textures = cached; batches = loaded; sky = loadedSky; sprites = loadedSprites; pitch = 0
+        sound = loadedSound; sound?.drain()
         hud = MD_GetHUD(); messageSerial = hud.messageSerial; messageUntil = hud.messageSerial > 0 ? hud.tick+140 : 0
         currentPlayer = MD_GetPlayer(); previousPlayer = currentPlayer
         position = SIMD2(currentPlayer.x,currentPlayer.y); yaw = currentPlayer.angle; eyeZ = currentPlayer.eyeZ
@@ -266,6 +288,16 @@ final class Renderer: NSObject, MTKViewDelegate {
                 encoder.setRenderPipelineState(spritePipeline)
                 do { try sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw) }
                 catch { engineReady = false; DispatchQueue.main.async { [weak self] in self?.onError?(error) } }
+                sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight)
+                if hud.damageFlash > 0 || hud.bonusFlash > 0 {
+                    var tint: SIMD4<Float> = hud.damageFlash > 0
+                        ? SIMD4(1,0,0,min(0.45,Float(hud.damageFlash)/80))
+                        : SIMD4(1,0.8,0.1,min(0.15,Float(hud.bonusFlash)/160))
+                    encoder.setRenderPipelineState(tintPipeline)
+                    encoder.setFragmentBytes(&tint,length:MemoryLayout<SIMD4<Float>>.stride,index:0)
+                    encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:3)
+                    encoder.setRenderPipelineState(spritePipeline)
+                }
                 sprites.drawHUD(encoder:encoder,state:hud,width:width,height:height)
             }
         }
@@ -276,8 +308,10 @@ final class Renderer: NSObject, MTKViewDelegate {
     private func update(view: GameView, delta: Double) throws {
         guard engineReady else { return }
         guard NSApp.isActive, view.window?.isKeyWindow == true, view.window?.attachedSheet == nil else {
+            try sound?.setActive(false)
             accumulator = 0; pendingTurn = 0; previousPlayer = currentPlayer; return
         }
+        try sound?.setActive(true)
         if view.keys.remove(15) != nil { view.releaseMouse(); try reset(); return }
         pendingTurn -= view.mouseMotion.x*0.0025
         pitch = (pitch-view.mouseMotion.y*0.0025).clamped(-1.2,1.2); view.mouseMotion = .zero
@@ -301,7 +335,8 @@ final class Renderer: NSObject, MTKViewDelegate {
             let use: Int32 = view.useQueued || view.keys.contains(14) || view.keys.contains(49) ? 1 : 0
             view.useQueued = false
             previousPlayer = currentPlayer
-            guard MD_Tick(forward,side,turn,use) != 0 else { throw PortError(String(cString:MD_LastError())) }
+            guard MD_CombatTick(forward,side,turn,use,view.consumeAttack(),view.consumeWeapon()) != 0 else { throw PortError(String(cString:MD_LastError())) }
+            sound?.drain()
             currentPlayer = MD_GetPlayer(); accumulator -= step
             hud = MD_GetHUD()
             if hud.messageSerial != messageSerial { messageSerial = hud.messageSerial; messageUntil = hud.tick+140 }
