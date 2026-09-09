@@ -122,7 +122,9 @@ The original engine decoder has not been hardened for deliberately crafted paylo
 ## Current limitations
 
 - Networking is not connected. The main, episode and difficulty menus use original Doom artwork and layout
-  with an animated skull. Options and save slots use matching bitmap controls.
+  with an animated skull. Ultimate Doom combines its title caption with the Doom
+  menu logo; a small footer shows the MetalDooM version/build. Options and save slots
+  use matching bitmap controls.
 - Sound positioning is sampled when an effect starts; continuous repositioning,
   original priority/pitch variation, PC-speaker sounds, and audio-device changes
   need further work. Native output has been validated through offline mixing;

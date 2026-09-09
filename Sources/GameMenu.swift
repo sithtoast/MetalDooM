@@ -52,9 +52,15 @@ final class GameMenu: NSView {
         if let image=images[name] { return image }
         guard let wad=app.wad else { return nil }
         if decoder == nil { decoder=try? Art(wad:wad) }
-        guard let decoder, let patch=try? decoder.patch(named:name) else { return nil }
-        origins[name]=CGPoint(x:patch.left,y:patch.top)
-        let pixels=patch.image
+        guard let decoder else { return nil }
+        let pixels: PixelImage
+        if name=="MD_ULTIMATE_LOGO" {
+            guard let logo=try? MenuLogo.ultimate(art:decoder) else { return nil }
+            pixels=logo;origins[name] = .zero
+        } else {
+            guard let patch=try? decoder.patch(named:name) else { return nil }
+            origins[name]=CGPoint(x:patch.left,y:patch.top);pixels=patch.image
+        }
         guard let rep=NSBitmapImageRep(bitmapDataPlanes:nil,pixelsWide:pixels.width,pixelsHigh:pixels.height,
             bitsPerSample:8,samplesPerPixel:4,hasAlpha:true,isPlanar:false,colorSpaceName:.deviceRGB,bytesPerRow:pixels.width*4,bitsPerPixel:32),let data=rep.bitmapData else { return nil }
         pixels.rgba.withUnsafeBytes { data.update(from:$0.bindMemory(to:UInt8.self).baseAddress!,count:pixels.rgba.count) }
@@ -92,14 +98,17 @@ final class GameMenu: NSView {
             button("Open WAD…") { [weak self] in self?.app.openWAD() }; return
         }
         let canSave = !app.attractActive && MD_GetProgress().phase==0 && MD_GetHUD().health>0
-        canvas("Paused",art:[("M_DOOM",94,2)],items:[
-            .init(title:"New Game",patch:"M_NGAME",x:97,y:64,action:{ [weak self] in self?.newGame() }),
-            .init(title:"Options",patch:"M_OPTION",x:97,y:80,action:{ [weak self] in self?.options() }),
-            .init(title:"Load Game",patch:"M_LOADG",x:97,y:96,action:{ [weak self] in self?.slots(saving:false) }),
-            .init(title:"Save Game",patch:"M_SAVEG",x:97,y:112,enabled:canSave,action:{ [weak self] in self?.slots(saving:true) }),
-            .init(title:"Read This",patch:"M_RDTHIS",x:97,y:128,action:{ [weak self] in self?.readThis() }),
-            .init(title:"Quit Game",patch:"M_QUITG",x:97,y:144,action:{ NSApp.terminate(nil) })
-        ],labels:[(app.wad?.gameName.uppercased() ?? "DOOM",72,180)],back:{ [weak self] in self?.app.dismissGameMenu() })
+        let ultimate=image("MD_ULTIMATE_LOGO") != nil
+        let offset: CGFloat=ultimate ? 24:0
+        canvas("Paused",art:[(ultimate ? "MD_ULTIMATE_LOGO":"M_DOOM",98,0)],items:[
+            .init(title:"New Game",patch:"M_NGAME",x:97,y:64+offset,action:{ [weak self] in self?.newGame() }),
+            .init(title:"Options",patch:"M_OPTION",x:97,y:80+offset,action:{ [weak self] in self?.options() }),
+            .init(title:"Load Game",patch:"M_LOADG",x:97,y:96+offset,action:{ [weak self] in self?.slots(saving:false) }),
+            .init(title:"Save Game",patch:"M_SAVEG",x:97,y:112+offset,enabled:canSave,action:{ [weak self] in self?.slots(saving:true) }),
+            .init(title:"Read This",patch:"M_RDTHIS",x:97,y:128+offset,action:{ [weak self] in self?.readThis() }),
+            .init(title:"Quit Game",patch:"M_QUITG",x:97,y:144+offset,action:{ NSApp.terminate(nil) })
+        ],back:{ [weak self] in self?.app.dismissGameMenu() })
+        classic?.footer=appTitle
     }
     private func readThis() {
         canvas("Help",art:[(app.wad?.lump("HELP1") != nil ? "HELP1" : "CREDIT",0,0)],items:[],back:{ [weak self] in self?.main() })

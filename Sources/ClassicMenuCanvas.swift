@@ -20,6 +20,7 @@ final class ClassicMenuCanvas: NSView {
     struct Editing { let index: Int; var text: String; let commit: (String) -> Void }
     var editing: Editing?
     var labels: [(String,CGFloat,CGFloat)] = []
+    var footer: String?
     var onSound: (String) -> Void = { _ in }
     var artwork: [(String,CGFloat,CGFloat)] = []
     var items: [Item] = []
@@ -175,6 +176,11 @@ final class ClassicMenuCanvas: NSView {
                 patch("M_THERMR",x+136,y)
                 patch("M_THERMO",x+8+CGFloat(max(0,min(1,meter())))*120,y)
             }
+        }
+        if let footer {
+            let string=NSAttributedString(string:footer,attributes:[.font:NSFont.monospacedSystemFont(ofSize:5.5*bounds.width/320,weight:.regular),.foregroundColor:NSColor.lightGray])
+            let size=string.size()
+            string.draw(at:NSPoint(x:(bounds.width-size.width)/2,y:bounds.height-size.height-3*bounds.height/200))
         }
         if items.indices.contains(selected), items[selected].enabled {
             patch("M_SKULL\(skull+1)",items[selected].x-32,items[selected].y-5)

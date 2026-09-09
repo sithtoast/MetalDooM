@@ -234,3 +234,13 @@ the same bridge implementation; cheats modify original player flags, inventory
 and powers, emitting HUD feedback. Nightmare/dead players and demos reject cheats.
 Weapon grants filter shareware and Doom II-only weapons. No vendored engine files
 are changed.
+
+## Menu branding
+
+MenuLogo derives the Ultimate Doom caption from the loaded standard-size TITLEPIC
+and combines it with the transparent M_DOOM patch at runtime. Gold caption pixels
+are isolated in the known title regions, outlined and resampled with nearest-neighbor
+sampling. The lower title logo is not copied because the character obscures it.
+Missing or differently sized artwork falls back to M_DOOM. No generated game artwork
+is shipped. GameMenu reserves extra header space for the composite and ClassicMenuCanvas
+renders a small version/build footer separately from bitmap menu labels.

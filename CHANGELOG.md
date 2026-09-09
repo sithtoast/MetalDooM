@@ -4,6 +4,14 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 40 — Ultimate Doom menu header
+
+- Build a transparent Ultimate Doom menu logo from the loaded WAD's gold title
+  caption and M_DOOM artwork, keeping game art out of the repository.
+- Remove the separate game-name label beneath the menu and add a small gray
+  MetalDooM version/build footer. Adjust Ultimate Doom menu spacing for the header.
+- Retain the standard M_DOOM logo when the expected Ultimate artwork is unavailable.
+
 ## Build 39 — Cheats, title screens and attract demos
 
 - Show the WAD's original title artwork and music before the menu, and identify the
