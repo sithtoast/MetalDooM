@@ -8,6 +8,15 @@ import simd
         let room = try DoomMap(wad:fixture,name:"MAP01")
         guard room.sector(at:.zero) == 0,
               try Geometry(map:room).triangleCount == 12 else { throw PortError("Fixture geometry regression.") }
+        let bounded = try Geometry(map:room)
+        for batch in bounded.batches where batch.material.flat {
+            for vertex in batch.vertices {
+                guard abs(vertex.position.x) <= 128.001, abs(vertex.position.z) <= 128.001 else {
+                    throw PortError("Subsector plane escaped its seg boundaries toward the unused far vertex.")
+                }
+            }
+        }
+        print("PASS: floor/ceiling polygons respect room edges despite expanded map bounds")
         let original = try Data(contentsOf:fixtureURL)
         let invalidURL = fixtureURL.deletingLastPathComponent().appendingPathComponent("invalid.wad")
         defer { try? FileManager.default.removeItem(at:invalidURL) }
@@ -43,7 +52,7 @@ import simd
             let wad = try WAD(url:URL(fileURLWithPath:path)), art = try Art(wad:wad)
             var checked = Set<MaterialKey>()
             for name in wad.maps {
-                let map = try DoomMap(wad:wad,name:name), geometry = try Geometry(map:map)
+                let map = try DoomMap(wad:wad,name:name), geometry = try Geometry(map:map,textureHeights:art.textureHeights())
                 guard geometry.triangleCount > 0 else { throw PortError("Empty geometry in \(name).") }
                 for batch in geometry.batches {
                     for vertex in batch.vertices {
@@ -54,6 +63,24 @@ import simd
                             throw PortError("Missing or invalid texture \(batch.material.name) in \(name).")
                         }
                     }
+                }
+                if name == "E1M1" {
+                    for texture in ["BRNBIGL","BRNBIGC","BRNBIGR"] {
+                        guard let batch = geometry.batches.first(where: { $0.material.name == texture }), !batch.vertices.isEmpty else {
+                            throw PortError("Missing exit middle texture: \(texture)")
+                        }
+                        for v in batch.vertices {
+                            guard v.position.y >= -24, v.position.y <= 104, v.uvLight.y >= 0, v.uvLight.y <= 128 else {
+                                throw PortError("Exit panel was repeated outside its opening.")
+                            }
+                        }
+                    }
+                    guard !geometry.skyVertices.isEmpty,
+                          geometry.skyVertices.contains(where: { $0.uvLight.w == 1 }),
+                          geometry.skyVertices.contains(where: { $0.uvLight.w == 0 }) else {
+                        throw PortError("Sky planes or boundary curtains are missing.")
+                    }
+                    print("PASS: E1M1 exit panels, bounded middle UVs, sky planes and boundary curtains")
                 }
                 print("PASS: \(name), \(map.sectors.count) sectors, \(geometry.triangleCount) triangles")
             }

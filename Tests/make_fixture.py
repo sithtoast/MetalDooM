@@ -22,7 +22,7 @@ lumps = [
     ('THINGS', struct.pack('<hhhhh', 0,0,0,1,7)),
     ('LINEDEFS', b''.join(struct.pack('<7H',i,(i+1)%4,1,0,0,i,65535) for i in range(4))),
     ('SIDEDEFS', b''.join(struct.pack('<hh8s8s8sH',0,0,name('-'),name('-'),name('TESTWALL'),0) for _ in range(4))),
-    ('VERTEXES', b''.join(struct.pack('<hh',*p) for p in points)),
+    ('VERTEXES', b''.join(struct.pack('<hh',*p) for p in points+[(4096,4096)])),
     ('SEGS', b''.join(struct.pack('<6H',i,(i+1)%4,0,i,0,0) for i in range(4))),
     ('SSECTORS', struct.pack('<HH',4,0)),
     ('NODES', b''),

@@ -57,7 +57,11 @@ Weapon selection requires ownership. R restarts after death; it resets inventory
 ## Implemented
 
 - ARM64 AppKit app, MetalKit viewport, direct Metal shaders.
-- Classic WAD/map loading, BSP-derived floors/ceilings, textured walls and sky.
+- Classic WAD/map loading, BSP/seg-clipped floors and ceilings, textured walls.
+- Two-sided middle textures with transparent openings, distinct front/back faces,
+  opening-height clipping, sidedef offsets, and upper/lower/middle pegging rules.
+- Cylindrical Doom sky projection with depth-writing sky planes and wall curtains
+  to mask distant geometry at outdoor boundaries and differing sky heights.
 - PLAYPAL, PNAMES, TEXTURE1/TEXTURE2, patch compositing, and floor flats.
 - Pinned Chocolate Doom engine with native memory and host services.
 - Original player movement, momentum, sliding, collision, stairs, view height, and use logic.
@@ -88,8 +92,10 @@ Weapon selection requires ownership. R restarts after death; it resets inventory
   message; R restarts. Death also requires R. Keys now unlock their matching doors.
 - Manual doors have been validated. Other sector actions use upstream logic but
   lifts, crushers, switches, and special-case maps need dedicated validation.
-- Lighting and sky projection are approximate; sky occlusion, texture pegging,
-  masked middle walls, animations, scrolling textures, and full palette effects remain (damage/pickup tint is implemented).
+- Lighting is approximate; world animations, scrolling textures, and full palette
+  effects remain (damage/pickup tint is implemented). Sky now follows the classic
+  horizontal repeat and horizon, with clamping for the optional vertical look;
+  extreme pitch and unusual sky-map tricks need further validation.
   Sprite animation is implemented; the pending animations are world textures/flats.
   The HUD face uses health bands and idle frames, not Doom's complete expression
   state machine. Power-up screen effects and fuzz rendering remain pending.
@@ -133,9 +139,12 @@ use AVAudioEngine offline rendering to check original pistol PCM, pause/resume,
 and malformed DMX rejection; they require access to macOS audio services.
 Engine placement helpers exist only in the test build.
 
-Validated: all nine maps and 138 world materials in the supplied shareware WAD;
+Validated: all nine maps and 146 world materials in the supplied shareware WAD;
 engine movement/door/pickup tests; native visual sprites, status bar, collection,
 locked-door messages, red-key HUD indicator, and passage through the unlocked door.
+Build 12 restored E1M1's BRNBIG exit panels with transparent openings and verified
+continuous outdoor sky while turning. Regression checks cover these surfaces and
+seg-bounded planes even when unused vertices expand map bounds.
 Build 11 additionally showed pistol rendering, enemy death, ammo/health changes,
 and switching to the fist in the native combat fixture.
 Visual fixtures change only THINGS records in temporary

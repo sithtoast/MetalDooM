@@ -121,6 +121,9 @@ final class Art {
         }
         return PixelImage(width: width, height: height, rgba: pixels)
     }
+    func textureHeights() throws -> [String:Float] {
+        try definitions.mapValues { Float(try $0.u16(14)) }
+    }
     static let fallback: PixelImage = {
         var pixels: [UInt8] = []
         for y in 0..<64 { for x in 0..<64 {
@@ -135,7 +138,8 @@ final class Art {
 struct Geometry {
     let batches: [Batch]
     let triangleCount: Int
-    init(map: DoomMap) throws {
+    let skyVertices: [WorldVertex]
+    init(map: DoomMap, textureHeights: [String:Float] = [:]) throws {
         var groups: [MaterialKey: [WorldVertex]] = [:]
         func vertex(_ p: SIMD2<Float>, _ height: Float, _ u: Float, _ v: Float, _ light: Float) -> WorldVertex {
             WorldVertex(position: SIMD4(p.x, height, -p.y, 1), uvLight: SIMD4(u,v,light,0))
@@ -148,7 +152,10 @@ struct Geometry {
             let two = vertex(b,bottom,u+length,anchor-bottom+side.y,light)
             let three = vertex(b,top,u+length,anchor-top+side.y,light)
             let four = vertex(a,top,u,anchor-top+side.y,light)
-            groups[MaterialKey(name:texture,flat:false), default:[]] += [one,two,three,one,three,four]
+            // w marks directional walls; the fragment shader rejects the far side.
+            var vertices = [one,two,three,one,three,four]
+            for i in vertices.indices { vertices[i].uvLight.w = 1 }
+            groups[MaterialKey(name:texture,flat:texture == "F_SKY1"), default:[]] += vertices
         }
         for line in map.lines {
             for isBack in [false,true] {
@@ -159,15 +166,30 @@ struct Geometry {
                 let otherIndex = isBack ? line.front : line.back
                 let shade: Float = abs(a.y-b.y) < 0.01 ? 0.88 : 1
                 let light = max(0.12,sector.light*shade)
+                let bottomPegged = line.flags & 16 != 0, topPegged = line.flags & 8 != 0
+                func height(_ name: String) -> Float { textureHeights[name] ?? 128 }
                 if otherIndex == 65535 {
-                    wall(a,b,sector.floor,sector.ceiling,side,side.middle,light,sector.ceiling)
+                    wall(a,b,sector.floor,sector.ceiling,side,side.middle,light,
+                         bottomPegged ? sector.floor+height(side.middle) : sector.ceiling)
+                    if sector.ceilingTexture == "F_SKY1" {
+                        wall(a,b,sector.ceiling,32768,side,"F_SKY1",1,0)
+                    }
                 } else {
                     let other = map.sectors[map.sides[otherIndex].sector]
                     if !(sector.ceilingTexture == "F_SKY1" && other.ceilingTexture == "F_SKY1") {
-                        wall(a,b,max(sector.floor,other.ceiling),sector.ceiling,side,side.upper,light,sector.ceiling)
+                        wall(a,b,max(sector.floor,other.ceiling),sector.ceiling,side,side.upper,light,
+                             topPegged ? sector.ceiling : other.ceiling+height(side.upper))
+                    } else {
+                        wall(a,b,other.ceiling,sector.ceiling,side,"F_SKY1",1,0)
                     }
-                    wall(a,b,sector.floor,min(sector.ceiling,other.floor),side,side.lower,light,other.floor)
-                    // Masked middle textures require sided draw ranges and pegging; deferred.
+                    wall(a,b,sector.floor,min(sector.ceiling,other.floor),side,side.lower,light,
+                         bottomPegged ? (sector.ceilingTexture == "F_SKY1" && other.ceilingTexture == "F_SKY1" ? other.ceiling : sector.ceiling) : other.floor)
+                    // Middle patches appear once within the shared opening; transparent
+                    // texels reveal the opposite sector rather than repeating vertically.
+                    let openingBottom = max(sector.floor,other.floor), openingTop = min(sector.ceiling,other.ceiling)
+                    let anchor = bottomPegged ? openingBottom+height(side.middle) : openingTop
+                    wall(a,b,max(openingBottom,anchor+side.y-height(side.middle)),
+                         min(openingTop,anchor+side.y),side,side.middle,light,anchor)
                 }
             }
         }
@@ -198,10 +220,20 @@ struct Geometry {
                 pending.append((node.right,clipped(polygon,node,true)))
                 pending.append((node.left,clipped(polygon,node,false)))
             } else {
+                let leaf = map.leaves[index & 0x7fff]
+                var polygon = polygon
+                // BSP partitions alone do not include every outer room edge.
+                // Complete each convex leaf using its directed seg boundaries.
+                for seg in map.segs[leaf.first..<leaf.first+leaf.count] {
+                    let a = map.points[seg.a], b = map.points[seg.b]
+                    if simd_length_squared(b-a) > 0 {
+                        polygon = clipped(polygon,Node(origin:a,direction:b-a,right:0,left:0),true)
+                    }
+                }
+                guard polygon.count >= 3 else { continue }
                 let sector = map.sectors[map.leafSector(index & 0x7fff)]
                 for ceiling in [false,true] {
                     let name = ceiling ? sector.ceilingTexture : sector.floorTexture
-                    if name == "F_SKY1" { continue }
                     let height = ceiling ? sector.ceiling : sector.floor
                     for i in 1..<polygon.count-1 {
                         let triangle = [polygon[0],polygon[i],polygon[i+1]].map { p in
@@ -212,6 +244,7 @@ struct Geometry {
                 }
             }
         }
+        skyVertices = groups.removeValue(forKey:MaterialKey(name:"F_SKY1",flat:true)) ?? []
         batches = groups.map { Batch(material:$0.key,vertices:$0.value) }.sorted {
             ($0.material.flat ? "F" : "W")+$0.material.name < ($1.material.flat ? "F" : "W")+$1.material.name
         }

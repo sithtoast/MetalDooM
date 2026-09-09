@@ -55,9 +55,12 @@ private struct GPUBatch { let vertices: MTLBuffer, texture: MTLTexture; let coun
 private struct Uniforms { var matrix: simd_float4x4 }
 
 final class Renderer: NSObject, MTKViewDelegate {
-    let device: MTLDevice, queue: MTLCommandQueue, pipeline: MTLRenderPipelineState, skyPipeline: MTLRenderPipelineState, spritePipeline: MTLRenderPipelineState, tintPipeline: MTLRenderPipelineState, depth: MTLDepthStencilState
+    let device: MTLDevice, queue: MTLCommandQueue, pipeline: MTLRenderPipelineState, skyPipeline: MTLRenderPipelineState, skySurfacePipeline: MTLRenderPipelineState, spritePipeline: MTLRenderPipelineState, tintPipeline: MTLRenderPipelineState, depth: MTLDepthStencilState
     private var batches: [GPUBatch] = []
     private var sky: MTLTexture?
+    private var skyGeometry: MTLBuffer?
+    private var skyVertexCount = 0
+    private var textureHeights: [String:Float] = [:]
     private var map: DoomMap?
     private var wad: WAD?
     private var sprites: SpriteRenderer?
@@ -103,13 +106,14 @@ final class Renderer: NSObject, MTKViewDelegate {
         #include <metal_stdlib>
         using namespace metal;
         struct Vertex { float4 position; float4 uvLight; };
-        struct Out { float4 position [[position]]; float2 uv; float light; float distance; float fullbright; };
+        struct Out { float4 position [[position]]; float2 uv; float light; float distance; float fullbright; float3 world; };
         vertex Out worldVertex(uint id [[vertex_id]], const device Vertex *v [[buffer(0)]],
                                constant float4x4 &matrix [[buffer(1)]]) {
             Out o; o.position = matrix * v[id].position; o.uv = v[id].uvLight.xy;
-            o.light = v[id].uvLight.z; o.distance = o.position.w; o.fullbright = v[id].uvLight.w; return o;
+            o.world = v[id].position.xyz; o.light = v[id].uvLight.z; o.distance = o.position.w; o.fullbright = v[id].uvLight.w; return o;
         }
-        fragment float4 worldFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]]) {
+        fragment float4 worldFragment(Out in [[stage_in]], bool front [[front_facing]], texture2d<float> tex [[texture(0)]]) {
+            if (in.fullbright > 0.5 && !front) discard_fragment();
             constexpr sampler s(coord::normalized, address::repeat, filter::nearest);
             float4 c = tex.sample(s, in.uv / float2(tex.get_width(),tex.get_height()));
             if (c.a < 0.5) discard_fragment();
@@ -123,6 +127,20 @@ final class Renderer: NSObject, MTKViewDelegate {
             float shade = in.fullbright > 0.5 ? 1.0 : in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
             return float4(c.rgb*shade,1.0);
         }
+        float4 skyColor(float3 direction, texture2d<float> tex) {
+            float angle = atan2(-direction.z,direction.x);
+            float slope = direction.y / max(length(direction.xz),0.0001);
+            // Doom uses 1024 columns per revolution and a sky midpoint of 100.
+            float2 uv = float2(angle*(512.0/M_PI_F)/tex.get_width(),
+                               (100.0-160.0*slope)/tex.get_height());
+            constexpr sampler s(coord::normalized, s_address::repeat, t_address::clamp_to_edge, filter::nearest);
+            return float4(tex.sample(s,uv).rgb,1);
+        }
+        fragment float4 skySurfaceFragment(Out in [[stage_in]], bool front [[front_facing]],
+                    constant float4 &eye [[buffer(0)]], texture2d<float> tex [[texture(0)]]) {
+            if (in.fullbright > 0.5 && !front) discard_fragment();
+            return skyColor(in.world-eye.xyz,tex);
+        }
         struct SkyOut { float4 position [[position]]; float2 uv; };
         vertex SkyOut skyVertex(uint id [[vertex_id]]) {
             float2 p = float2((id << 1) & 2, id & 2);
@@ -134,11 +152,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             float x = (in.uv.x*2.0-1.0)*camera.z*0.57735027;
             float y = (in.uv.y*2.0-1.0)*0.57735027;
             float f = cos(camera.y)-y*sin(camera.y), h = sin(camera.y)+y*cos(camera.y);
-            float angle = camera.x-atan2(x,f);
-            float elevation = atan2(h,length(float2(x,f)));
-            float2 uv = float2(-angle * (2.0/M_PI_F),clamp(0.5-elevation/M_PI_F*2.0,0.0,1.0));
-            constexpr sampler s(coord::normalized, s_address::repeat, t_address::clamp_to_edge, filter::nearest);
-            return float4(tex.sample(s,uv).rgb,1.0);
+            return skyColor(float3(cos(camera.x)*f+sin(camera.x)*x,h,-sin(camera.x)*f+cos(camera.x)*x),tex);
         }
         """
         let library = try device.makeLibrary(source:shader,options:nil)
@@ -148,6 +162,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         descriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
         descriptor.depthAttachmentPixelFormat = .depth32Float
         pipeline = try device.makeRenderPipelineState(descriptor:descriptor)
+        descriptor.fragmentFunction = library.makeFunction(name:"skySurfaceFragment")
+        skySurfacePipeline = try device.makeRenderPipelineState(descriptor:descriptor)
         descriptor.fragmentFunction = library.makeFunction(name:"spriteFragment")
         spritePipeline = try device.makeRenderPipelineState(descriptor:descriptor)
         descriptor.vertexFunction = library.makeFunction(name:"skyVertex")
@@ -165,7 +181,8 @@ final class Renderer: NSObject, MTKViewDelegate {
     }
     func load(wad: WAD, map name: String) throws -> (triangles:Int,missing:[String]) {
         guard wad.signature == "IWAD" else { throw PortError("The gameplay prototype requires a standalone Doom IWAD. PWAD merging is not connected yet.") }
-        let map = try DoomMap(wad:wad,name:name), geometry = try Geometry(map:map), art = try Art(wad:wad)
+        let map = try DoomMap(wad:wad,name:name), art = try Art(wad:wad)
+        let heights = try art.textureHeights(), geometry = try Geometry(map:map,textureHeights:heights)
         let loadedSprites = try SpriteRenderer(device:device,wad:wad)
         let loadedSound = try SoundPlayer(wad:wad)
         var materials = Set(geometry.batches.map(\.material))
@@ -213,12 +230,14 @@ final class Renderer: NSObject, MTKViewDelegate {
             throw PortError(String(cString:MD_LastError()))
         }
         guard MD_SectorCount() == map.sectors.count else { engineReady = false; throw PortError("Engine and Metal sector counts differ.") }
+        textureHeights = heights
         self.map = map; self.wad = wad; textures = cached; batches = loaded; sky = loadedSky; sprites = loadedSprites; pitch = 0
         sound = loadedSound; sound?.drain()
         hud = MD_GetHUD(); messageSerial = hud.messageSerial; messageUntil = hud.messageSerial > 0 ? hud.tick+140 : 0
         currentPlayer = MD_GetPlayer(); previousPlayer = currentPlayer
         position = SIMD2(currentPlayer.x,currentPlayer.y); yaw = currentPlayer.angle; eyeZ = currentPlayer.eyeZ
         accumulator = 0; pendingTurn = 0; turnHeld = 0; lastTime = CACurrentMediaTime(); engineReady = true
+        try uploadSkyGeometry(geometry)
         try syncGeometry()
         return (geometry.triangleCount,Array(Set(missing)).sorted())
     }
@@ -232,6 +251,14 @@ final class Renderer: NSObject, MTKViewDelegate {
             return GPUBatch(vertices:buffer,texture:texture,count:batch.vertices.count)
         }
     }
+    private func uploadSkyGeometry(_ geometry: Geometry) throws {
+        skyVertexCount = geometry.skyVertices.count
+        skyGeometry = nil
+        if skyVertexCount > 0 {
+            skyGeometry = device.makeBuffer(bytes:geometry.skyVertices,length:skyVertexCount*MemoryLayout<WorldVertex>.stride,options:.storageModeShared)
+            guard skyGeometry != nil else { throw PortError("Cannot allocate sky boundaries.") }
+        }
+    }
     private func syncGeometry() throws {
         guard var map else { return }
         var changed = false
@@ -243,7 +270,9 @@ final class Renderer: NSObject, MTKViewDelegate {
             }
         }
         if changed {
-            batches = try makeBatches(Geometry(map:map),textures:textures)
+            let geometry = try Geometry(map:map,textureHeights:textureHeights)
+            batches = try makeBatches(geometry,textures:textures)
+            try uploadSkyGeometry(geometry)
             self.map = map
         }
     }
@@ -262,7 +291,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             semaphore.signal()
         }
         guard let encoder = command.makeRenderCommandEncoder(descriptor:pass) else { inFlight.signal(); return }
-        encoder.setRenderPipelineState(pipeline); encoder.setDepthStencilState(depth); encoder.setCullMode(.none)
+        encoder.setRenderPipelineState(pipeline); encoder.setDepthStencilState(depth); encoder.setCullMode(.none); encoder.setFrontFacing(.counterClockwise)
         if map != nil {
             let width = max(1,view.drawableSize.width), height = max(1,view.drawableSize.height)
             let worldHeight = max(1,height-SpriteRenderer.hudHeight(width:width))
@@ -280,6 +309,15 @@ final class Renderer: NSObject, MTKViewDelegate {
             let forward = SIMD3(cos(yaw)*cos(pitch),sin(pitch),-sin(yaw)*cos(pitch))
             var uniform = Uniforms(matrix:perspective(aspect:aspect) * look(eye:eye,forward:forward))
             encoder.setVertexBytes(&uniform,length:MemoryLayout<Uniforms>.stride,index:1)
+            if let skyGeometry, let sky {
+                var skyEye = SIMD4(eye,1)
+                encoder.setRenderPipelineState(skySurfacePipeline)
+                encoder.setVertexBuffer(skyGeometry,offset:0,index:0)
+                encoder.setFragmentBytes(&skyEye,length:MemoryLayout<SIMD4<Float>>.stride,index:0)
+                encoder.setFragmentTexture(sky,index:0)
+                encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:skyVertexCount)
+                encoder.setRenderPipelineState(pipeline)
+            }
             for batch in batches {
                 encoder.setVertexBuffer(batch.vertices,offset:0,index:0); encoder.setFragmentTexture(batch.texture,index:0)
                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:batch.count)

@@ -42,10 +42,22 @@ changes and absent-map requests preserve the active engine.
 
 WAD `(x,y)` becomes Metal `(x,height,-y)`. Vertices contain position and texel UV/light
 float4s. Wall art is composited at load time; floors/ceilings are clipped through the
-classic BSP. All side materials are cached, including those hidden by closed sectors.
+classic BSP and each leaf's directed seg boundaries. All side materials are cached, including those hidden by closed sectors.
 Engine floor/ceiling height or light changes rebuild geometry using current values.
 Textures persist and submitted buffers are immutable. Metal retains resources used
 by in-flight commands; up to three command buffers may be outstanding.
+
+Two-sided middle textures cover one texture-height interval clipped to the shared
+sector opening. Pegging flags and row offsets determine its anchor, as well as
+upper/lower/one-sided wall alignment. Directional wall fragments reject back faces,
+so opposing sidedefs can use different art without depth fighting. Transparent
+fragments discard before depth writes, preserving views and sprites behind grilles.
+
+Sky flats are separate GPU geometry, not simply omitted ceilings. Sky planes and
+boundary curtains write depth while sampling an unlit cylindrical sky using the
+world ray, 1024 columns per revolution, and a 100-texel horizon. A matching background
+fills uncovered pixels. Sky-to-sky height changes produce sky curtains rather than
+ordinary upper walls. Dynamic geometry updates rebuild sky surfaces too.
 
 Camera position, angle, and eye height interpolate between engine tics. Moving
 sector geometry currently advances at tic rate. The accumulator is bounded after
@@ -103,3 +115,8 @@ CombatValidation uses test-only isolated targets to check pistol/fist damage,
 ammo, animation/flash, monster attacks, death, reset and empty-ammo fallback.
 AudioValidation renders the original pistol sound offline through AVAudioEngine.
 The full game-state loop should extend the same copied-snapshot boundary.
+
+Surface regression tests assert E1M1 BRNBIG panels and their UV bounds, sky planes
+and curtains, and floor/ceiling containment with an unused far-away fixture vertex.
+`make_surface_fixture.py` creates local exit/sky viewing positions without monsters;
+it changes only THINGS records, retaining original geometry and art.
