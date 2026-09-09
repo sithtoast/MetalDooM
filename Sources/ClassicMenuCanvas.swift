@@ -16,6 +16,7 @@ final class ClassicMenuCanvas: NSView {
         var adjust: ((Int) -> Void)? = nil
         var meter: (() -> Float)? = nil
         var slot = false
+        var textScale: CGFloat = 1
     }
     struct Editing { let index: Int; var text: String; let commit: (String) -> Void }
     var editing: Editing?
@@ -139,19 +140,19 @@ final class ClassicMenuCanvas: NSView {
     override func draw(_ dirtyRect: NSRect) {
         NSGraphicsContext.saveGraphicsState(); defer { NSGraphicsContext.restoreGraphicsState() }
         NSGraphicsContext.current?.imageInterpolation = .none
-        func patch(_ name: String,_ x: CGFloat,_ y: CGFloat,_ alpha: CGFloat = 1) {
+        func patch(_ name: String,_ x: CGFloat,_ y: CGFloat,_ alpha: CGFloat = 1,_ size: CGFloat = 1) {
             guard let image=image(name) else { return }
             let origin=patchOrigin(name)
-            image.draw(in:NSRect(x:(x-origin.x)*bounds.width/320,y:(y-origin.y)*bounds.height/200,
-                width:image.size.width*bounds.width/320,height:image.size.height*bounds.height/200),
+            image.draw(in:NSRect(x:(x-origin.x*size)*bounds.width/320,y:(y-origin.y*size)*bounds.height/200,
+                width:image.size.width*size*bounds.width/320,height:image.size.height*size*bounds.height/200),
                 from:.zero,operation:.sourceOver,fraction:alpha,respectFlipped:true,hints:nil)
         }
-        func text(_ value: String,_ x: CGFloat,_ y: CGFloat,_ alpha: CGFloat = 1,_ maxWidth: CGFloat = 270) {
+        func text(_ value: String,_ x: CGFloat,_ y: CGFloat,_ alpha: CGFloat = 1,_ maxWidth: CGFloat = 270,_ size: CGFloat = 1) {
             var cursor=x
             for char in value.uppercased().unicodeScalars {
-                let name=String(format:"STCFN%03d",char.value), width=image(name)?.size.width ?? 4
+                let name=String(format:"STCFN%03d",char.value), width=(image(name)?.size.width ?? 4)*size
                 if cursor+width>x+maxWidth { break }
-                patch(name,cursor,y,alpha); cursor += width
+                patch(name,cursor,y,alpha,size); cursor += width
             }
         }
         for (name,x,y) in artwork { patch(name,x,y) }
@@ -166,7 +167,7 @@ final class ClassicMenuCanvas: NSView {
             }
             if item.patch.isEmpty {
                 let value=editing?.index==index ? editing!.text+(skull==0 ? "_" : "") : item.title
-                text(value,item.x,item.y,alpha,item.slot ? 192 : 260)
+                text(value,item.x,item.y,alpha,item.slot ? 192 : 260,item.textScale)
             } else { patch(item.patch,item.x,item.y,alpha) }
             if let value=item.value { text(value(),190,item.y,alpha,116) }
             if let meter=item.meter {

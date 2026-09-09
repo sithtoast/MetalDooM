@@ -109,6 +109,7 @@ final class GameMenu: NSView {
             .init(title:"Quit Game",patch:"M_QUITG",x:97,y:144+offset,action:{ NSApp.terminate(nil) })
         ],back:{ [weak self] in self?.app.dismissGameMenu() })
         classic?.footer=appTitle
+        if !app.attractActive && MD_GetHUD().health <= 0 { classic?.selected=2 }
     }
     private func readThis() {
         canvas("Help",art:[(app.wad?.lump("HELP1") != nil ? "HELP1" : "CREDIT",0,0)],items:[],back:{ [weak self] in self?.main() })
@@ -156,9 +157,9 @@ final class GameMenu: NSView {
     }
     private func options() {
         canvas("Options",art:[("M_OPTTTL",108,15)],items:[
-            .init(title:"Sound Volume",patch:"",x:60,y:64,action:{ [weak self] in self?.audioOptions() }),
-            .init(title:"Display",patch:"",x:60,y:96,action:{ [weak self] in self?.displayOptions() }),
-            .init(title:"Back",patch:"",x:60,y:128,action:{ [weak self] in self?.main() })
+            .init(title:"Sound Volume",patch:"",x:60,y:64,action:{ [weak self] in self?.audioOptions() },textScale:2),
+            .init(title:"Display",patch:"",x:60,y:96,action:{ [weak self] in self?.displayOptions() },textScale:2),
+            .init(title:"Back",patch:"",x:60,y:128,action:{ [weak self] in self?.main() },textScale:2)
         ],labels:[("ENTER SELECT   ESC BACK",48,180)],back:{ [weak self] in self?.main() })
     }
     private func audioOptions() {

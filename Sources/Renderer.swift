@@ -97,6 +97,8 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var progress = MD_Progress()
     private var intermission = IntermissionSequence()
     private var intermissionTime: Double = 0
+    private var finale = FinaleSequence()
+    private var deathTime: Double = 0
     private var lastGeometryTick: Int32 = -1
     var onMapChanged: ((String) -> Void)?
     func pauseAudio() { try? sound?.setActive(false); music?.update(active:false) }
@@ -132,10 +134,10 @@ final class Renderer: NSObject, MTKViewDelegate {
     var playerStatus: String {
         guard engineReady else { return "" }
         if progress.phase != 0 {
-            if progress.phase == 2 { return "Episode complete · Kills \(progress.kills)/\(progress.maxKills) · Items \(progress.items)/\(progress.maxItems) · Secrets \(progress.secrets)/\(progress.maxSecrets) · Choose another map or R to restart" }
+            if progress.phase == 2 { return "Episode complete · Kills \(progress.kills)/\(progress.maxKills) · Items \(progress.items)/\(progress.maxItems) · Secrets \(progress.secrets)/\(progress.maxSecrets) · Esc for menu · Enter / Use to advance story" }
             return "\(intermission.entering ? "Entering next level" : "Level complete") · Kills \(progress.kills)/\(progress.maxKills) · Items \(progress.items)/\(progress.maxItems) · Secrets \(progress.secrets)/\(progress.maxSecrets) · Time \(progress.seconds)s · Enter to continue"
         }
-        if currentPlayer.health <= 0 { return "You died — R to restart" }
+        if currentPlayer.health <= 0 { return "You died — E / Space / Enter to restart · Esc to load a game" }
         let names = ["Blue card","Yellow card","Red card","Blue skull","Yellow skull","Red skull"]
         let keys = names.indices.filter { hud.keys & (1 << $0) != 0 }.map { names[$0] }
         return "Kills \(hud.kills)/\(hud.totalKills) · Health \(hud.health) · Armor \(hud.armor) · Ammo \(hud.readyAmmo >= 0 ? String(hud.readyAmmo) : "—") · Keys: \(keys.isEmpty ? "none" : keys.joined(separator:", "))"
@@ -312,7 +314,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         animatedIDs=animationIDs; animatedWalls=walls; animatedFlats=flats
         demoPlayback = demo != nil
         skill=MD_GetSkill()
-        progress = MD_GetProgress(); intermission = IntermissionSequence(progress); intermissionTime = 0; lastGeometryTick = -1
+        progress = MD_GetProgress(); intermission = IntermissionSequence(progress); intermissionTime = 0; deathTime = 0; finale = FinaleSequence(); lastGeometryTick = -1
         intermissionArt = loadedIntermission
         textureHeights = heights
         self.map = map; self.wad = wad; textures = cached; batches = loaded; sky = loadedSky; sprites = loadedSprites; pitch = 0
@@ -415,7 +417,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         if progress.phase != 0, let intermissionArt {
             encoder.setRenderPipelineState(spritePipeline)
             encoder.setFragmentBytes(&noPower,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
-            intermissionArt.draw(encoder:encoder,state:progress,sequence:intermission,width:max(1,view.drawableSize.width),height:max(1,view.drawableSize.height))
+            intermissionArt.draw(encoder:encoder,state:progress,sequence:intermission,finale:finale,width:max(1,view.drawableSize.width),height:max(1,view.drawableSize.height))
         } else if map != nil {
             let width = max(1,view.drawableSize.width), height = max(1,view.drawableSize.height)
             let worldHeight = max(1,height-SpriteRenderer.hudHeight(width:width))
@@ -500,15 +502,27 @@ final class Renderer: NSObject, MTKViewDelegate {
         if view.keys.remove(15) != nil { view.releaseMouse(); try reset(); return }
         if progress.phase != 0 {
             intermissionTime += delta
-            let pressed = view.continueQueued && intermissionTime >= 0.3
-            view.continueQueued = false
-            for event in intermission.update(seconds:delta,pressed:pressed) { MD_IntermissionSound(event) }
+            let pressed = (view.continueQueued || view.useQueued) && intermissionTime >= 0.3
+            view.continueQueued = false; view.useQueued = false
+            if progress.phase==2 && progress.commercial==0 {
+                for event in finale.update(seconds:delta,pressed:pressed) {
+                    if event==3 { try music?.select("D_BUNNY") } else { MD_IntermissionSound(event) }
+                }
+            } else {
+                for event in intermission.update(seconds:delta,pressed:pressed) { MD_IntermissionSound(event) }
+            }
             sound?.drain()
             if intermission.advance, let wad {
                 let name = progress.commercial != 0 ? String(format:"MAP%02d",progress.nextMap) : "E\(progress.episode)M\(progress.nextMap)"
                 view.releaseMouse(); _ = try load(wad:wad,map:name,continuing:true); onMapChanged?(name)
             }
             return
+        }
+        if currentPlayer.health <= 0 && !demoPlayback {
+            deathTime += delta
+            let restart = (view.useQueued || view.continueQueued) && deathTime >= 0.75
+            view.useQueued=false; view.continueQueued=false
+            if restart { view.releaseMouse(); try reset(); return }
         }
         view.continueQueued = false
         pendingTurn -= view.mouseMotion.x*0.0025
@@ -537,10 +551,14 @@ final class Renderer: NSObject, MTKViewDelegate {
             sound?.drain()
             currentPlayer = MD_GetPlayer(); accumulator -= step
             hud = MD_GetHUD(); progress = MD_GetProgress()
+            if previousPlayer.health > 0 && currentPlayer.health <= 0 && !demoPlayback {
+                view.releaseMouse(); deathTime=0
+            }
             if demoPlayback && MD_DemoPlaying()==0 { paused=true;accumulator=0;break }
             if progress.phase != 0 {
                 view.releaseMouse(); accumulator = 0; intermissionTime = 0; messageUntil = 0
                 intermission = IntermissionSequence(progress)
+                finale = FinaleSequence(episode:progress.episode,textLength:String(cString:MD_FinaleText(progress.episode)).count)
                 try music?.select(MusicPlayer.endTrack(progress))
                 break
             }

@@ -4,6 +4,19 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 45 — Episode endings and animated intermissions
+
+- Add original Doom episode story text, tiled backgrounds, ending artwork and
+  victory music, including Episode 3's scrolling bunny finale and ending shots.
+  Use/Enter reveals the story, then advances to the artwork; automatic timing works.
+- Animate episode intermission backgrounds and the Episode 2 secret-map overlay
+  using WAD patches, without affecting gameplay randomness.
+- Restart after death with a fresh E, Space or Enter press after a short delay.
+  Clear held input at death and select Load Game when opening the pause menu.
+- Enlarge Sound Volume, Display and Back consistently on the initial Options page.
+- Expand checks to all four episode progression chains, representative lifts,
+  crushers and secret counting, finale timing, plus existing save/load regressions.
+
 ## Build 44 — Power-up effects, fuzz and automap
 
 - Add invulnerability inverse grayscale, night vision, suit and berserk scene tints,

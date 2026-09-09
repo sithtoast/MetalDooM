@@ -58,6 +58,8 @@ int MD_ReadSave(const char *path);
 
 #ifdef MD_TESTING
 void MD_TestMonsters(int enabled);
+int MD_TestCrossSpecial(int special);
+int MD_TestFindSecret(float *x,float *y);
 void MD_TestFaceState(int health, int damage, int attack, int invulnerable, int direction);
 void MD_TestExit(int secret);
 int MD_TestSwitch(int special, float *x,float *y,float *angle,int *side);
@@ -82,3 +84,6 @@ void MD_StopDemo(void);
 
 typedef struct { float x1,y1,x2,y2; int kind,mapped; } MD_MapLine;
 int MD_CopyMapLines(MD_MapLine *output,int capacity);
+
+// Original Doom episode story text; static storage.
+const char *MD_FinaleText(int episode);

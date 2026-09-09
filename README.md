@@ -2,9 +2,9 @@
 
 A native Apple Silicon / Metal source-port project for classic Doom and Doom II.
 
-**Current milestone: named maps, native save/load, and persistent quick saves.**
+**Current milestone: Ultimate Doom episode endings and animated intermissions.**
 Original gameplay and exit routing run in the Doom engine, with Metal world,
-weapon, HUD, and intermission rendering. Original finales remain.
+weapon, HUD, intermission and Doom episode-finale rendering.
 The world is drawn as triangles by Metal. No software framebuffer, SDL, OpenGL, or
 Vulkan presentation layer is used.
 
@@ -42,7 +42,7 @@ releases; independent checkouts do not share a global numbering sequence.
 | A / D | Strafe |
 | Left / right | Turn |
 | Shift | Run |
-| E / Space | Use a door or switch |
+| E / Space | Use a door or switch; restart after death; advance intermission/story |
 | Click the viewport | Capture mouse; subsequent clicks/hold fire |
 | F | Fire (also works without mouse capture) |
 | 1–7 | Classic weapon slots; 1 fist/chainsaw, 2 pistol, 3 shotgun, etc. |
@@ -55,7 +55,9 @@ releases; independent checkouts do not share a global numbering sequence.
 
 Mouse capture releases and simulation/audio pause on focus loss. Aim uses classic
 Doom horizontal targeting and vertical autoaim; looking up/down is cosmetic.
-Weapon selection requires ownership. R restarts after death; it resets inventory.
+Weapon selection requires ownership. After death, a fresh E, Space or Enter press
+restarts with starting inventory after a short delay. Escape selects Load Game in
+the pause menu. R remains an immediate fresh-inventory restart.
 
 ## Saving and loading
 
@@ -100,9 +102,13 @@ The original engine decoder has not been hardened for deliberately crafted paylo
   reserves/capacity, weapons owned, key cards/skulls, and a health-based face.
 - Original normal/secret exit routing, classic intermission artwork and final
   kills/items/secrets/time/par count-up with original sounds, followed by an Entering
-  screen with completed-level markers and a flashing destination pointer.
+  screen with completed-level markers, a flashing destination pointer and original
+  episode background animations.
 - Health, armor, weapons, and ammo carry across levels; keys and temporary powers
-  clear through the original finish-level rules. Episode endings stop at a summary.
+  clear through the original finish-level rules. Doom episodes end with original
+  story text, tiled backgrounds, music and ending artwork, including the Episode 3
+  bunny panorama and animated THE END. Use/Enter reveals text, then advances to art;
+  original automatic timing also works. Escape opens the menu at any time.
 - Live upper/middle/lower switch textures, including timed reset, and sidedef offsets
   synchronized each tic. The Ultimate Doom starting-room pillar switch is verified.
 - Original weapon state machines, ammo consumption, autoaim, melee, hitscan,
@@ -130,13 +136,12 @@ The original engine decoder has not been hardened for deliberately crafted paylo
   need further work. Native output has been validated through offline mixing;
   physical speaker output has not been independently recorded.
 - Progression uses original completion/load-level functions rather than the full
-  G_Ticker loop. Death requires R (fresh inventory). Networking and
-  original finale/story sequences are not connected. Episode endings show final
-  stats; choose another episode with the map selector.
-- Intermission background animation remains. Doom II story breaks are
-  not presented, and Doom II has not been validated.
-- Manual doors have been validated. Other sector actions use upstream logic but
-  lifts, crushers, switches, and special-case maps need dedicated validation.
+  G_Ticker loop. Networking is not connected.
+- Doom II story breaks and the cast ending are not presented; Doom II remains
+  unvalidated.
+- Automated checks cover all Ultimate Doom map loads, normal and secret episode
+  routes, plus representative doors, lifts, crushers, switches, secrets and saves.
+  This does not replace full manual episode playthroughs or cover every map special.
 - Lighting is approximate; scrolling behavior and full palette
   effects remain (damage/pickup tint is implemented). Sky now follows the classic
   horizontal repeat and horizon, with clamping for the optional vertical look;
@@ -220,7 +225,7 @@ restart into E1M2, Quick Load restored the persisted E1M1 save and its map title
 ## Next milestones
 
 1. Refine palette fidelity, automap exploration and visibility culling.
-2. Add intermission background animations, finales, and respawning.
+2. Play through full Ultimate Doom episodes and investigate remaining compatibility gaps.
 3. Verify Doom II, longer play sessions, texture effects, and less common sector actions.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for module boundaries.
@@ -228,7 +233,12 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for module boundaries.
 See [CHANGELOG.md](CHANGELOG.md) for the build-by-build history.
 
 Intermission regression checks: `bash scripts/test-intermission.sh` covers original
-counter timing, sound cues, skipping, map timeout, episode endings and secret markers.
+counter timing, sound cues, skipping, map timeout, animated backgrounds, secret
+markers, finale text timing and the bunny ending. `scripts/test-progression.sh`
+checks all four normal episode chains and secret returns plus representative
+lift, crusher and secret-sector behavior. `Tests/make_finale_fixture.py` generates
+a local-only Ultimate Doom WAD fixture whose M8 maps use E1M1 exit geometry;
+launch with `-warp E1M8` (or E2/E3/E4M8) and press E to inspect each finale.
 
 ## Pause menu and options
 
@@ -340,3 +350,11 @@ approximations; exact COLORMAP/palette output and software fuzz patterns differ.
 Validation: `bash scripts/test-effects-map.sh /path/to/doom1.WAD`. Options rows use
 consistent bitmap text; the Ultimate menu caption uses tighter letter masks to
 exclude stray title-background pixels.
+
+Build 45 validation: isolated native app copies displayed all four episode ending
+artworks, the full bunny panorama/END animation, changing E1 intermission frames,
+and the larger Options rows. After an actual monster death, Escape selected Load
+Game and E restarted with 100 health. Timing, progression, save/load, input and
+classic-menu regression suites passed. Fixture exits exercise completion and
+presentation, not the original M8 boss battles. Full manual episode playthroughs
+and physical-speaker verification remain separate checks.

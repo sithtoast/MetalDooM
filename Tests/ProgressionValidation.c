@@ -43,13 +43,35 @@ int main(int argc,char **argv) {
     puts("PASS: real exit switch freezes stats, then E1M2 preserves health/armor/weapons/ammo");
     collect(13);assert(MD_GetHUD().keys!=0);MD_TestExit(0);ticks(1);assert(MD_Continue());assert(MD_GetHUD().keys==0);
     puts("PASS: keys are cleared when advancing to E1M3");
+    assert(MD_Load(argv[1],1,1));
+    int count=MD_SectorCount(); MD_Sector *sectors=calloc(count,sizeof(*sectors));
+    for(int i=0;i<count;++i) sectors[i]=MD_GetSector(i);
+    assert(MD_TestCrossSpecial(88));ticks(35);
+    int moved=0;for(int i=0;i<count;++i) if(MD_GetSector(i).floor!=sectors[i].floor) moved=1;
+    assert(moved);ticks(350);
+    for(int i=0;i<count;++i) assert(MD_GetSector(i).floor==sectors[i].floor);
+    free(sectors);
+    assert(MD_Load(argv[1],4,7)); count=MD_SectorCount();sectors=calloc(count,sizeof(*sectors));
+    for(int i=0;i<count;++i) sectors[i]=MD_GetSector(i);
+    assert(MD_TestCrossSpecial(25));ticks(35);
+    moved=0;for(int i=0;i<count;++i) if(MD_GetSector(i).ceiling<sectors[i].ceiling) moved=1;
+    assert(moved);free(sectors);
+    assert(MD_Load(argv[1],1,1));assert(MD_TestFindSecret(&x,&y));
+    assert(MD_TestPlacePlayer(x,y,0));ticks(35);MD_TestExit(0);ticks(1);assert(MD_GetProgress().secrets==1);
+    puts("PASS: real map lift lowers and returns, crusher descends, secret counts once");
     int returns[]={4,6,7,3};
     for(int episode=1;episode<=4;++episode) {
         assert(MD_Load(argv[1],episode,3));MD_TestExit(1);ticks(1);assert(MD_GetProgress().nextMap==9);assert(MD_Continue());
         MD_TestExit(0);ticks(1);assert(MD_GetProgress().nextMap==returns[episode-1] && MD_GetProgress().didSecret);assert(MD_Continue());
-        assert(MD_Load(argv[1],episode,8));MD_TestExit(0);ticks(1);assert(MD_GetProgress().phase==2 && !MD_Continue());
+        assert(strlen(MD_FinaleText(episode))>100);
+        assert(MD_Load(argv[1],episode,1));
+        for(int map=1;map<=8;++map) {
+            assert(MD_GetProgress().map==map); MD_TestExit(0);ticks(1);
+            if(map<8) { assert(MD_GetProgress().phase==1 && MD_GetProgress().nextMap==map+1);assert(MD_Continue()); }
+            else { assert(MD_GetProgress().phase==2 && !MD_Continue()); }
+        }
     }
-    puts("PASS: all four episodes route to secret maps, return correctly, and stop at episode completion");
+    puts("PASS: all four episodes route to secret maps, return correctly, and run the complete M1-M8 chain into episode completion");
     for(int episode=1;episode<=4;++episode) for(int map=1;map<=9;++map) {
         assert(MD_Load(argv[1],episode,map));ticks(2);assert(MD_GetProgress().map==map);
     }

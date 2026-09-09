@@ -19,6 +19,12 @@
 #include "z_zone.h"
 #include "i_system.h"
 #include "d_items.h"
+#include "d_englsh.h"
+
+const char *MD_FinaleText(int episode) {
+    switch (episode) { case 1: return E1TEXT; case 2: return E2TEXT; case 3: return E3TEXT; case 4: return E4TEXT; default: return ""; }
+}
+
 #include "p_saveg.h"
 #include "s_sound.h"
 #include "sounds.h"
@@ -448,6 +454,24 @@ MD_HUD MD_GetHUD(void) {
 }
 
 #ifdef MD_TESTING
+int MD_TestCrossSpecial(int special) {
+    for (int i=0;i<numlines;++i) if (lines[i].special==special) {
+        P_CrossSpecialLine(i,0,players[0].mo); return 1;
+    }
+    return 0;
+}
+int MD_TestFindSecret(float *x,float *y) {
+    for (int i=0;i<numlines;++i) {
+        line_t *line=&lines[i];
+        if (!line->frontsector || line->frontsector->special!=9) continue;
+        float dx=(float)line->dx/FRACUNIT,dy=(float)line->dy/FRACUNIT,len=hypotf(dx,dy);
+        if (len==0) continue;
+        float px=((double)line->v1->x+line->v2->x)/(2*FRACUNIT)+dy/len*8;
+        float py=((double)line->v1->y+line->v2->y)/(2*FRACUNIT)-dx/len*8;
+        if (R_PointInSubsector(px*FRACUNIT,py*FRACUNIT)->sector==line->frontsector) { *x=px;*y=py;return 1; }
+    }
+    return 0;
+}
 void MD_TestExit(int secret) { if (secret) G_SecretExitLevel(); else G_ExitLevel(); }
 int MD_TestSwitch(int special,float *x,float *y,float *angle,int *side) {
     for (int i=0;i<numlines;++i) if (lines[i].special == special) {
