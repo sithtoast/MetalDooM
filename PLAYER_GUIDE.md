@@ -53,7 +53,10 @@ new WAD loads successfully. Cancel leaves your current game available.
 
 - **Main game:** choose a folder to list its main IWADs, select one, or use
   Choose IWAD. You can also drop a main WAD or folder into the left drop area.
-  The last folder is remembered. Folder browsing scans that folder only.
+  Recognized games show their game title and edition above the filename.
+  SIGIL and add-ons with a declared GAMECONF title also show their names; unknown
+  add-ons keep their filenames. The last folder is remembered. Folder browsing
+  scans that folder only.
 - **Extra WADs:** add optional PWADs using Add PWAD or the right drop area.
   Dropping a folder adds its PWADs in filename order. Move Up, Move Down and
   Remove let you adjust the stack; later files take priority. Duplicate files

@@ -4,6 +4,15 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.2.1 · Build 80 — Game titles in the WAD picker
+
+- Show recognized game names and KEX edition labels above filenames in both
+  picker columns. Recognize SIGIL and declared GAMECONF add-on titles; retain
+  filenames for unknown add-ons and full paths in tooltips.
+- Cache names during picker use and update the player guide.
+- Verify all four rerelease IWAD names and SIGIL in the native build 80 picker;
+  the WAD picker drop/load-order regression passes with the new rows.
+
 ## 0.2.1 · Build 79 — Folder and drag-and-drop WAD picker
 
 - Replace the two-step file/load-order flow with a single two-column picker:

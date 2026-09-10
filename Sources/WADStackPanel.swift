@@ -12,6 +12,19 @@ enum WADPickerFiles {
         let signature=String(decoding:data,as:UTF8.self)
         return ["IWAD","PWAD"].contains(signature) ? signature : nil
     }
+    static func displayName(_ url:URL)->String {
+        guard let wad=try? WAD(url:url) else { return url.lastPathComponent }
+        if wad.signature == "IWAD" { return wad.displayName }
+        if wad.maps.contains("E5M1"),wad.lump("E5TEXT") != nil,wad.lump("SIGILINT") != nil { return "SIGIL" }
+        if let bytes=wad.lump("GAMECONF"),bytes.count<=65536,
+           let json=(try? JSONSerialization.jsonObject(with:bytes.data)) as? [String:Any],
+           json["type"] as? String == "gameconf",let data=json["data"] as? [String:Any],
+           let title=data["title"] as? String {
+            let clean=title.components(separatedBy:.controlCharacters).joined(separator:" ").trimmingCharacters(in:.whitespacesAndNewlines)
+            if !clean.isEmpty,clean.count<=128 { return clean }
+        }
+        return url.lastPathComponent
+    }
     static func contents(of folder:URL, kind signature:String) throws -> [URL] {
         try FileManager.default.contentsOfDirectory(at:folder,includingPropertiesForKeys:nil,options:[.skipsHiddenFiles])
             .map { $0.standardizedFileURL.resolvingSymlinksInPath() }
@@ -60,6 +73,11 @@ private final class WADDropArea: NSView {
 final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
     var onCancel: (()->Void)?
     var onPlay: ((URL,[URL])->Void)?
+    private var names:[URL:String]=[:]
+    private func name(_ url:URL)->String {
+        if let cached=names[url] { return cached }
+        let title=WADPickerFiles.displayName(url);names[url]=title;return title
+    }
     private var refreshing=false
     private var base:URL?
     private var folder:URL?
@@ -94,7 +112,7 @@ final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
         label("Load order",NSRect(x:430,y:446,width:390,height:22))
         for (table,x,name) in [(mainTable,CGFloat(20),"Main WADs"),(extrasTable,CGFloat(430),"Extra WAD load order")] {
             let column=NSTableColumn(identifier:NSUserInterfaceItemIdentifier(name));column.width=366
-            table.addTableColumn(column);table.headerView=nil;table.rowHeight=28
+            table.addTableColumn(column);table.headerView=nil;table.rowHeight=44
             table.dataSource=self;table.delegate=self;table.allowsEmptySelection=true
             table.setAccessibilityLabel(name)
             let scroll=NSScrollView(frame:NSRect(x:x,y:225,width:390,height:215))
@@ -128,7 +146,7 @@ final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
         mainTable.reloadData();extrasTable.reloadData()
         if let base,let i=mainFiles.firstIndex(of:base) { mainTable.selectRowIndexes(IndexSet(integer:i),byExtendingSelection:false) }
         refreshing=false
-        selectedLabel.stringValue=base.map { "Selected: " + $0.lastPathComponent } ?? "No main WAD selected"
+        selectedLabel.stringValue=base.map { "Selected: " + name($0) } ?? "No main WAD selected"
         selectedLabel.toolTip=base?.path;playButton.isEnabled=base != nil
         updateButtons()
     }
@@ -141,7 +159,7 @@ final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
         let url=url.standardizedFileURL.resolvingSymlinksInPath()
         do {
             let files=try WADPickerFiles.contents(of:url,kind:"IWAD")
-            folder=url;mainFiles=files;folderLabel.stringValue=url.path;folderLabel.toolTip=url.path
+            names.removeAll();folder=url;mainFiles=files;folderLabel.stringValue=url.path;folderLabel.toolTip=url.path
             UserDefaults.standard.set(url.path,forKey:"wadPickerFolder")
             if let base,!files.contains(base) { self.base=nil }
             notice.stringValue=files.isEmpty ? "No main IWADs found in this folder. Extra PWADs belong on the right." : "\(files.count) main WAD\(files.count == 1 ? "" : "s") found. Select one to play."
@@ -176,14 +194,24 @@ final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
     func numberOfRows(in tableView:NSTableView)->Int { tableView === mainTable ? mainFiles.count : addOns.count }
     func tableView(_ tableView:NSTableView,viewFor column:NSTableColumn?,row:Int)->NSView? {
         let url=(tableView === mainTable ? mainFiles : addOns)[row]
-        let field=NSTextField(labelWithString:(tableView === mainTable ? "" : "\(row+1). ") + url.lastPathComponent)
-        field.lineBreakMode = .byTruncatingMiddle;field.toolTip=url.path;return field
+        let cell=NSView(frame:NSRect(x:0,y:0,width:366,height:44))
+        let title=NSTextField(labelWithString:(tableView === mainTable ? "" : "\(row+1). ") + name(url))
+        title.font = .systemFont(ofSize:13,weight:.medium)
+        title.frame=NSRect(x:0,y:21,width:366,height:20)
+        let filename=NSTextField(labelWithString:url.lastPathComponent)
+        filename.font = .systemFont(ofSize:11);filename.textColor = .secondaryLabelColor
+        filename.frame=NSRect(x:0,y:3,width:366,height:16)
+        for field in [title,filename] {
+            field.lineBreakMode = .byTruncatingMiddle;field.autoresizingMask=[.width]
+            field.toolTip=name(url) + "\n" + url.path;cell.addSubview(field)
+        }
+        return cell
     }
     func tableViewSelectionDidChange(_ notification:Notification) {
         guard !refreshing else { return }
         if notification.object as? NSTableView === mainTable,mainFiles.indices.contains(mainTable.selectedRow) {
             base=mainFiles[mainTable.selectedRow]
-            selectedLabel.stringValue="Selected: " + base!.lastPathComponent;selectedLabel.toolTip=base?.path;playButton.isEnabled=true
+            selectedLabel.stringValue="Selected: " + name(base!);selectedLabel.toolTip=base?.path;playButton.isEnabled=true
         }
         updateButtons()
     }
