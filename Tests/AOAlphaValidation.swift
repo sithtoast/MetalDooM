@@ -11,9 +11,16 @@ func validateAlphaRays(device: MTLDevice, queue: MTLCommandQueue) throws {
     let kernel="""
     kernel void probe(primitive_acceleration_structure world [[buffer(0)]],
             const device AOVertex *vertices [[buffer(1)]], const device uint4 *materials [[buffer(2)]],
-            const device uchar *alpha [[buffer(3)]], device float *distances [[buffer(4)]], uint id [[thread_position_in_grid]]) {
+            const device uchar *alpha [[buffer(3)]], device float4 *distances [[buffer(4)]], uint id [[thread_position_in_grid]]) {
         ray r;r.origin=float3(float(id)+0.5,1.5,2);r.direction=float3(0,0,-1);r.min_distance=0.05;r.max_distance=8;
-        distances[id]=aoHitDistance(r,world,vertices,materials,alpha);
+        float hit=aoHitDistance(r,world,vertices,materials,alpha);
+        DynamicLight light={float4(float(id)+0.5,1.5,-1,8),float4(1,0.35,0.08,1),float4(1,0,0,0)};
+        float shadowed=directLight(r.origin,r.direction,light,world,vertices,materials,alpha).r;
+        light.options.x=0;
+        float unshadowed=directLight(r.origin,r.direction,light,world,vertices,materials,alpha).r;
+        light.options.x=1;light.positionRadius.z=-3;
+        float behindWall=directLight(r.origin,r.direction,light,world,vertices,materials,alpha).r;
+        distances[id]=float4(hit,shadowed,unshadowed,behindWall);
     }
     """
     let ao=try AmbientOcclusion(device:device,shader:prefix,format:.bgra8Unorm)
@@ -34,7 +41,7 @@ func validateAlphaRays(device: MTLDevice, queue: MTLCommandQueue) throws {
         var info=[SIMD4<UInt32>(offset,4,4,0)]
         if wall { info.append(SIMD4(0,4,4,6)) }
         try ao.updateMaterials(info,device:device)
-        let output=device.makeBuffer(length:16,options:.storageModeShared)!
+        let output=device.makeBuffer(length:64,options:.storageModeShared)!
         let encoder=command.makeComputeCommandEncoder()!
         encoder.setComputePipelineState(pipeline)
         encoder.setAccelerationStructure(ao.structure!,bufferIndex:0)
@@ -43,7 +50,14 @@ func validateAlphaRays(device: MTLDevice, queue: MTLCommandQueue) throws {
         encoder.dispatchThreads(MTLSize(width:4,height:1,depth:1),threadsPerThreadgroup:MTLSize(width:4,height:1,depth:1))
         encoder.endEncoding();command.commit();command.waitUntilCompleted()
         validationRequire(command.status == .completed,"Alpha ray command failed: \(String(describing:command.error))")
-        return Array(UnsafeBufferPointer(start:output.contents().assumingMemoryBound(to:Float.self),count:4))
+        let results=Array(UnsafeBufferPointer(start:output.contents().assumingMemoryBound(to:SIMD4<Float>.self),count:4))
+        for result in results {
+            let expected:Float=result.x<3 ? 0:0.390625
+            validationRequire(abs(result.y-expected)<0.0001,"Shadow must stop at grille bars, pass through holes, and ignore a wall beyond the light")
+            validationRequire(abs(result.z-0.390625)<0.0001,"Unshadowed light must match analytic falloff")
+            validationRequire(abs(result.w-(wall || result.x<3 ? 0:0.140625))<0.0001,"Wall in front of light must cast a shadow")
+        }
+        return results.map { $0.x }
     }
     func expect(_ actual:[Float],_ expected:[Float]) {
         validationRequire(zip(actual,expected).allSatisfy { abs($0-$1)<0.001 },"Alpha ray distances \(actual), expected \(expected)")
@@ -55,5 +69,6 @@ func validateAlphaRays(device: MTLDevice, queue: MTLCommandQueue) throws {
     expect(try probe(uv:-3),[4,2,4,2])
     validationRequire(ao.buildCount==built,"UV-only change rebuilt geometry")
     expect(try probe(wall:false),[2,8,2,8])
+    print("PASS: analytic direct light falloff, grille shadows, finite light distance, backing-wall shadows and shadow bypass")
     print("PASS: alpha bars hit, holes reveal the wall or open sky, 127/128 cutoff and negative UV wrapping match raster rules; animation/UV updates avoid BVH rebuilds")
 }

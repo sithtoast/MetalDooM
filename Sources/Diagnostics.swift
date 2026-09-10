@@ -27,6 +27,17 @@ extension App {
         configureMetalHUD()
     }
 
+    @objc func toggleDynamicLight() {
+        do {
+            try renderer.setDynamicLight(!renderer.dynamicLightEnabled)
+            sessionLog.append("Moving test light: \(renderer.dynamicLightEnabled ? "On":"Off")")
+        } catch { show(error) }
+    }
+    @objc func toggleDynamicLightShadows() {
+        renderer.setDynamicLightShadows(!renderer.dynamicLightShadows)
+        sessionLog.append("Test light shadows: \(renderer.dynamicLightShadows ? "On":"Off")")
+    }
+
     @objc func copyDiagnosticReport() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(diagnosticReport(),forType:.string)
@@ -73,7 +84,9 @@ extension App {
         Ray-traced AO: \(renderer.ambientOcclusionEnabled ? "On (8 rays, alpha-tested world)" : "Off")
         AO strength: \(Int(renderer.aoSettings.strength*100))%
         AO radius: \(Int(renderer.aoSettings.radius)) Doom units
-        AO occluder triangles: \(renderer.ambientOcclusion?.triangleCount ?? 0)
+        Moving test light: \(renderer.dynamicLightEnabled ? "On (amber, radius 256, intensity 2, 8-second orbit)":"Off")
+        Test light shadows: \(renderer.dynamicLightShadows ? "On (alpha-tested world)":"Off")
+        Shared ray occluder triangles: \(renderer.ambientOcclusion?.triangleCount ?? 0)
         Ray tracing in render shaders: \(renderer.ambientOcclusionSupported)
         Recent GPU command duration: \(String(format:"%.3f",renderer.recentGPUTime*1000)) ms (not a benchmark)
         Metal HUD: \(metalHUDEnabled ? "On" : "Off")

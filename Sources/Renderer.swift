@@ -81,15 +81,42 @@ final class Renderer: NSObject, MTKViewDelegate {
     func setAOSettings(strength: Float? = nil, radius: Float? = nil) {
         aoSettings=AOSettings(strength:strength ?? aoSettings.strength,radius:radius ?? aoSettings.radius)
     }
+    // The optional ray pipeline/mesh is shared by AO and the test light.
     private(set) var ambientOcclusion: AmbientOcclusion?
-    var ambientOcclusionEnabled: Bool { ambientOcclusion != nil }
+    private(set) var ambientOcclusionEnabled = false
+    private(set) var dynamicLightEnabled = false
+    private(set) var dynamicLightShadows = true
     var ambientOcclusionSupported: Bool { device.supportsRaytracing && device.supportsRaytracingFromRender }
     var onGPUFrame: ((Double) -> Void)?
     private(set) var recentGPUTime: Double = 0
     func setAmbientOcclusion(_ enabled: Bool) throws {
-        guard enabled != ambientOcclusionEnabled else { return }
-        ambientOcclusion = enabled ? try AmbientOcclusion(device:device,shader:worldShader,format:worldFormat) : nil
-        aoGeometryDirty=true
+        try configureRayEffects(ao:enabled,light:dynamicLightEnabled)
+    }
+    func setDynamicLight(_ enabled: Bool) throws {
+        try configureRayEffects(ao:ambientOcclusionEnabled,light:enabled)
+    }
+    func setDynamicLightShadows(_ enabled: Bool) { dynamicLightShadows=enabled }
+    private func configureRayEffects(ao: Bool, light: Bool) throws {
+        if (ao || light) && ambientOcclusion == nil {
+            ambientOcclusion=try AmbientOcclusion(device:device,shader:worldShader,format:worldFormat)
+            aoGeometryDirty=true
+        }
+        ambientOcclusionEnabled=ao;dynamicLightEnabled=light
+        if !ao && !light { ambientOcclusion=nil }
+    }
+    private func disableRayEffects() {
+        ambientOcclusion=nil;ambientOcclusionEnabled=false;dynamicLightEnabled=false
+    }
+    private func movingLightUniforms() -> DynamicLightUniforms {
+        guard dynamicLightEnabled else { return DynamicLightUniforms() }
+        var light=DynamicLightUniforms.moving(eye:SIMD3(position.x,eyeZ,-position.y),yaw:yaw,
+                                             tics:hud.levelTics,shadows:dynamicLightShadows)
+        if let map {
+            let sector=map.sectors[map.sector(at:SIMD2(light.positionRadius.x,-light.positionRadius.z))]
+            guard sector.ceiling-sector.floor>16 else { return DynamicLightUniforms() }
+            light.positionRadius.y=min(sector.ceiling-8,max(sector.floor+8,light.positionRadius.y))
+        }
+        return light
     }
     private func prepareAmbientOcclusion(command: MTLCommandBuffer) throws {
         guard let ao=ambientOcclusion else { return }
@@ -480,8 +507,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         command.addCompletedHandler { [weak self] buffer in
             if let error = buffer.error {
                 DispatchQueue.main.async { [weak self] in
-                    self?.ambientOcclusion=nil
-                    self?.onWarning?("Metal command error (ambient occlusion disabled): \(error)")
+                    self?.disableRayEffects()
+                    self?.onWarning?("Metal command error (ray-traced effects disabled): \(error)")
                 }
             }
             let gpuTime=max(0,buffer.gpuEndTime-buffer.gpuStartTime)
@@ -493,8 +520,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         do { try prepareAmbientOcclusion(command:command) }
         catch {
-            ambientOcclusion=nil
-            DispatchQueue.main.async { [weak self] in self?.onWarning?("Ambient occlusion disabled: \(error)") }
+            disableRayEffects()
+            DispatchQueue.main.async { [weak self] in self?.onWarning?("Ray-traced effects disabled: \(error)") }
         }
         pass.depthAttachment.storeAction = .store
         // A BVH build may already be encoded. Submit it even if the render
@@ -543,7 +570,10 @@ final class Renderer: NSObject, MTKViewDelegate {
                 encoder.setFragmentBuffer(materials,offset:0,index:6)
                 encoder.setFragmentBuffer(alpha,offset:0,index:7)
                 var settings=aoSettings.uniform
+                if !ambientOcclusionEnabled { settings.y=0 }
                 encoder.setFragmentBytes(&settings,length:MemoryLayout<SIMD4<Float>>.stride,index:8)
+                var light=movingLightUniforms()
+                encoder.setFragmentBytes(&light,length:MemoryLayout<DynamicLightUniforms>.stride,index:9)
             }
             for batch in batches {
                 encoder.setVertexBuffer(batch.vertices,offset:0,index:0); encoder.setFragmentTexture(animatedTexture(batch),index:0)

@@ -4,6 +4,24 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.5.0 · Build 94 — Moving light and ray-traced shadows
+
+- Add an optional amber light orbiting just ahead of the player, with a separate
+  Test Light Shadows comparison toggle. Its eight-second motion follows game
+  time and pauses with gameplay. Both lighting effects remain off at launch.
+- Cast hard shadows from world geometry and masked grille bars using finite rays
+  toward the light. Share AO's ray mesh while keeping effects independently
+  switchable; light motion and shadow toggles do not rebuild geometry.
+- Preserve sector lighting, fixed-colormap power-ups, sprites, weapon/HUD and
+  stats/secret notifications. Remember choices within a session across map/save
+  loads; include them in diagnostics and benchmark identity.
+- Validate analytic blocker/mask/falloff cases, native Doom/Doom II GPU rendering,
+  motion/pause, exact classic restoration, visible original-room shadows, moving
+  doors, save/load, map replacement and shutdown; verify native build 94 controls.
+- This is one test light. Sprite lighting/shadows, torch/projectile lights,
+  emissive surfaces and bloom are not included. GPU samples use validation and
+  readback; sustained gameplay performance and other GPUs remain untested.
+
 ## 0.4.0 · Build 93 — Integrate main into Metal experiments
 
 - Rebase the AO, masked-grille and ceiling-seam work onto main commit `771625e`,

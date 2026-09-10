@@ -8,8 +8,8 @@ Choose **View → Ray-Traced Ambient Occlusion (Experimental)** to compare the
 current scene. The checkbox is per session and does not change game/save data.
 It is disabled on GPUs without Metal ray tracing in render shaders. Allocation,
 shader compilation and GPU failures report an error; the classic path remains
-available. No ray-tracing pipeline or acceleration structure is allocated while
-the effect has never been enabled.
+available. The ray-tracing pipeline and acceleration structure are allocated only while
+AO or the moving test light is enabled.
 
 **View → AO Strength** offers 0–100% in 25% steps. **View → AO Radius** offers
 16, 32, 48 and 96 Doom units. The defaults are 50% strength and 48 units; choices
@@ -41,6 +41,49 @@ older resources. UV-only changes replace the immutable attribute buffer without
 rebuilding the structure, and animation changes replace material mappings only.
 Alpha masks are packed at map load. This version rebuilds the whole world mesh
 for geometric changes; separating static/moving geometry remains future work.
+
+## Moving test light and shadows — 0.5.0
+
+**View → Moving Test Light (Experimental)** enables one amber light with radius
+256 Doom units and intensity 2. It orbits a point 40 units ahead of the player
+over eight seconds (16 units forward/back, 32 sideways), at eye height +12 clamped
+inside the destination sector's floor/ceiling. Its clock is level game time, so
+it freezes while paused/inactive and resumes from saved time. A wall may obscure
+the source during its orbit. There is no visible source orb or physical light actor.
+
+**Test Light Shadows** defaults on and is separately switchable. Direct lighting
+uses the surface normal, squared radial falloff and the original texture color.
+One finite ray toward the light tests visibility only for lit, in-range fragments;
+geometry beyond the light does not block it. Grille masks use the same current
+texture translation, wrapping and alpha threshold as AO. These are hard shadows.
+
+AO and the light share one pipeline, acceleration structure and immutable mask
+buffers but remain independently enabled. Moving the light or toggling shadows
+does not rebuild geometry. Turning both effects off releases ray resources and
+restores the original pipeline. Failure disables both with a warning. Both start
+off; controls are per session, survive map/save loads, appear in diagnostics and
+benchmark identity, and are locked during a benchmark.
+
+Direct light is added after AO darkens ambient sector lighting. It affects world
+surfaces only: sprites/weapon/HUD/sky and fixed-colormap power-ups retain their
+existing paths. Billboard sprites neither receive nor cast light/shadows. No HDR,
+bloom, emissive textures, torch/projectile light collection, indirect illumination
+or soft-shadow sampling is included in this first experiment.
+
+The existing GPU script now also checks analytic light attenuation, opaque and
+masked blockers, geometry beyond the light, shadow bypass, independent toggles,
+light motion, paused stability, shared resources and save/load. `AO_CEILING=1`
+also compares shadows at twelve original E1M1 room/phase combinations. Outputs
+include `light-shadowed.png`, `light-unshadowed.png`, `light-ao.png` and scene pairs.
+
+A separate native room fixture can be generated without changing source game data:
+
+```sh
+python3 Tests/make_surface_fixture.py /path/to/DOOM.WAD build/light.wad light
+```
+
+Open the resulting WAD and enable the test light. It relocates the player near
+the E1M1 pillar/stairs and disables monsters; geometry/art remain original.
 
 ## Comparing and measuring
 

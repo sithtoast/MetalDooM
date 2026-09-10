@@ -12,6 +12,8 @@ Swift owns native input/windowing and direct Metal rendering.
 | Sources/WAD.swift | Bounded binary reads, classic map records, BSP lookup |
 | Sources/Geometry.swift | Palette/patch decoding and world triangle generation |
 | Sources/Renderer.swift | Fixed tics, interpolation, sector synchronization, Metal resources |
+| Sources/AmbientOcclusion.swift | Shared ray mesh/pipeline, masked intersections, AO and direct-light shadow shading |
+| Sources/DynamicLight.swift | Deterministic camera-relative light orbit and GPU uniforms |
 | Sources/SpriteRenderer.swift | Sprite texture cache, billboard quads, original HUD patch composition |
 | Sources/IntermissionRenderer.swift | Original intermission patches, stats and destination screen |
 | Sources/SaveStore.swift | Versioned save container, WAD hash, integrity, atomic persistence |
@@ -338,14 +340,20 @@ cast name, sprite patch, flip and death state; Metal presents BOSSBACK, text and
 sprite quads without calling software drawers. Fire taps are retained until a cast
 tic. Swift selects D_READ_M/D_EVIL; native finale music hooks are presentation stubs.
 
-## Experimental ray-traced ambient occlusion
+## Experimental ray-traced lighting
 
 `AmbientOcclusion.swift` owns the optional shader and primitive acceleration
-structure. View enables it and selects strength/radius for the session; classic
+structure shared by independently enabled AO and the moving test light. View
+selects AO strength/radius and light/shadow toggles for the session; classic
 rendering is the launch default. World positions build the structure before
 rendering on the same command buffer. Masked hits use interpolated texel UVs and
 the current animated alpha mask; opaque batches commit directly. Replacement
 buffers/structures keep queued frames immutable. Position equality avoids builds
-for light-only/UV-only changes. World fragments trace eight short hemisphere rays;
-sky, sprite and HUD shading remain independent. See
+for sector-light/UV-only changes. AO traces eight short hemisphere rays. Direct
+light adds a normal-weighted, radially attenuated color contribution and, when
+shadows are enabled, a finite alpha-tested visibility ray toward the light.
+`DynamicLight.swift` derives the orbit from level tics and camera orientation;
+moving it changes uniforms rather than the acceleration structure. Sky, sprite,
+weapon and HUD shading remain independent. Both effects bypass fixed-colormap
+power-ups; ray failure clears both enable flags and restores classic rendering. See
 [Metal experiments](METAL_EXPERIMENTS.md) for controls and measurement boundaries.

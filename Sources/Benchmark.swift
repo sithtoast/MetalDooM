@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 extension App {
     var benchmarkSettings: String {
-        "\(view.drawableSize)|\(view.renderScale)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)|\(renderer.aoSettings.strength)|\(renderer.aoSettings.radius)"
+        "\(view.drawableSize)|\(view.renderScale)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)|\(renderer.aoSettings.strength)|\(renderer.aoSettings.radius)|\(renderer.dynamicLightEnabled)|\(renderer.dynamicLightShadows)"
     }
     @objc func runBenchmark() {
         guard benchmark == nil else { return }
@@ -89,6 +89,14 @@ extension App {
         if item.action == #selector(toggleAmbientOcclusion) {
             item.state=renderer.ambientOcclusionEnabled ? .on : .off
             return renderer.ambientOcclusionSupported
+        }
+        if item.action == #selector(toggleDynamicLight) {
+            item.state=renderer.dynamicLightEnabled ? .on:.off
+            return renderer.ambientOcclusionSupported
+        }
+        if item.action == #selector(toggleDynamicLightShadows) {
+            item.state=renderer.dynamicLightShadows ? .on:.off
+            return renderer.ambientOcclusionSupported && renderer.dynamicLightEnabled
         }
         if item.action == #selector(cancelBenchmark) { return false }
         if item.action == #selector(exportBenchmarkResult) { return lastBenchmarkReport != nil }

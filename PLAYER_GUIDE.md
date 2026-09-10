@@ -148,6 +148,20 @@ Launch the app by opening `~/Dev/MetalDooM/build/MetalDooM.app` in Finder. Save 
 quit an older running build first. If no WAD is open, choose Open WAD and select
 your IWAD; for example `~/Downloads/The_Ultimate_Doom/DOOM.WAD`.
 
+## Experimental lighting
+
+In View, enable **Moving Test Light (Experimental)** for one amber light that
+orbits a point just ahead of you. **Test Light Shadows** compares lighting with
+and without world shadows; it defaults on. The light's eight-second motion follows
+game time, so Escape pauses it. It can be used with or without ray-traced AO.
+Both effects start off at launch and require Metal ray tracing in render shaders.
+
+Walls, floors, ceilings and grille bars block the light; transparent grille pixels
+let it through. Sprites, the weapon and HUD keep their original lighting. This
+is a test light, not torch/projectile lighting or bloom; it has no visible orb.
+It follows your position and can become occluded when its orbit crosses a wall.
+Light/shadow choices last for the session and survive map/save loads.
+
 ## Developer console
 
 Press backtick/tilde (`~`) to open the console; Escape or the same key closes it.
@@ -280,4 +294,3 @@ Plutonia saves cannot be mixed, and renaming an identical IWAD preserves saves.
 This is dedicated Final Doom support, not general GAMECONF/UMAPINFO or DeHackEd
 support. Classic/enhanced mode selection, SIGIL II, Legacy of Rust/ID24 and Doom 64
 remain future milestones.
-

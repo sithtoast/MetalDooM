@@ -37,7 +37,7 @@ final class AmbientOcclusion {
 
     init(device: MTLDevice, shader: String, format: MTLPixelFormat) throws {
         guard device.supportsRaytracing && device.supportsRaytracingFromRender else {
-            throw PortError("Ray-traced ambient occlusion is unavailable on this GPU.")
+            throw PortError("Ray-traced effects are unavailable on this GPU.")
         }
         let library = try device.makeLibrary(source:shader + Self.shader,options:nil)
         let descriptor = MTLRenderPipelineDescriptor()
@@ -55,7 +55,7 @@ final class AmbientOcclusion {
             mesh=[];counts=[];opacity=[];baseVertices=[];structure=nil;vertices=nil;return
         }
         guard let freshVertices=device.makeBuffer(bytes:next,length:next.count*MemoryLayout<AOVertex>.stride,options:.storageModeShared) else {
-            throw PortError("Cannot allocate ambient occlusion vertices.")
+            throw PortError("Cannot allocate ray-traced world vertices.")
         }
         let rebuild=structure == nil || nextCounts != counts || nextOpacity != opacity || next.count != mesh.count || zip(next,mesh).contains { $0.position != $1.position }
         var starts:[UInt32]=[], start=0
@@ -75,9 +75,9 @@ final class AmbientOcclusion {
             guard let fresh=device.makeAccelerationStructure(size:sizes.accelerationStructureSize),
                   let scratch=device.makeBuffer(length:sizes.buildScratchBufferSize,options:.storageModePrivate),
                   let encoder=command.makeAccelerationStructureCommandEncoder() else {
-                throw PortError("Cannot allocate ambient occlusion acceleration structure.")
+                throw PortError("Cannot allocate ray-traced world acceleration structure.")
             }
-            fresh.label="AO world triangles (alpha-tested)"
+            fresh.label="Shared AO/light world triangles (alpha-tested)"
             encoder.build(accelerationStructure:fresh,descriptor:descriptor,scratchBuffer:scratch,scratchBufferOffset:0)
             encoder.endEncoding();structure=fresh;buildCount += 1
         }
@@ -89,7 +89,7 @@ final class AmbientOcclusion {
         guard next != materialInfo else { return }
         guard !next.isEmpty else { materials=nil;materialInfo=[];return }
         guard let fresh=device.makeBuffer(bytes:next,length:next.count*MemoryLayout<SIMD4<UInt32>>.stride,options:.storageModeShared) else {
-            throw PortError("Cannot allocate ambient occlusion material mappings.")
+            throw PortError("Cannot allocate ray-traced world material mappings.")
         }
         materials=fresh;materialInfo=next
     }
@@ -99,6 +99,7 @@ final class AmbientOcclusion {
     #include <metal_raytracing>
     using namespace raytracing;
     struct AOVertex { float4 position; float4 uv; };
+    struct DynamicLight { float4 positionRadius; float4 colorIntensity; float4 options; };
     float aoHitDistance(ray r, primitive_acceleration_structure world,
             const device AOVertex *vertices, const device uint4 *materials, const device uchar *alpha) {
         intersection_params params;
@@ -118,11 +119,31 @@ final class AmbientOcclusion {
         }
         return hits.get_committed_intersection_type()==intersection_type::none ? r.max_distance:hits.get_committed_distance();
     }
+    float3 directLight(float3 surface, float3 normal, DynamicLight light,
+            primitive_acceleration_structure world, const device AOVertex *vertices,
+            const device uint4 *materials, const device uchar *alpha) {
+        float3 offset=light.positionRadius.xyz-surface;
+        float distance=length(offset), radius=light.positionRadius.w;
+        if (light.colorIntensity.w<=0 || distance>=radius || distance<=0.2) return float3(0);
+        float cosine=max(0.0,dot(normal,offset/distance));
+        if (cosine<=0) return float3(0);
+        if (light.options.x>0) {
+            ray shadow;
+            shadow.origin=surface+normal*0.15;
+            float3 toLight=light.positionRadius.xyz-shadow.origin;
+            shadow.max_distance=length(toLight);shadow.min_distance=0.05;
+            shadow.direction=toLight/shadow.max_distance;
+            if (aoHitDistance(shadow,world,vertices,materials,alpha)<shadow.max_distance) return float3(0);
+        }
+        float falloff=1.0-distance/radius;
+        return light.colorIntensity.rgb*(light.colorIntensity.w*cosine*falloff*falloff);
+    }
     fragment float4 aoFragment(Out in [[stage_in]], bool front [[front_facing]],
             texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]],
             constant float4 &eye [[buffer(3)]], primitive_acceleration_structure world [[buffer(4)]],
             const device AOVertex *vertices [[buffer(5)]], const device uint4 *materials [[buffer(6)]],
-            const device uchar *alpha [[buffer(7)]], constant float4 &settings [[buffer(8)]]) {
+            const device uchar *alpha [[buffer(7)]], constant float4 &settings [[buffer(8)]],
+            constant DynamicLight &light [[buffer(9)]]) {
         if (in.fullbright > 0.5 && !front) discard_fragment();
         constexpr sampler s(coord::normalized, address::repeat, filter::nearest);
         float4 c=tex.sample(s,in.uv/float2(tex.get_width(),tex.get_height()));
@@ -149,7 +170,10 @@ final class AmbientOcclusion {
             }
             shade*=1.0-settings.y*(occlusion/8.0);
         }
-        return float4(powerColor(c.rgb*shade,power),1);
+        float3 illumination=float3(shade);
+        if (power.x==0 && power.y==0 && light.colorIntensity.w>0)
+            illumination+=directLight(in.world,n,light,world,vertices,materials,alpha);
+        return float4(powerColor(c.rgb*illumination,power),1);
     }
     """
 }

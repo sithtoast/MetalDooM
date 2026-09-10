@@ -12,7 +12,7 @@ The active experiment is on `codex/metal-experiments`; check Git status/log befo
 continuing. The user selected **ray-traced ambient occlusion**. It is implemented
 as a per-session View menu option, with classic rendering still the default.
 
-Current version: **0.4.0**, successful local app **build 93**. `Info.plist` owns
+Current version: **0.5.0**, successful local app **build 94**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
 This is an experimental branch, not a published release. No push was requested.
 
@@ -64,11 +64,20 @@ MetalFX spatial/temporal/denoised upscaling and frame interpolation support.
 These optional MetalFX paths are not implemented. Other GPUs remain untested.
 The prior build 83 benchmark is historical; see validation docs for timing limits.
 
-The user is comparing dynamic lights/shadows against emissive surfaces/bloom.
-The recommendation is one moving shadow-casting light using the current ray mesh,
-then projectile/torch lighting, followed by emissive texture masks and restrained
-bloom. These are proposals, not an implemented or selected next feature. Keep compatibility and
-in-window picker work on separate branches. No push has been requested.
+The selected next feature, one moving shadow-casting light, is now implemented.
+View → Moving Test Light (Experimental) enables an amber camera-relative light;
+Test Light Shadows compares masked world shadows with unshadowed lighting. It is
+independent of AO, shares its pipeline/mesh, starts off, and uses the level clock
+for an eight-second orbit. Doors/grilles participate; sky and billboard sprites
+still do not cast shadows. Light does not affect sprites, weapon, HUD or power-up
+fullbright rendering. See docs/METAL_EXPERIMENTS.md for details and boundaries.
+
+Build 94's GPU validation covers analytical falloff/blockers, finite shadow rays,
+animated masks, independent effects, paused/moving light, original-room shadows,
+shared-resource lifecycle, doors, save/load, map replacement and shutdown. Native
+View controls and the moving light were checked in a separate original-geometry
+pillar-room fixture. Follow-ups remain actual torch/projectile lights, emissive
+masks and restrained bloom; none of those is implemented. No push was requested.
 
 ## Current behavior and important boundaries
 

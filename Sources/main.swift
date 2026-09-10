@@ -92,6 +92,8 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 let item=radiusMenu.addItem(withTitle:title,action:#selector(selectAORadius(_:)),keyEquivalent:"")
                 item.tag=value;item.target=self
             }
+            viewMenu.addItem(withTitle:"Moving Test Light (Experimental)",action:#selector(toggleDynamicLight),keyEquivalent:"").target=self
+            viewMenu.addItem(withTitle:"Test Light Shadows",action:#selector(toggleDynamicLightShadows),keyEquivalent:"").target=self
             let audioItem=NSMenuItem(), audioMenu=NSMenu(title:"Audio")
             audioItem.submenu=audioMenu; menu.addItem(audioItem)
             let musicItem=audioMenu.addItem(withTitle:"Music",action:#selector(toggleMusic(_:)),keyEquivalent:"m")

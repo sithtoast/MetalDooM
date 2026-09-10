@@ -3,6 +3,39 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.5.0, build 94 — Moving light and shadows
+
+- Native GPU checks with Metal API validation pass on original Ultimate Doom
+  E1M1 and Doom II MAP01. The analytic shader fixture verifies squared falloff,
+  grille bars/holes, 127/128 alpha cutoff, animated/UV masks, a wall before the
+  light, a wall beyond the light, and the unshadowed comparison path.
+- Actual frames change as the light's game-time phase advances and remain stable
+  while paused. AO and light toggle independently, share the same ray resource,
+  and release it when both are disabled. Movement/shadow toggles do not rebuild
+  geometry; disabling both restores exact classic pixels. HUD pixels are unchanged.
+- Twelve E1M1 room/phase pairs compare shadows with unshadowed light; the pillar
+  room has 9,753–26,456 red-channel pixels occluded across its four phases. All
+  48 original ceiling captures still pass. Original door motion updates the shared
+  mesh; enabled effects, game-time phase, map replacement and shutdown survive
+  native save/load and queued GPU frames.
+- Final E1M1 light measurements at 1280×800, 8 warm-up + 32 samples per mode:
+  unshadowed light 1.09 ms, shadowed light 1.23 ms, AO plus shadowed light 3.05 ms.
+  These use the zigzag viewpoint after the ceiling tests, not the initial AO-only
+  spawn viewpoint. Earlier same-view light samples were 1.20/1.82 ms, illustrating
+  run-to-run variation. Doom II MAP01 sampled 1.52/1.83 ms without/with shadows.
+  All are full-command durations with validation/readback and are not sustained
+  FPS, isolated shader cost, or evidence that combined effects outperform AO.
+- Native 0.5.0 build 94: View light/shadow controls, an orbiting pool of amber
+  light, shadows, AO together, and existing counters/time/par were inspected near
+  the original E1M1 pillar/stairs. A separate local fixture changes player start
+  and disables monsters; original source WADs remain untouched. That preview was
+  left open with AO and shadowed lighting enabled; the user's original game remains.
+- Diagnostics/export regression passes both without a WAD and with original
+  E1M1, including report context, clipboard restoration, benchmark cancellation
+  and shutdown. Effect settings also change the benchmark identity in GPU tests.
+- Other GPUs, exhaustive maps/camera paths, GPU fault injection, sustained frame
+  rates and sprite lighting/shadow casting remain untested or unimplemented.
+
 ## 0.4.0, build 93 — Rebase onto main `771625e`
 
 - Replayed all three Metal experiment commits atop the level-stats/secret feature

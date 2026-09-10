@@ -3,7 +3,11 @@
 Classic Doom on Apple Silicon, with native Metal rendering and gameplay powered
 by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
-**Version 0.4.0 · early preview · Developer ID signed, not notarized.**
+**Version 0.5.0 · experimental source preview · not notarized.**
+
+This branch adds **View → Moving Test Light (Experimental)** and optional
+ray-traced shadows alongside AO. Local builds are ad-hoc signed; release packages
+use the separate signing workflow. See [Metal experiments](docs/METAL_EXPERIMENTS.md).
 
 ## Get started
 

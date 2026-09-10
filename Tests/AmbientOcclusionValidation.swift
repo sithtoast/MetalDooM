@@ -126,6 +126,76 @@ if ProcessInfo.processInfo.environment["AO_CEILING"] == "1" {
     try subject.renderer.validationSynchronizeEngine()
     print("PASS: 24 zigzag ceiling viewpoints have no sky leaks with classic or maximum AO")
 }
+// Light and AO share the same mesh but remain independently switchable.
+try subject.renderer.setAmbientOcclusion(false)
+let lightClassic=frame()
+let lightSettingsKey=subject.benchmarkSettings
+try subject.renderer.setDynamicLight(true)
+validationRequire(!subject.renderer.ambientOcclusionEnabled,"Enabling a light must not enable AO")
+let lit=frame()
+let shared=subject.renderer.ambientOcclusion!
+let lightBuilds=shared.buildCount
+validationRequire(lit != lightClassic,"Moving light did not illuminate the world")
+validationRequire(lit[hudStart...]==lightClassic[hudStart...],"Light changed the HUD")
+validationRequire(frame()==lit,"Paused light must remain stationary")
+validationRequire(subject.benchmarkSettings != lightSettingsKey)
+subject.renderer.setDynamicLightShadows(false)
+let unshadowed=frame()
+for i in stride(from:0,to:hudStart,by:4) { for c in 0..<3 {
+    validationRequire(lit[i+c]<=unshadowed[i+c],"Shadows added illumination")
+}}
+try png(lit,"light-shadowed");try png(unshadowed,"light-unshadowed")
+subject.renderer.setDynamicLightShadows(true)
+subject.renderer.validationLightPhase(70)
+let moved=frame()
+validationRequire(moved != lit,"Light did not move after advancing its game-time phase")
+validationRequire(shared.buildCount==lightBuilds,"Light movement/shadow toggle rebuilt world geometry")
+try subject.renderer.setAmbientOcclusion(true)
+let combined=frame()
+validationRequire(subject.renderer.ambientOcclusion === shared,"AO and light must share their ray mesh")
+validationRequire(combined != moved,"AO did not combine with the moving light")
+try png(combined,"light-ao")
+try subject.renderer.setDynamicLight(false)
+validationRequire(subject.renderer.ambientOcclusionEnabled && subject.renderer.ambientOcclusion === shared)
+try subject.renderer.setAmbientOcclusion(false)
+validationRequire(subject.renderer.ambientOcclusion == nil,"Disabling both effects must release ray resources")
+validationRequire(frame()==lightClassic,"Disabling light/AO must restore classic pixels")
+validationRequire(subject.benchmarkSettings==lightSettingsKey)
+try subject.renderer.setDynamicLight(true)
+for shadows in [false,true] {
+    subject.renderer.setDynamicLightShadows(shadows)
+    for _ in 0..<8 { _=frame() };gpuTimes=[]
+    for _ in 0..<32 { _=frame() }
+    print("Light shadows \(shadows): GPU command mean \(gpuTimes.reduce(0,+)/Double(gpuTimes.count)) ms, 1280x800, \(gpuTimes.count) samples")
+}
+try subject.renderer.setAmbientOcclusion(true)
+for _ in 0..<8 { _=frame() };gpuTimes=[]
+for _ in 0..<32 { _=frame() }
+print("AO plus shadowed light: GPU command mean \(gpuTimes.reduce(0,+)/Double(gpuTimes.count)) ms, 1280x800, \(gpuTimes.count) samples")
+try subject.renderer.setAmbientOcclusion(false)
+print("PASS: moving light, paused stability, independent AO/light toggles, shared geometry, HUD preservation and exact classic restoration")
+
+if ProcessInfo.processInfo.environment["AO_CEILING"] == "1" {
+    var mostShadowed=0
+    for (scene,pose) in [(Float(1056),Float(-3400),Float.pi/2),(288,-3040,-Float.pi/2),(1888,-2480,0)].enumerated() {
+        validationRequire(MD_TestPlacePlayer(pose.0,pose.1,pose.2) != 0)
+        try subject.renderer.validationSynchronizeEngine()
+        for phase:Int32 in [0,70,140,210] {
+            subject.renderer.validationLightPhase(phase)
+            subject.renderer.setDynamicLightShadows(true);let shadows=frame()
+            subject.renderer.setDynamicLightShadows(false);let clear=frame()
+            let changed=stride(from:0,to:hudStart,by:4).filter { shadows[$0+2]<clear[$0+2] }.count
+            mostShadowed=max(mostShadowed,changed)
+            print("Shadow scene \(scene), phase \(phase): \(changed) red-channel pixels occluded")
+            try png(shadows,"light-scene-\(scene)-\(phase)-shadows")
+            try png(clear,"light-scene-\(scene)-\(phase)-clear")
+        }
+    }
+    validationRequire(mostShadowed>1000,"World geometry did not visibly cast test-light shadows")
+    subject.renderer.setDynamicLightShadows(true)
+    print("PASS: original world geometry visibly casts shadows")
+}
+
 // Open a real original door and verify the same renderer rebuilds the ray mesh.
 if subject.wad!.maps.contains("E1M1") {
     try subject.renderer.setAmbientOcclusion(true)
@@ -149,6 +219,18 @@ if subject.wad!.maps.contains("E1M1") {
     try png(frame(),"door-ao")
     print("PASS: original door opens, AO mesh rebuilds during motion and stops rebuilding when paused")
 }
+// Save/load retains independently selected effects and restores the game-time orbit.
+try subject.renderer.setAmbientOcclusion(true)
+try subject.renderer.validationSynchronizeEngine()
+let savedTime=MD_GetHUD().levelTics
+let lightSave=output.appendingPathComponent("light.mdsave")
+try subject.renderer.saveGame(to:lightSave,title:"Moving light validation")
+try subject.renderer.loadGame(from:lightSave)
+_=frame()
+validationRequire(subject.renderer.dynamicLightEnabled && subject.renderer.ambientOcclusionEnabled)
+validationRequire(MD_GetHUD().levelTics==savedTime,"Save/load changed the light's game-time phase")
+print("PASS: enabled light/AO and game-time orbit survive native save/load")
+
 // Exercise map replacement with an enabled acceleration structure, then shutdown
 // while GPU work/resources have existed. One engine WAD stack remains in use.
 try subject.renderer.setAmbientOcclusion(true)
