@@ -2,6 +2,7 @@
 import AppKit
 import MetalKit
 import Darwin
+import CryptoKit
 
 extension App {
     // Launch Services enables HUD machinery via Info.plist; explicitly hide it
@@ -36,6 +37,11 @@ extension App {
         let process = ProcessInfo.processInfo
         let drawable = view.drawableSize
         let files = wad?.sourceURLs.enumerated().map { "\($0.offset + 1). \($0.element.lastPathComponent)" }.joined(separator:"\n") ?? "None"
+        let fingerprints = wad.map { wad in
+            zip(wad.sourceURLs,wad.sourceData).enumerated().map { index,pair in
+                "\(index+1). \(pair.0.lastPathComponent): \(SHA256.hash(data:pair.1).map { String(format:"%02x",$0) }.joined())"
+            }.joined(separator:"\n")
+        } ?? "None"
         let buildDate = Bundle.main.object(forInfoDictionaryKey:"MetalDooMBuildDate") as? String ?? "Unavailable"
         let fps = diagnosticFPS.map { String(format:"%.1f",$0) } ?? "Not sampled yet"
         return """
@@ -63,6 +69,8 @@ extension App {
         Presentation: \(attractActive ? (attractDemo ? "Demo playback" : "Title/attract") : "Gameplay/menu")
         Ordered WAD files (base first):
         \(files)
+        WAD SHA-256 (ordered; loaded file contents):
+        \(fingerprints)
 
         Add reproduction steps, expected/actual behavior and a screenshot if useful.
         """

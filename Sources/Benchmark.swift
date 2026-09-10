@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import AppKit
 import MetalKit
-import CryptoKit
 import UniformTypeIdentifiers
 
 extension App {
@@ -23,10 +22,7 @@ extension App {
             closeAutomap();view.releaseMouse();view.keys.removeAll()
             try playDemo("DEMO1")
             attractActive=false;view.inputBlocked=true;maps.isEnabled=false
-            let fingerprints=zip(wad.sourceURLs,wad.sourceData).enumerated().map { index,pair in
-                "\(index+1). \(pair.0.lastPathComponent): \(SHA256.hash(data:pair.1).map { String(format:"%02x",$0) }.joined())"
-            }.joined(separator:"\n")
-            benchmark=BenchmarkRun(context:diagnosticReport()+"\nWAD SHA-256 (ordered):\n"+fingerprints,settings:benchmarkSettings)
+            benchmark=BenchmarkRun(context:diagnosticReport(),settings:benchmarkSettings)
             sessionLog.append("Benchmark started: DEMO1, warm-up 5s, sample 15s, cap \(view.preferredFramesPerSecond)")
         } catch { beginAttract();show(error) }
     }

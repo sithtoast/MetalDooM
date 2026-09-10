@@ -60,8 +60,8 @@ with both backends. No instrument banks or game music are bundled.
 ## Testing and diagnostics
 
 Use **Diagnostics → Metal Performance HUD** to toggle Apple’s graphics overlay,
-and **Copy Diagnostic Report** to copy hardware, build and game details for a bug
-report. **Run Benchmark…** replays DEMO1 from the title screen; export completed
+and **Copy Diagnostic Report** to copy hardware, build and game details plus SHA-256 hashes of every loaded WAD
+for a bug report. Hashes use the loaded file contents and preserve base/add-on order. **Run Benchmark…** replays DEMO1 from the title screen; export completed
 results or a bounded session log from the same menu. See [TESTING.md](TESTING.md) for setup, comparisons and reporting steps.
 
 ## Controls

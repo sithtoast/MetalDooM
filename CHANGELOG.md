@@ -4,6 +4,13 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 67 — WAD hashes in diagnostics
+
+- Include SHA-256 hashes for every loaded IWAD/PWAD, in load order, in copied
+  diagnostics and session exports, using the exact file contents loaded in memory.
+- Share the same report with benchmarks without duplicating their hash listing.
+- Verify the installed build's copied report against independent file hashes.
+
 ## Build 66 — KEX edition identification
 
 - Identify Doom, Doom II, TNT and Plutonia rerelease IWADs from their campaign
