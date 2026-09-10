@@ -7,7 +7,7 @@ b=bytearray(source.read_bytes());n,o=struct.unpack_from('<ii',b,4)
 lumps=[struct.unpack_from('<ii8s',b,o+i*16) for i in range(n)]
 m=next(i for i,x in enumerate(lumps) if x[2].rstrip(b'\0')==b'E1M1')
 p,size,_=lumps[m+1]
-poses={'exit':(3008,-4256,0),'sky':(2000,-3540,90),'progression':(2944,-4768,180),'pillar':(288,-3040,270)}
+poses={'exit':(3008,-4256,0),'sky':(2000,-3540,90),'progression':(2944,-4768,180),'pillar':(288,-3040,270),'ceiling':(2848,-2960,45)}
 x,y,angle=poses[scene]
 for off in range(p,p+size,10):
  kind=struct.unpack_from('<H',b,off+6)[0]

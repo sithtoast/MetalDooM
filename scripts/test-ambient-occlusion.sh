@@ -20,9 +20,13 @@ source=source[:start]+'    func show(_ error: Error) { validationFail(String(des
 (output/'Renderer.swift').write_text((root/'Sources/Renderer.swift').read_text()+"""
 // Test-only bridge in this copied source file; not part of app builds.
 extension Renderer {
+    var validationMapName: String? { map?.name }
+    func validationCamera(_ x:Float,_ y:Float,_ z:Float,_ angle:Float,_ tilt:Float) {
+        position=SIMD2(x,y);eyeZ=z;yaw=angle;pitch=tilt
+    }
     func validationSynchronizeEngine() throws {
         currentPlayer=MD_GetPlayer();previousPlayer=currentPlayer;hud=MD_GetHUD()
-        position=SIMD2(currentPlayer.x,currentPlayer.y);eyeZ=currentPlayer.eyeZ;yaw=currentPlayer.angle
+        position=SIMD2(currentPlayer.x,currentPlayer.y);eyeZ=currentPlayer.eyeZ;yaw=currentPlayer.angle;pitch=0
         try syncGeometry()
     }
 }

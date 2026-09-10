@@ -60,6 +60,7 @@ Run the focused native GPU regression with your own WAD:
 ```sh
 bash scripts/test-ambient-occlusion.sh /path/to/DOOM.WAD
 AO_OUTPUT="$PWD/build/ao-doom2" bash scripts/test-ambient-occlusion.sh /path/to/doom2.wad MAP01
+AO_CEILING=1 AO_OUTPUT="$PWD/build/ao-ceiling" bash scripts/test-ambient-occlusion.sh /path/to/DOOM.WAD
 ```
 
 The regression needs a logged-in Mac desktop and GPU access. Its gameplay
@@ -86,3 +87,14 @@ preserving geometry, and disables monsters in that map. Never distribute the
 output IWAD. The GPU regression also checks analytic grille rays against known
 hit distances, alpha cutoff, negative UV wrapping, texture-mask changes and
 UV-only updates; these do not depend on a particular WAD's scene contents.
+
+`AO_CEILING=1` requires original Ultimate Doom E1M1 geometry/art. It captures 24
+upward viewpoints in the zigzag room with AO off and at strength 100%/radius 96,
+rejects bright sky pixels above the HUD, and writes a `ceiling.mdsave` camera
+fixture. To start a native window near the affected ceiling, generate a local WAD
+with `python3 Tests/make_surface_fixture.py /path/to/DOOM.WAD build/ceiling.wad ceiling`,
+open that WAD and look up. The long ceiling slit reported in build
+86 also occurred with AO off: rounded BSP seg endpoints trimmed gaps out of the
+flat mesh. Build 87 uses original linedef clipping and shared flat/wall edge
+vertices to close the slit and smaller T-junction gaps. This adds triangles; the
+older performance figures above should not be treated as build 87 measurements.

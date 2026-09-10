@@ -51,7 +51,13 @@ requests preserve the active engine.
 
 WAD `(x,y)` becomes Metal `(x,height,-y)`. Vertices contain position and texel UV/light
 float4s. Wall art is composited at load time; floors/ceilings are clipped through the
-classic BSP and each leaf's directed seg boundaries. All side materials are cached, including those hidden by closed sectors.
+classic BSP and each leaf's original directed linedefs. Seg endpoints can be rounded
+off those lines by node builders, so they must not define clipping planes. Clipping
+uses Double precision, then inserts shared edge vertices into adjacent flats and
+horizontal wall edges before converting to GPU floats. Subdivided boundaries use
+center fans to preserve collinear vertices and avoid raster T-junction cracks.
+Wall UV/light attributes interpolate along the original triangle. All side materials
+are cached, including those hidden by closed sectors.
 Engine floor/ceiling height, light, sidedef texture or offset changes rebuild geometry
 using current values, once per changed tic. The native bridge caches texture names
 from the WAD using the engine's texture indices, without exposing internal texture

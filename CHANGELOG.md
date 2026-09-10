@@ -28,6 +28,18 @@ are never included in the repository.
 - Validate engine counts, time, saves, transitions, secret notice timing and
   Doom II par coverage; verify the HUD and controls in the running app.
 
+## 0.3.0 · Build 87 — Close ceiling seams
+
+- Fix the bright slit in E1M1's zigzag-room ceiling, visible with classic rendering
+  as well as maximum AO. Clip flats to original linedefs instead of rounded BSP
+  seg endpoints, keep precise intersections and match shared flat/wall edge vertices.
+- Add a rounded-segment geometry fixture and 24 ceiling viewpoints rendered with
+  AO disabled and at 100% strength/96-unit radius. Preserve texture alignment,
+  sector lighting, moving-door updates and existing AO controls.
+- Validate all 68 Ultimate Doom/Doom II geometry/art maps, focused GPU suites
+  and the native build 87 ceiling view. Shared edges add triangles; a sustained
+  gameplay performance comparison has not been run.
+
 ## 0.3.0 · Build 86 — AO controls and transparent grilles
 
 - Add per-session View controls for AO strength (0–100%) and radius (16–96 Doom

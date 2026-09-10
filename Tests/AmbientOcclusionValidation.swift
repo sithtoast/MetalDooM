@@ -100,6 +100,32 @@ validationRequire(changed>1000,"AO did not visibly affect world surfaces")
 for i in stride(from:0,to:hudStart,by:4) { for c in 0..<3 { validationRequire(occluded[i+c]<=classic[i+c],"AO unexpectedly brightened pixel") } }
 try png(classic,"classic");try png(occluded,"ao")
 print("PASS: \(changed) world pixels shaded; HUD unchanged; stable paused pixels; disabling AO restores identical classic image")
+// Opt-in fixture for the original Ultimate Doom E1M1 zigzag room. Its ceiling
+// and walls are dark; bright pixels above the HUD reveal sky through mesh gaps.
+if ProcessInfo.processInfo.environment["AO_CEILING"] == "1" {
+    validationRequire(subject.renderer.validationMapName == "E1M1","AO_CEILING requires original E1M1")
+    subject.renderer.setAOSettings(strength:1,radius:96)
+    for enabled in [false,true] {
+        try subject.renderer.setAmbientOcclusion(enabled)
+        for (p,point) in [(Float(2848),Float(-2960)),(3008,-3328),(3008,-3744)].enumerated() {
+            for a in 0..<8 {
+                subject.renderer.validationCamera(point.0,point.1,17,Float(a)*Float.pi/4,1.05)
+                let pixels=frame()
+                try png(pixels,"ceiling-\(p)-\(a)-\(enabled ? "ao":"classic")")
+                let bright=stride(from:0,to:600*1280*4,by:4).filter {
+                    min(pixels[$0],pixels[$0+1],pixels[$0+2])>180
+                }.count
+                validationRequire(bright==0,"Ceiling sky leak: \(bright) pixels at pose \(p)/\(a), AO \(enabled)")
+            }
+        }
+    }
+    validationRequire(MD_TestPlacePlayer(2848,-2960,Float.pi/4) != 0)
+    subject.renderer.validationCamera(2848,-2960,17,Float.pi/4,1.05)
+    try subject.renderer.saveGame(to:output.appendingPathComponent("ceiling.mdsave"),title:"Zigzag ceiling regression")
+    subject.renderer.setAOSettings(strength:defaultSettings.strength,radius:defaultSettings.radius)
+    try subject.renderer.validationSynchronizeEngine()
+    print("PASS: 24 zigzag ceiling viewpoints have no sky leaks with classic or maximum AO")
+}
 // Open a real original door and verify the same renderer rebuilds the ray mesh.
 if subject.wad!.maps.contains("E1M1") {
     try subject.renderer.setAmbientOcclusion(true)

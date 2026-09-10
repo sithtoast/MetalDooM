@@ -195,21 +195,28 @@ struct Geometry {
         }
         var minimum = map.points[0], maximum = minimum
         for p in map.points { minimum = simd_min(minimum,p); maximum = simd_max(maximum,p) }
-        let bounds = [minimum,SIMD2(maximum.x,minimum.y),maximum,SIMD2(minimum.x,maximum.y)]
-        func clipped(_ polygon: [SIMD2<Float>], _ node: Node, _ right: Bool) -> [SIMD2<Float>] {
+        // Keep clipping intersections precise until the final GPU vertex upload.
+        let bounds = [minimum,SIMD2(maximum.x,minimum.y),maximum,SIMD2(minimum.x,maximum.y)].map { SIMD2<Double>($0) }
+        func clipped(_ polygon: [SIMD2<Double>], _ node: Node, _ right: Bool) -> [SIMD2<Double>] {
             guard !polygon.isEmpty else { return [] }
-            var result: [SIMD2<Float>] = []
+            let origin = SIMD2<Double>(node.origin), direction = SIMD2<Double>(node.direction)
+            func distance(_ point: SIMD2<Double>) -> Double {
+                let delta = point-origin
+                return (direction.x*delta.y-direction.y*delta.x) * (right ? -1 : 1)
+            }
+            var result: [SIMD2<Double>] = []
             var a = polygon.last!
-            var da = cross(node.direction,a-node.origin) * (right ? -1 : 1)
+            var da = distance(a)
             for b in polygon {
-                let db = cross(node.direction,b-node.origin) * (right ? -1 : 1)
+                let db = distance(b)
                 if (da >= 0) != (db >= 0) { result.append(a+(b-a)*(da/(da-db))) }
                 if db >= 0 { result.append(b) }
                 a = b; da = db
             }
             return result
         }
-        var pending: [(Int,[SIMD2<Float>])] = [(map.nodes.isEmpty ? 0x8000 : map.nodes.count-1,bounds)]
+        var pending: [(Int,[SIMD2<Double>])] = [(map.nodes.isEmpty ? 0x8000 : map.nodes.count-1,bounds)]
+        var flats: [(polygon:[SIMD2<Double>],sector:Sector)] = []
         var visits = 0
         while let (index,polygon) = pending.popLast() {
             visits += 1
@@ -223,24 +230,112 @@ struct Geometry {
                 let leaf = map.leaves[index & 0x7fff]
                 var polygon = polygon
                 // BSP partitions alone do not include every outer room edge.
-                // Complete each convex leaf using its directed seg boundaries.
+                // Clip against the original directed linedef, not its seg endpoints:
+                // node builders round split vertices to integer coordinates. Using
+                // those shortened segs as planes cuts slivers out of adjacent flats
+                // (visible as sky leaks in E1M1's zigzag room) and misaligns walls.
                 for seg in map.segs[leaf.first..<leaf.first+leaf.count] {
-                    let a = map.points[seg.a], b = map.points[seg.b]
+                    let line = map.lines[seg.line]
+                    let a = map.points[seg.side == 0 ? line.a : line.b]
+                    let b = map.points[seg.side == 0 ? line.b : line.a]
                     if simd_length_squared(b-a) > 0 {
                         polygon = clipped(polygon,Node(origin:a,direction:b-a,right:0,left:0),true)
                     }
                 }
                 guard polygon.count >= 3 else { continue }
                 let sector = map.sectors[map.leafSector(index & 0x7fff)]
-                for ceiling in [false,true] {
-                    let name = ceiling ? sector.ceilingTexture : sector.floorTexture
-                    let height = ceiling ? sector.ceiling : sector.floor
-                    for i in 1..<polygon.count-1 {
-                        let triangle = [polygon[0],polygon[i],polygon[i+1]].map { p in
-                            vertex(p,height,p.x,-p.y,max(0.12,sector.light))
-                        }
-                        groups[MaterialKey(name:name,flat:true),default:[]] += triangle
+                flats.append((polygon,sector))
+            }
+        }
+        // Adjacent leaves can have different numbers of vertices along the same
+        // edge. Split both sides at every shared point so rasterization does not
+        // leave single-pixel cracks at those T-junctions.
+        let points = Array(Set(flats.flatMap { $0.polygon }))
+        let sorted = [points.sorted { $0.x < $1.x },points.sorted { $0.y < $1.y }]
+        func lowerBound(_ values:[SIMD2<Double>],_ axis:Int,_ value:Double) -> Int {
+            var low=0,high=values.count
+            while low<high {
+                let mid=(low+high)/2
+                if values[mid][axis]<value { low=mid+1 } else { high=mid }
+            }
+            return low
+        }
+        func edgePoints(_ a:SIMD2<Double>,_ b:SIMD2<Double>) -> [(Double,SIMD2<Double>)] {
+            let delta=b-a,length=simd_length_squared(b-a)
+            guard length>1e-14 else { return [] }
+            let ranges=(0..<2).map { axis in
+                lowerBound(sorted[axis],axis,min(a[axis],b[axis])-1e-7)..<lowerBound(sorted[axis],axis,max(a[axis],b[axis])+1e-7)
+            }
+            let axis=ranges[0].count<ranges[1].count ? 0:1
+            var interior:[(Double,SIMD2<Double>)]=[]
+            for point in sorted[axis][ranges[axis]] {
+                let t=simd_dot(point-a,delta)/length
+                if t>1e-8 && t<1-1e-8 && simd_length_squared(point-(a+delta*t))<1e-14 {
+                    interior.append((t,point))
+                }
+            }
+            var result:[(Double,SIMD2<Double>)]=[]
+            var previous=SIMD2<Float>(a)
+            for entry in interior.sorted(by: { $0.0<$1.0 }) {
+                let point=SIMD2<Float>(entry.1)
+                if point != previous && point != SIMD2<Float>(b) { result.append(entry);previous=point }
+            }
+            return result
+        }
+        // Give wall tops/bottoms the same edge vertices as the neighboring flats.
+        // Interpolate attributes along each original triangle to retain pegging,
+        // texture coordinates and directional-wall flags.
+        for key in Array(groups.keys) {
+            let original=groups[key]!
+            var stitched:[WorldVertex]=[]
+            for i in stride(from:0,to:original.count,by:3) {
+                let triangle=Array(original[i..<i+3])
+                var boundary:[WorldVertex]=[]
+                for edge in 0..<3 {
+                    let a=triangle[edge],b=triangle[(edge+1)%3]
+                    boundary.append(a)
+                    guard a.position.y==b.position.y else { continue }
+                    let from=SIMD2(Double(a.position.x),Double(-a.position.z))
+                    let to=SIMD2(Double(b.position.x),Double(-b.position.z))
+                    for (t,point) in edgePoints(from,to) {
+                        boundary.append(WorldVertex(position:SIMD4(Float(point.x),a.position.y,Float(-point.y),1),
+                                                    uvLight:a.uvLight+(b.uvLight-a.uvLight)*Float(t)))
                     }
+                }
+                if boundary.count==3 { stitched += triangle;continue }
+                let center=WorldVertex(position:triangle.reduce(SIMD4<Float>.zero) { $0+$1.position }/3,
+                                       uvLight:triangle.reduce(SIMD4<Float>.zero) { $0+$1.uvLight }/3)
+                for j in boundary.indices { stitched += [center,boundary[j],boundary[(j+1)%boundary.count]] }
+            }
+            groups[key]=stitched
+        }
+        for flat in flats {
+            let sector=flat.sector
+            var polygon:[SIMD2<Double>]=[]
+            var split=false
+            for i in flat.polygon.indices {
+                let a=flat.polygon[i],b=flat.polygon[(i+1)%flat.polygon.count]
+                guard simd_length_squared(b-a)>1e-14 else { continue }
+                polygon.append(a)
+                let interior=edgePoints(a,b)
+                polygon += interior.map { $0.1 }
+                split = split || !interior.isEmpty
+            }
+            guard polygon.count>=3 else { continue }
+            // A center fan preserves collinear boundary vertices, unlike a fan
+            // anchored at a corner on an edge that has just been subdivided.
+            let center=polygon.reduce(SIMD2<Double>.zero,+)/Double(polygon.count)
+            let triangles: [[SIMD2<Double>]] = split
+                ? polygon.indices.map { [center,polygon[$0],polygon[($0+1)%polygon.count]] }
+                : (1..<polygon.count-1).map { [polygon[0],polygon[$0],polygon[$0+1]] }
+            for ceiling in [false,true] {
+                let name = ceiling ? sector.ceilingTexture : sector.floorTexture
+                let height = ceiling ? sector.ceiling : sector.floor
+                for points in triangles {
+                    let triangle = points.map { p in
+                        vertex(SIMD2<Float>(p),height,Float(p.x),Float(-p.y),max(0.12,sector.light))
+                    }
+                    groups[MaterialKey(name:name,flat:true),default:[]] += triangle
                 }
             }
         }

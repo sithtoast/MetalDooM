@@ -27,6 +27,32 @@ visibly reports MetalDooM 0.4.0 (build 92). Gameplay source is unchanged from bu
 - Source WADs were unchanged. Generated fixture/game data and app bundles remain
   ignored. This is targeted validation, not a complete campaign playthrough.
 
+## Zigzag ceiling seams — build 87
+
+- Reproduced the user's build 86 bright ceiling slit in original E1M1 at
+  `(2848,-2960)`, yaw 45 degrees, pitch 1.05. It occurs with AO disabled too.
+  The old renderer failed the new synthetic rounded-seg fixture: flat area
+  16416 instead of 16448. Correcting linedef clipping removed the long slit;
+  shared flat/wall vertices also removed the remaining single-pixel leaks.
+- `AO_CEILING=1` validates 24 upward viewpoints at 1280×800 in both classic and
+  maximum AO (100% strength, 96-unit radius): no bright sky-leak pixels in any of
+  the 48 captures. Final GPU checks pass on original E1M1 and Doom II MAP01,
+  including alpha rays, settings, classic restoration, stable HUD/paused output,
+  moving doors (E1M1), map replacement and clean shutdown.
+- All 36 Ultimate Doom and 32 Doom II geometry/material/sprite checks pass,
+  alongside the original fixture, rounded-seg fixture and malformed-data checks.
+- Native build 87 was independently opened with a local ceiling fixture and
+  visually checked looking up with AO disabled and at 100%/96 units. The original
+  build 86 game was kept running; the separate validation copy was then closed.
+- Shared edge subdivisions increase E1M1's visible world mesh from 1969 to 3063
+  triangles. Final paused GPU samples with validation/readback averaged about
+  4.85 ms with AO and 0.17–0.19 ms classic on E1M1/MAP01. No sustained gameplay
+  performance comparison or exhaustive camera sweep across every map was run.
+- The native File → Load Game picker did not enable Open for the generated
+  `.mdsave` fixture on this Mac. The native visual check instead used the isolated
+  fixture WAD's Quick Save/Load with an upward pitch. Picker behavior remains
+  outside this ceiling correction.
+
 ## AO controls, alpha testing and validator repair — build 86
 
 - Native build 86: View strength/radius controls were exercised at 100%/96 units,
@@ -225,4 +251,3 @@ exact campaign story text/backgrounds, the cast cycle and teleport height.
 Native app checks cover both MAP01 scenes, campaign branding, and loaded-WAD
 Quit/window-close exit status. Doom II, Ultimate Doom and rerelease SIGIL remain
 regression checks. Complete manual campaign playthroughs remain outstanding.
-

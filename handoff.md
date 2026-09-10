@@ -36,7 +36,15 @@ submitted resources remain immutable. Sky and billboard sprites do not occlude.
 Build 86 native controls/presentation were verified. GPU checks passed on
 Ultimate Doom, Doom II and a generated MIDGRATE fixture, including analytic alpha
 rays, settings effects, classic restoration, HUD stability, moving doors, map
-replacement and shutdown. The app was left in E1M1 with AO on at default settings.
+replacement and shutdown.
+
+Build 87 fixes the user's bright ceiling slit in E1M1's zigzag room. It was also
+present with AO off: flats were clipped to rounded seg endpoints. Geometry now
+uses original directed linedefs, Double intersections and shared flat/wall edge
+vertices. All 68 Ultimate Doom/Doom II geometry/art checks pass. The opt-in
+`AO_CEILING=1` GPU regression covers 24 viewpoints in classic and maximum AO;
+local images and a loadable `ceiling.mdsave` go in `AO_OUTPUT`. The user's existing
+build 86 game was preserved while the fix was tested separately.
 
 The user saw validate-ao crash dialogs from the old focus assertion. The harness
 now drives the original door fixture independently of focus using a bridge added
