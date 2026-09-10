@@ -19,6 +19,12 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var statusBarHeight: NSLayoutConstraint!
     var statusBarMenuItem: NSMenuItem?
     var statusBarVisible = UserDefaults.standard.object(forKey:"showStatusBar") as? Bool ?? true
+    var levelStatsView: LevelStatsView?
+    var levelStatsMenuItem: NSMenuItem?, parTimeMenuItem: NSMenuItem?, secretMenuItem: NSMenuItem?
+    var messageTop: NSLayoutConstraint?
+    var levelStatsVisible = UserDefaults.standard.object(forKey:"showLevelStats") as? Bool ?? true
+    var parTimeVisible = UserDefaults.standard.bool(forKey:"showParTime")
+    var secretNotifications = UserDefaults.standard.object(forKey:"secretNotifications") as? Bool ?? true
     var maps: NSPopUpButton!
     var message: MessageLabel!
     var wad: WAD?
@@ -67,6 +73,12 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             viewItem.submenu=viewMenu; menu.addItem(viewItem)
             statusBarMenuItem=viewMenu.addItem(withTitle:"Show Status Bar",action:#selector(toggleStatusBar),keyEquivalent:"")
             statusBarMenuItem?.target=self
+            levelStatsMenuItem=viewMenu.addItem(withTitle:"Show Level Stats",action:#selector(toggleLevelStats),keyEquivalent:"")
+            levelStatsMenuItem?.target=self
+            parTimeMenuItem=viewMenu.addItem(withTitle:"Show Par Time",action:#selector(toggleParTime),keyEquivalent:"")
+            parTimeMenuItem?.target=self
+            secretMenuItem=viewMenu.addItem(withTitle:"Secret Notifications",action:#selector(toggleSecretNotifications),keyEquivalent:"")
+            secretMenuItem?.target=self
             let audioItem=NSMenuItem(), audioMenu=NSMenu(title:"Audio")
             audioItem.submenu=audioMenu; menu.addItem(audioItem)
             let musicItem=audioMenu.addItem(withTitle:"Music",action:#selector(toggleMusic(_:)),keyEquivalent:"m")
@@ -139,17 +151,26 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             message = MessageLabel(labelWithString:""); message.translatesAutoresizingMaskIntoConstraints = false
             message.font = .monospacedSystemFont(ofSize:14,weight:.bold); message.textColor = .yellow
             message.backgroundColor = NSColor.black.withAlphaComponent(0.7); message.drawsBackground = true; message.isHidden = true
+            let levelStats=LevelStatsView(); levelStats.translatesAutoresizingMaskIntoConstraints=false
+            root.addSubview(levelStats); levelStatsView=levelStats
+            NSLayoutConstraint.activate([
+                levelStats.leadingAnchor.constraint(equalTo:view.leadingAnchor),levelStats.trailingAnchor.constraint(equalTo:view.trailingAnchor),
+                levelStats.topAnchor.constraint(equalTo:view.topAnchor),levelStats.bottomAnchor.constraint(equalTo:view.bottomAnchor)
+            ])
             root.addSubview(message)
+            messageTop=message.topAnchor.constraint(equalTo:view.topAnchor,constant:16)
             NSLayoutConstraint.activate([
                 view.topAnchor.constraint(equalTo:root.topAnchor),view.leadingAnchor.constraint(equalTo:root.leadingAnchor),view.trailingAnchor.constraint(equalTo:root.trailingAnchor),view.bottomAnchor.constraint(equalTo:statusBar.topAnchor),
                 statusBar.leadingAnchor.constraint(equalTo:root.leadingAnchor),statusBar.trailingAnchor.constraint(equalTo:root.trailingAnchor),statusBar.bottomAnchor.constraint(equalTo:root.bottomAnchor),statusBarHeight,
                 maps.leadingAnchor.constraint(equalTo:statusBar.leadingAnchor,constant:12),maps.topAnchor.constraint(equalTo:statusBar.topAnchor,constant:8),maps.widthAnchor.constraint(equalToConstant:100),maps.heightAnchor.constraint(equalToConstant:26),
                 status.leadingAnchor.constraint(equalTo:maps.trailingAnchor,constant:12),status.trailingAnchor.constraint(equalTo:statusBar.trailingAnchor,constant:-16),status.centerYAnchor.constraint(equalTo:maps.centerYAnchor),
                 help.leadingAnchor.constraint(equalTo:statusBar.leadingAnchor,constant:16),help.trailingAnchor.constraint(equalTo:statusBar.trailingAnchor,constant:-16),help.topAnchor.constraint(equalTo:statusBar.topAnchor,constant:39),
-                message.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:16),message.topAnchor.constraint(equalTo:view.topAnchor,constant:16),
+                message.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:16),messageTop!,
                 message.trailingAnchor.constraint(lessThanOrEqualTo:view.trailingAnchor,constant:-16)
             ])
             updateStatusBar()
+            renderer.onHUDFrame = { [weak self] in self?.updateLevelStats() }
+            updateLevelStats()
             renderer.onFrame = { [weak self] fps in
                 guard let self else { return }
                 self.diagnosticFPS = fps

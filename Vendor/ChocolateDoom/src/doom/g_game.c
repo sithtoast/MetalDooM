@@ -1384,6 +1384,18 @@ static const int chexpars[6] =
 }; 
  
 
+// Safe read-only par lookup for the native live HUD. Episode 4 has no
+// authored vanilla par table; do not expose the original overflow emulation.
+int G_LevelParSeconds(void)
+{
+    if (gamemode == commercial)
+        return gamemap >= 1 && gamemap <= 32 ? cpars[gamemap-1] : -1;
+    if (gameversion == exe_chex)
+        return gamemap >= 1 && gamemap <= 5 ? chexpars[gamemap] : -1;
+    return gameepisode >= 1 && gameepisode <= 3 && gamemap >= 1 && gamemap <= 9
+        ? pars[gameepisode][gamemap] : -1;
+}
+
 //
 // G_DoCompleted 
 //

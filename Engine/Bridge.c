@@ -464,6 +464,7 @@ int MD_CopyWeaponSprites(MD_WeaponSprite *output, int capacity) {
     return count;
 }
 
+extern int G_LevelParSeconds(void);
 MD_HUD MD_GetHUD(void) {
     MD_HUD hud = {0};
     if (!loaded) return hud;
@@ -483,6 +484,13 @@ MD_HUD MD_GetHUD(void) {
     hud.maxCells = player->maxammo[am_cell]; hud.maxRockets = player->maxammo[am_misl];
     for (int i=0; i<NUMCARDS; ++i) if (player->cards[i]) hud.keys |= 1u<<i;
     for (int i=0; i<NUMWEAPONS; ++i) if (player->weaponowned[i]) hud.weapons |= 1u<<i;
+    hud.items = player->itemcount; hud.totalItems = totalitems;
+    hud.secrets = player->secretcount; hud.totalSecrets = totalsecret;
+    hud.levelTics = leveltime; hud.parSeconds = G_LevelParSeconds();
+    if (sigilEpisode && gameepisode == 5 && gamemap >= 1 && gamemap <= 9) {
+        static const int pars[] = {90,150,360,420,780,420,780,300,660};
+        hud.parSeconds = pars[gamemap-1];
+    }
     hud.damageFlash = player->damagecount; hud.kills = player->killcount; hud.totalKills = totalkills;
     hud.bonusFlash = player->bonuscount; hud.messageSerial = messageSerial; hud.tick = gametic;
     snprintf(hud.message,sizeof(hud.message),"%s",lastMessage);

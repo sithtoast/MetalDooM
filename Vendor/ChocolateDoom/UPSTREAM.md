@@ -5,7 +5,10 @@
 - Retrieved: 2026-09-09
 - License: GPL-2.0-or-later; see COPYING.md and individual source headers.
 
-Contains the upstream top-level `src/*.[ch]` and `src/doom/` files, unchanged.
+Contains the upstream top-level `src/*.[ch]` and `src/doom/` files.
+Local change: `src/doom/g_game.c` exports a read-only `G_LevelParSeconds` lookup
+using the original par tables, with bounds checks and no episode-IV overflow
+emulation. The original completion behavior is unchanged.
 Only files listed in ../../Engine/sources.txt are built. Native host adaptation is
 outside this directory in Engine/. SDL, network, audio, and software presentation
 are not linked. No game WAD assets are included.

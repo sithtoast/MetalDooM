@@ -4,6 +4,20 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.3.0 · Build 91 — Level stats and secret notifications
+
+- Add compact, color-coded live kills/items/secrets counters and a whole-second
+  level clock using the original WAD font. Reduce the overlay size after visual
+  review and remove distracting subsecond updates.
+- Announce newly discovered secrets for three seconds of game time, independently
+  of pickup messages. Restore saved counts without replaying notifications.
+- Add remembered Level Stats, Par Time and Secret Notifications controls in
+  View and Options → HUD. Stats/notifications default on; par defaults off.
+- Show built-in campaign par times, turn par gold when reached, and show N/A for
+  maps without defined pars. Hide the overlay during title demos and endings.
+- Validate engine counts, time, saves, transitions, secret notice timing and
+  Doom II par coverage; verify the HUD and controls in the running app.
+
 ## 0.3.0 — Next-chat handoff (app build 81 unchanged)
 
 - Add handoff.md with the current implementation/release state, validation limits,

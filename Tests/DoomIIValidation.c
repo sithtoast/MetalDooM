@@ -11,6 +11,7 @@ int main(int argc,char **argv) {
     assert(argc==2);
     for(int map=1;map<=32;map++) {
         assert(MD_Load(argv[1],1,map)); assert(MD_GetProgress().commercial);
+        assert(MD_GetHUD().parSeconds>0);
         ticks(5,0,-1); assert(MD_SectorCount()>0);
         int n=MD_CopyThings(NULL,0,0,0); assert(n>0);
         MD_Thing *things=calloc(n,sizeof(*things)); MD_CopyThings(things,n,0,0);

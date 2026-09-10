@@ -3,6 +3,23 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## Build 91 — Compact level stats and secret notifications
+
+- `test-level-stats.sh` passed with the original Ultimate Doom IWAD: live item
+  and secret counts, one discovery per sector, tic time, native save restoration,
+  agreement with exit stats, next-map/restart reset and undefined episode-IV par.
+- State/format tests passed after the final whole-second adjustment: no subsecond
+  changes, minute/hour rollover, missing par, 105-tic notification expiry and
+  refresh, and suppression when restoring/resetting counts.
+- `test-combat.sh` passed for kills and existing combat behavior. `test-doom2.sh`
+  passed all 32 maps with positive par lookups plus existing combat/progression.
+- Native build 88 checks covered View and Options → HUD toggles, stats hide/show,
+  paused time, and gold par after the target. Build 91 visually verified the
+  smaller counters, whole-second time, persisted par preference and a gold
+  SECRET FOUND! with S advancing from 0/4 to 1/4 in an ignored local IWAD fixture.
+- Source WADs were unchanged. Generated fixture/game data and app bundles remain
+  ignored. This is targeted validation, not a complete campaign playthrough.
+
 ## Validation
 
 ```sh

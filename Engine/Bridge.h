@@ -19,6 +19,7 @@ typedef struct {
     int weaponGrin, faceIndex;
     int fixedColorMap, suitFlash, berserkFlash, allmap, invisibility;
     int bonusFlash, messageSerial, tick, damageFlash, kills, totalKills;
+    int items, totalItems, secrets, totalSecrets, levelTics, parSeconds;
     char message[128];
 } MD_HUD;
 

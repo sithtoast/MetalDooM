@@ -81,6 +81,27 @@ Doom HUD (face, health, ammo and armor) remains visible independently.
 Open WAD remains available through **File → Open WAD…** or **Command-O**, and on
 the empty startup screen.
 
+## Level stats and secrets
+
+The upper-left overlay shows **TIME** as minutes:seconds and **K / I / S**
+as kills, items and secrets found out of each level's totals. Completed nonempty
+counters turn green. Items follow Doom's intermission rules: health/armor bonuses
+and other counted items count; ordinary ammo and weapon pickups do not all count.
+The clock follows the 35 Hz game simulation, pauses with the game, resets on a new
+level or restart, and restores from saves.
+
+A gold **SECRET FOUND!** notice appears for three seconds of game time when you
+enter a new secret. Pickup messages have their own space below the stats. Loading
+a save does not announce secrets already discovered.
+
+Use **Options → HUD** or the **View** menu to toggle Level Stats, Par Time and
+Secret Notifications. Stats and notifications default to on; par time defaults to
+off. All three choices are remembered. Par time appears beside TIME when stats
+are enabled and turns gold when reached. It uses the built-in campaign reference
+(Doom episodes I–III, Doom II/Final Doom, or SIGIL); custom maps retain that slot's
+reference, and maps without a defined par, including Doom episode IV, show N/A.
+The overlay is hidden during title demos, intermissions and finales.
+
 ## Saving and loading
 
 Use **File → Save Game…** to choose a `.mdsave` file, or **Quick Save** for one

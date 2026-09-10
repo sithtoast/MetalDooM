@@ -159,8 +159,20 @@ final class GameMenu: NSView {
         canvas("Options",art:[("M_OPTTTL",108,15)],items:[
             .init(title:"Sound Volume",patch:"",x:60,y:64,action:{ [weak self] in self?.audioOptions() },textScale:2),
             .init(title:"Display",patch:"",x:60,y:96,action:{ [weak self] in self?.displayOptions() },textScale:2),
-            .init(title:"Back",patch:"",x:60,y:128,action:{ [weak self] in self?.main() },textScale:2)
+            .init(title:"HUD",patch:"",x:60,y:128,action:{ [weak self] in self?.hudOptions() },textScale:2),
+            .init(title:"Back",patch:"",x:60,y:156,action:{ [weak self] in self?.main() },textScale:2)
         ],labels:[("ENTER SELECT   ESC BACK",48,180)],back:{ [weak self] in self?.main() })
+    }
+    private func hudOptions() {
+        canvas("HUD",art:[("M_OPTTTL",108,15)],items:[
+            .init(title:"Level stats",patch:"",x:48,y:64,action:{},value:{ [weak self] in self?.app.levelStatsVisible == true ? "ON" : "OFF" },
+                adjust:{ [weak self] _ in self?.app.toggleLevelStats() }),
+            .init(title:"Par time",patch:"",x:48,y:88,action:{},value:{ [weak self] in self?.app.parTimeVisible == true ? "ON" : "OFF" },
+                adjust:{ [weak self] _ in self?.app.toggleParTime() }),
+            .init(title:"Secret notice",patch:"",x:48,y:112,action:{},value:{ [weak self] in self?.app.secretNotifications == true ? "ON" : "OFF" },
+                adjust:{ [weak self] _ in self?.app.toggleSecretNotifications() }),
+            .init(title:"Back",patch:"",x:48,y:144,action:{ [weak self] in self?.options() })
+        ],labels:[("PAR REQUIRES LEVEL STATS",40,172),("LEFT/RIGHT ADJUST   ESC BACK",40,188)],back:{ [weak self] in self?.options() })
     }
     private func audioOptions() {
         canvas("Audio",art:[("M_SVOL",60,25)],items:[

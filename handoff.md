@@ -13,13 +13,17 @@ commit was `279ed70` (publishing helper). This document is committed afterward.
 Only local `main` existed; none of the proposed experimental branches has been
 created. Check `git log`, `git status`, and remote state before starting work.
 
-Current version: **0.3.0**, successful local app **build 81**. `Info.plist` owns
+Current version: **0.3.0**, successful local app **build 91**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
-The publishing helper and this document do not change the app build.
+Main now includes a small level-stats HUD (kills/items/secrets and whole-second
+clock), optional campaign par time, and independent secret notifications. Controls
+are in View and Options → HUD; preferences persist. The user requested a smaller
+HUD and found hundredths distracting, so retain the compact, whole-second display.
+See CHANGELOG.md and docs/VALIDATION.md for this change's evidence.
 
-## What the user wants next
+## Previously discussed branch directions
 
-The user wants to start one of the separate branch directions discussed below.
+The user previously discussed starting one of the separate branch directions below.
 They have not selected which one yet. Establish that choice before implementation;
 do not combine all three or introduce a broad advanced-mode toggle first.
 Branch names below are proposals, not existing branches or requested exact names.

@@ -105,6 +105,10 @@ final class Renderer: NSObject, MTKViewDelegate {
     func releaseMusic() { music?.update(active:false);music=nil }
     func pauseAudio() { try? sound?.setActive(false); music?.update(active:false) }
     private var hud = MD_HUD()
+    private var secretNotice = SecretNotice()
+    var levelHUD: MD_HUD? { engineReady && progress.phase == 0 && !demoPlayback ? hud : nil }
+    var secretFound: Bool { levelHUD != nil && secretNotice.visible(at:hud.levelTics) }
+    var onHUDFrame: (() -> Void)?
     var notice = ""
     var noticeUntil: Double = 0
     private var messageSerial: Int32 = 0, messageUntil: Int32 = 0
@@ -330,6 +334,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         music?.update(active:false); music=loadedMusic; music?.enabled=musicEnabled; music?.volume=musicVolume
         sound = loadedSound; sound?.volume=effectsVolume; sound?.drain()
         hud = MD_GetHUD(); messageSerial = hud.messageSerial; messageUntil = hud.messageSerial > 0 ? hud.tick+140 : 0
+        secretNotice.reset(hud)
         currentPlayer = MD_GetPlayer(); previousPlayer = currentPlayer
         position = SIMD2(currentPlayer.x,currentPlayer.y); yaw = currentPlayer.angle; eyeZ = currentPlayer.eyeZ
         accumulator = 0; pendingTurn = 0; turnHeld = 0; lastTime = CACurrentMediaTime(); engineReady = true
@@ -409,6 +414,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         let time = CACurrentMediaTime(), delta = min(time-lastTime,0.25); lastTime = time
         do { try update(view:view,delta:delta) }
         catch { engineReady = false; view.releaseMouse(); DispatchQueue.main.async { [weak self] in self?.onError?(error) } }
+        onHUDFrame?()
         guard let pass = view.currentRenderPassDescriptor, let drawable = view.currentDrawable,
               let command = queue.makeCommandBuffer() else { return }
         inFlight.wait()
@@ -587,6 +593,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             sound?.drain()
             currentPlayer = MD_GetPlayer(); accumulator -= step
             hud = MD_GetHUD(); progress = MD_GetProgress()
+            secretNotice.update(hud)
             if previousPlayer.health > 0 && currentPlayer.health <= 0 && !demoPlayback {
                 view.releaseMouse(); deathTime=0
             }
