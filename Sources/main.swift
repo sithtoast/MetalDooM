@@ -19,6 +19,8 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var message: MessageLabel!
     var wad: WAD?
     var stackPanel: WADStackPanel?
+    var switchingWAD = false
+    var wadSwitchTimer: Timer?
     var menuAudio: SoundPlayer?
     var automapView: AutomapView?
     var attractActive=false, attractDemo=false, attractIndex=0, attractElapsed=0.0
@@ -175,6 +177,9 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 } else { addOns=[] }
                 load(URL(fileURLWithPath:NSString(string:arguments[index+1]).expandingTildeInPath),addOns:addOns,showTitle:!arguments.contains("-warp"))
             }
+            if let index = arguments.firstIndex(of:"-switch-ready"), index+1 < arguments.count {
+                try? (wad == nil ? "failed" : "ready").write(toFile:arguments[index+1],atomically:true,encoding:.utf8)
+            }
             if let index = arguments.firstIndex(of:"-warp"), index+1 < arguments.count {
                 maps.selectItem(withTitle:arguments[index+1].uppercased()); changeMap()
             }
@@ -218,17 +223,62 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
     @objc func openWAD() {
-        guard wad == nil else { show(PortError("Restart MetalDooM to choose a different base game or add-on stack."));return }
+        guard !switchingWAD, window.attachedSheet == nil else { return }
         view.releaseMouse()
         let panel = NSOpenPanel(); panel.allowedContentTypes = [UTType(filenameExtension:"wad") ?? .data]
         panel.canChooseDirectories = false; panel.allowsMultipleSelection = false
         panel.beginSheetModal(for:window) { [weak self] response in
             guard let self, response == .OK, let url=panel.url else { return }
-            let stack=WADStackPanel(base:url)
+            let stack=WADStackPanel(base:url,replacingGame:self.wad != nil)
             self.stackPanel=stack
-            stack.onPlay={ [weak self] extras in self?.load(url,addOns:extras);self?.stackPanel=nil }
+            stack.onPlay={ [weak self] extras in
+                guard let self else { return }
+                self.stackPanel=nil
+                if self.wad == nil { self.load(url,addOns:extras) }
+                else { self.switchWAD(url,addOns:extras) }
+            }
+            stack.onCancel={ [weak self] in self?.stackPanel=nil }
             self.window.beginSheet(stack)
         }
+    }
+    // Chocolate Doom owns process-global WAD resources. Hand off only after the
+    // replacement instance reports a successful load, preserving this game on failure.
+    func switchWAD(_ url: URL, addOns: [URL]) {
+        do {
+            _ = try WAD(url:url,addOns:addOns)
+            let directory=FileManager.default.temporaryDirectory.appendingPathComponent("MetalDooM-switch-" + UUID().uuidString)
+            try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:false)
+            let ready=directory.appendingPathComponent("ready")
+            let wasPaused=renderer.paused
+            switchingWAD=true; renderer.paused=true
+            let configuration=NSWorkspace.OpenConfiguration()
+            configuration.createsNewApplicationInstance=true
+            configuration.arguments=["-iwad",url.path,"-switch-ready",ready.path]
+            if !addOns.isEmpty { configuration.arguments += ["-file"] + addOns.map(\.path) }
+            NSWorkspace.shared.openApplication(at:Bundle.main.bundleURL,configuration:configuration) { [weak self] application,error in
+                DispatchQueue.main.async {
+                    guard let self else { try? FileManager.default.removeItem(at:directory); return }
+                    func finish(_ success:Bool) {
+                        self.wadSwitchTimer?.invalidate(); self.wadSwitchTimer=nil
+                        try? FileManager.default.removeItem(at:directory)
+                        self.switchingWAD=false
+                        if success { NSApp.terminate(nil) }
+                        else {
+                            application?.terminate()
+                            self.renderer.paused=wasPaused
+                            NSApp.activate(ignoringOtherApps:true)
+                            self.show(error ?? PortError("The selected WAD could not be opened. Your current game is still available."))
+                        }
+                    }
+                    guard application != nil, error == nil else { finish(false); return }
+                    let deadline=Date().addingTimeInterval(60)
+                    self.wadSwitchTimer=Timer.scheduledTimer(withTimeInterval:0.1,repeats:true) { _ in
+                        if let result=try? String(contentsOf:ready,encoding:.utf8) { finish(result == "ready") }
+                        else if application?.isTerminated == true || Date() >= deadline { finish(false) }
+                    }
+                }
+            }
+        } catch { show(error) }
     }
     func load(_ url: URL, addOns: [URL] = [], showTitle:Bool=true) {
         do {
@@ -388,6 +438,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         view?.inputBlocked = true
         view?.isPaused = true
         view?.delegate = nil
+        wadSwitchTimer?.invalidate(); wadSwitchTimer=nil
         renderer?.paused = true
         renderer?.pauseAudio()
         renderer?.releaseMusic()

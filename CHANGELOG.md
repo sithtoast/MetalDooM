@@ -4,6 +4,17 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.2.1 · Build 76 — Switch WADs during play
+
+- Allow Open WAD during a running game, including selection of an ordered add-on stack.
+- Start the chosen stack in a fresh app instance and close the old instance only
+  after a successful load acknowledgement. Preserve the current game on cancellation
+  or failure, and explain that players should save before switching.
+- Update the player guide and engine architecture notes.
+- Validate the native build, chooser cancellation, an Ultimate Doom E1M1 to Doom II
+  switch, one remaining app process, and malformed-WAD rejection preserving Doom II.
+  The launch-failure and timeout paths have not been induced in native testing.
+
 ## Build 75 — Player-focused release archive
 
 - Move contributor setup, release, development, architecture, testing and validation

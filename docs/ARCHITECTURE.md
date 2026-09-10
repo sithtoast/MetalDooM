@@ -43,8 +43,9 @@ each tic, with a serial so repeated pickups of the same type still renew the not
 Everything runs on the main thread. Swift never owns pointers into Doom's arena;
 snapshots copy scalars through C. Fatal errors unwind to `setjmp` wholly within C,
 poison the instance, and become native error messages. Restart after a fatal error.
-One fixed IWAD/PWAD stack initializes per process; map restarts reuse those resources. Rejected WAD
-changes and absent-map requests preserve the active engine.
+One fixed IWAD/PWAD stack initializes per process; map restarts reuse those resources. Open WAD hands off to a fresh app instance, closing the old instance only after
+a successful-load acknowledgement. Canceled or failed switches and absent-map
+requests preserve the active engine.
 
 ## Rendering and input
 

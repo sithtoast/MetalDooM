@@ -4,18 +4,20 @@ import UniformTypeIdentifiers
 
 // Reviewable load order. Base data remains external; later add-ons take priority.
 final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
+    var onCancel: (()->Void)?
     var onPlay: (([URL])->Void)?
     private var addOns: [URL]=[]
     private let table=NSTableView()
-    init(base: URL) {
-        super.init(contentRect:NSRect(x:0,y:0,width:620,height:350),styleMask:[.titled],backing:.buffered,defer:false)
+    init(base: URL, replacingGame: Bool = false) {
+        super.init(contentRect:NSRect(x:0,y:0,width:620,height:380),styleMask:[.titled],backing:.buffered,defer:false)
         title="WAD Load Order";isReleasedWhenClosed=false
         let root=contentView!
         func label(_ text:String,_ y:CGFloat) {
             let label=NSTextField(labelWithString:text);label.frame=NSRect(x:20,y:y,width:580,height:24);root.addSubview(label)
         }
-        label("Base game: \(base.lastPathComponent)",310)
-        label("Optional add-ons — later files override earlier files.",280)
+        label("Base game: \(base.lastPathComponent)",340)
+        label("Optional add-ons — later files override earlier files.",310)
+        if replacingGame { label("Play ends the current game. Cancel to go back and save first.",280) }
         let column=NSTableColumn(identifier:NSUserInterfaceItemIdentifier("file"));column.title="Load order";column.width=570
         table.addTableColumn(column);table.dataSource=self;table.delegate=self;table.rowHeight=26
         let scroll=NSScrollView(frame:NSRect(x:20,y:100,width:580,height:170));scroll.documentView=table;scroll.hasVerticalScroller=true
@@ -53,6 +55,6 @@ final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
     }
     @objc private func moveEarlier() { move(-1) }
     @objc private func moveLater() { move(1) }
-    @objc private func cancel() { sheetParent?.endSheet(self);orderOut(nil) }
+    @objc private func cancel() { sheetParent?.endSheet(self);orderOut(nil);onCancel?() }
     @objc private func play() { sheetParent?.endSheet(self);orderOut(nil);onPlay?(addOns) }
 }

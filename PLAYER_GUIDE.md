@@ -32,7 +32,7 @@ with both backends. No instrument banks or game music are bundled.
 | Escape | Pause/open menu; back from submenus; resume from main menu |
 | R | Restart map with fresh starting inventory |
 | Return / Enter | Intermission: skip counting, show destination, then skip the four-second map display |
-| Command-O | Choose IWAD (restart first to change loaded IWAD) |
+| Command-O | Open or switch IWAD and optional add-ons |
 | Command-S / Command-L | Save Game… / Load Game… |
 | Command-Shift-S / Command-Shift-L | Quick Save / Quick Load for this WAD |
 
@@ -41,6 +41,11 @@ Doom horizontal targeting and vertical autoaim; looking up/down is cosmetic.
 Weapon selection requires ownership. After death, a fresh E, Space or Enter press
 restarts with starting inventory after a short delay. Escape selects Load Game in
 the pause menu. R remains an immediate fresh-inventory restart.
+
+Use **File → Open WAD…** during a game to choose another base WAD and add-ons.
+Save first if you want to keep your progress. Selecting Play opens the new game
+in a fresh app instance automatically; the previous instance closes after the
+new WAD loads successfully. Cancel leaves your current game available.
 
 ## Saving and loading
 
