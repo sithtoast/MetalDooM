@@ -4,6 +4,12 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.3.0 — Next-chat handoff (app build 81 unchanged)
+
+- Add handoff.md with the current implementation/release state, validation limits,
+  workflow and proposed compatibility, rendering and in-window picker branches.
+- No experimental branch has been selected or created; no app rebuild required.
+
 ## 0.3.0 — Publishing helper (app build 81 unchanged)
 
 - Add scripts/publish.sh with a read-only dry run, a clean-main requirement and
