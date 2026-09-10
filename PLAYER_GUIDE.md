@@ -47,6 +47,19 @@ Save first if you want to keep your progress. Selecting Play opens the new game
 in a fresh app instance automatically; the previous instance closes after the
 new WAD loads successfully. Cancel leaves your current game available.
 
+## Window layout
+
+The map picker sits beside the map name in the bottom status bar. Selecting a map
+starts it with fresh inventory; save your progress first.
+
+**View → Show Status Bar** shows or hides the bottom map picker, status text and
+control hints. It is visible by default, and your choice is remembered across
+launches and WAD switches. Hiding it gives that space to the game view. The classic
+Doom HUD (face, health, ammo and armor) remains visible independently.
+
+Open WAD remains available through **File → Open WAD…** or **Command-O**, and on
+the empty startup screen.
+
 ## Saving and loading
 
 Use **File → Save Game…** to choose a `.mdsave` file, or **Quick Save** for one

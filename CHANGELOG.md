@@ -4,6 +4,16 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.2.1 · Build 77 — Optional bottom status bar
+
+- Remove the top toolbar and place the map picker beside the map name in the
+  bottom status bar. Keep Open WAD in the File menu and empty startup screen.
+- Add View → Show Status Bar, visible by default and remembered across launches.
+  Hiding the bar expands the game view without hiding the classic Doom HUD.
+- Update the player guide. Validate the native layout, E1M1 to E1M2 map selection,
+  hide/show behavior, classic HUD visibility, preference persistence after relaunch,
+  and the empty startup screen in build 77.
+
 ## 0.2.1 · Build 76 — Switch WADs during play
 
 - Allow Open WAD during a running game, including selection of an ordered add-on stack.

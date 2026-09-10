@@ -15,6 +15,10 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var view: GameView!
     var renderer: Renderer!
     var status: NSTextField!
+    var statusBar: NSView!
+    var statusBarHeight: NSLayoutConstraint!
+    var statusBarMenuItem: NSMenuItem?
+    var statusBarVisible = UserDefaults.standard.object(forKey:"showStatusBar") as? Bool ?? true
     var maps: NSPopUpButton!
     var message: MessageLabel!
     var wad: WAD?
@@ -59,6 +63,10 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             quickSave.target = self; quickSave.keyEquivalentModifierMask = [.command,.shift]
             let quickLoad = fileMenu.addItem(withTitle:"Quick Load",action:#selector(quickLoadGame),keyEquivalent:"l")
             quickLoad.target = self; quickLoad.keyEquivalentModifierMask = [.command,.shift]
+            let viewItem=NSMenuItem(), viewMenu=NSMenu(title:"View")
+            viewItem.submenu=viewMenu; menu.addItem(viewItem)
+            statusBarMenuItem=viewMenu.addItem(withTitle:"Show Status Bar",action:#selector(toggleStatusBar),keyEquivalent:"")
+            statusBarMenuItem?.target=self
             let audioItem=NSMenuItem(), audioMenu=NSMenu(title:"Audio")
             audioItem.submenu=audioMenu; menu.addItem(audioItem)
             let musicItem=audioMenu.addItem(withTitle:"Music",action:#selector(toggleMusic(_:)),keyEquivalent:"m")
@@ -116,29 +124,32 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
                 return self.gameMenu?.handleKey(event) == true ? nil : event
             }
-            let button = NSButton(title:"Open WAD…",target:self,action:#selector(openWAD))
             maps = NSPopUpButton(); maps.target = self; maps.action = #selector(changeMap); maps.isEnabled = false
-            let label = NSTextField(labelWithString:"METALDOOM   /   GAMEPLAY PREVIEW")
-            label.font = .monospacedSystemFont(ofSize:12,weight:.bold)
-            let spacer = NSView()
-            let toolbar = NSStackView(views:[label,spacer,maps,button]); toolbar.spacing = 16
+            maps.setAccessibilityLabel("Map")
             status = NSTextField(labelWithString:summary); status.font = .monospacedSystemFont(ofSize:11,weight:.regular)
             status.lineBreakMode = .byTruncatingTail
+            status.setContentCompressionResistancePriority(.defaultLow,for:.horizontal)
             let help = NSTextField(labelWithString:"WASD move · Shift run · E / Space use · Click to capture, then fire · F fire · 1–7 weapons · Esc menu · Tab map · ~ console · R restart")
             help.font = .systemFont(ofSize:11); help.textColor = .secondaryLabelColor
-            for child in [toolbar,view!,status!,help] { child.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(child) }
+            help.lineBreakMode = .byTruncatingTail
+            statusBar=NSView()
+            for child in [view!,statusBar!] { child.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(child) }
+            for child in [maps!,status!,help] { child.translatesAutoresizingMaskIntoConstraints = false; statusBar.addSubview(child) }
+            statusBarHeight=statusBar.heightAnchor.constraint(equalToConstant:60)
             message = MessageLabel(labelWithString:""); message.translatesAutoresizingMaskIntoConstraints = false
             message.font = .monospacedSystemFont(ofSize:14,weight:.bold); message.textColor = .yellow
             message.backgroundColor = NSColor.black.withAlphaComponent(0.7); message.drawsBackground = true; message.isHidden = true
             root.addSubview(message)
             NSLayoutConstraint.activate([
-                toolbar.topAnchor.constraint(equalTo:root.topAnchor,constant:12),toolbar.leadingAnchor.constraint(equalTo:root.leadingAnchor,constant:16),toolbar.trailingAnchor.constraint(equalTo:root.trailingAnchor,constant:-16),toolbar.heightAnchor.constraint(equalToConstant:30),
-                view.topAnchor.constraint(equalTo:toolbar.bottomAnchor,constant:12),view.leadingAnchor.constraint(equalTo:root.leadingAnchor),view.trailingAnchor.constraint(equalTo:root.trailingAnchor),view.bottomAnchor.constraint(equalTo:status.topAnchor,constant:-10),
-                status.leadingAnchor.constraint(equalTo:root.leadingAnchor,constant:16),status.trailingAnchor.constraint(equalTo:root.trailingAnchor,constant:-16),status.bottomAnchor.constraint(equalTo:help.topAnchor,constant:-6),
-                help.leadingAnchor.constraint(equalTo:root.leadingAnchor,constant:16),help.bottomAnchor.constraint(equalTo:root.bottomAnchor,constant:-10),
+                view.topAnchor.constraint(equalTo:root.topAnchor),view.leadingAnchor.constraint(equalTo:root.leadingAnchor),view.trailingAnchor.constraint(equalTo:root.trailingAnchor),view.bottomAnchor.constraint(equalTo:statusBar.topAnchor),
+                statusBar.leadingAnchor.constraint(equalTo:root.leadingAnchor),statusBar.trailingAnchor.constraint(equalTo:root.trailingAnchor),statusBar.bottomAnchor.constraint(equalTo:root.bottomAnchor),statusBarHeight,
+                maps.leadingAnchor.constraint(equalTo:statusBar.leadingAnchor,constant:12),maps.topAnchor.constraint(equalTo:statusBar.topAnchor,constant:8),maps.widthAnchor.constraint(equalToConstant:100),maps.heightAnchor.constraint(equalToConstant:26),
+                status.leadingAnchor.constraint(equalTo:maps.trailingAnchor,constant:12),status.trailingAnchor.constraint(equalTo:statusBar.trailingAnchor,constant:-16),status.centerYAnchor.constraint(equalTo:maps.centerYAnchor),
+                help.leadingAnchor.constraint(equalTo:statusBar.leadingAnchor,constant:16),help.trailingAnchor.constraint(equalTo:statusBar.trailingAnchor,constant:-16),help.topAnchor.constraint(equalTo:statusBar.topAnchor,constant:39),
                 message.leadingAnchor.constraint(equalTo:view.leadingAnchor,constant:16),message.topAnchor.constraint(equalTo:view.topAnchor,constant:16),
                 message.trailingAnchor.constraint(lessThanOrEqualTo:view.trailingAnchor,constant:-16)
             ])
+            updateStatusBar()
             renderer.onFrame = { [weak self] fps in
                 guard let self else { return }
                 self.diagnosticFPS = fps
@@ -185,6 +196,19 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             if wad == nil { openGameMenu() }
         } catch { show(error) }
+    }
+    @objc func toggleStatusBar() {
+        statusBarVisible.toggle()
+        UserDefaults.standard.set(statusBarVisible,forKey:"showStatusBar")
+        updateStatusBar()
+    }
+    func updateStatusBar() {
+        // Only AppKit chrome changes; the renderer's classic Doom HUD stays intact.
+        if !statusBarVisible, window.firstResponder === maps { window.makeFirstResponder(view) }
+        statusBar.isHidden = !statusBarVisible
+        statusBarHeight.constant = statusBarVisible ? 60 : 0
+        statusBarMenuItem?.state = statusBarVisible ? .on : .off
+        window.contentView?.layoutSubtreeIfNeeded()
     }
     @objc func quickSaveGame() {
         view.releaseMouse()
