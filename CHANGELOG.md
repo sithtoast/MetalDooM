@@ -4,6 +4,17 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 54 — Final Doom
+
+- Recognize TNT: Evilution and The Plutonia Experiment from the base IWAD,
+  preserving campaign identity for renamed files and ordered add-on stacks.
+- Display all 64 campaign map names and select Final Doom's original gameplay
+  profile, story screens and cast ending, using each IWAD's artwork/music/skies.
+- Validate all 64 rerelease maps, assets, music, secret routes, inventory,
+  save restoration/isolation, cast cycle and original teleport-height behavior.
+- Preserve Doom II, Ultimate Doom and rerelease SIGIL regression coverage.
+  Verify both native MAP01 scenes and clean loaded-WAD Quit/window-close exits.
+
 ## Build 51 — Doom II finales, WAD stacks and SIGIL
 
 - Add Doom II story breaks and the original interactive, animated 17-member cast

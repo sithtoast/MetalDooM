@@ -2,7 +2,7 @@
 
 A native Apple Silicon / Metal source-port project for classic Doom and Doom II.
 
-**Current milestone: Doom II finales and ordered PWAD loading with SIGIL Episode 5.**
+**Current milestone: Final Doom (TNT: Evilution and The Plutonia Experiment), alongside Doom, Doom II and SIGIL Episode 5.**
 Original gameplay and exit routing run in the Doom engine, with Metal world,
 weapon, HUD, intermission and Doom episode-finale rendering.
 The world is drawn as triangles by Metal. No software framebuffer, SDL, OpenGL, or
@@ -415,3 +415,40 @@ identity. Native checks use a local exit-position PWAD for Doom II presentation;
 actual special encounters are checked separately with the original maps in C.
 Ultimate Doom geometry/progression/saves and loaded-WAD shutdown remain regressions.
 These checks do not replace complete manual playthroughs.
+
+
+## Final Doom
+
+Open `tnt.wad` or `plutonia.wad` as the base IWAD, with no add-on required.
+MetalDooM identifies the campaign from its base resource set, including when the
+file is renamed, and selects the original Final Doom engine behavior. Add-on
+resources do not change the base campaign. The rerelease IWADs supplied for this
+milestone are the validated versions; other releases still need regression runs.
+
+Both campaigns have their own 32 map names, menu/title artwork, music and skies,
+six story breaks, secret exits and cast ending. Music uses each IWAD's original
+Doom II-style track slots; skies change at MAP12 and MAP21. Gameplay uses the
+original Final Doom executable profile, including its teleporter-height quirk
+(the rerelease also requests this through `comp_finaldoomteleport`).
+
+```sh
+open build/MetalDooM.app --args -iwad /path/to/tnt.wad
+open build/MetalDooM.app --args -iwad /path/to/plutonia.wad
+bash scripts/test-final-doom.sh /path/to/tnt.wad /path/to/plutonia.wad
+```
+
+Quit before switching base games. Saves identify IWAD contents, so TNT and
+Plutonia saves cannot be mixed, and renaming an identical IWAD preserves saves.
+
+Build 54 validation covers all 64 map geometries/materials, native sprite
+snapshots and brief monster ticks, MIDI decoding, sky ranges, map names,
+cross-map save restoration and wrong-campaign rejection. Native engine checks
+cover every normal route, both secret routes and returns, inventory carryover,
+exact campaign story text/backgrounds, the cast cycle and teleport height.
+Native app checks cover both MAP01 scenes, campaign branding, and loaded-WAD
+Quit/window-close exit status. Doom II, Ultimate Doom and rerelease SIGIL remain
+regression checks. Complete manual campaign playthroughs remain outstanding.
+
+This is dedicated Final Doom support, not general GAMECONF/UMAPINFO or DeHackEd
+support. Classic/enhanced mode selection, SIGIL II, Legacy of Rust/ID24 and Doom 64
+remain future milestones.

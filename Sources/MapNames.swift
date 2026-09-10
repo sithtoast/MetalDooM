@@ -71,6 +71,74 @@ extension WAD {
         "MAP31": "Wolfenstein",
         "MAP32": "Grosse",
     ]
+    private static let tntNames: [String] = [
+        "System Control",
+        "Human BBQ",
+        "Power Control",
+        "Wormhole",
+        "Hanger",
+        "Open Season",
+        "Prison",
+        "Metal",
+        "Stronghold",
+        "Redemption",
+        "Storage Facility",
+        "Crater",
+        "Nukage Processing",
+        "Steel Works",
+        "Dead Zone",
+        "Deepest Reaches",
+        "Processing Area",
+        "Mill",
+        "Shipping/Respawning",
+        "Central Processing",
+        "Administration Center",
+        "Habitat",
+        "Lunar Mining Project",
+        "Quarry",
+        "Baron's Den",
+        "Ballistyx",
+        "Mount Pain",
+        "Heck",
+        "River Styx",
+        "Last Call",
+        "Pharaoh",
+        "Caribbean",
+    ]
+    private static let plutoniaNames: [String] = [
+        "Congo",
+        "Well Of Souls",
+        "Aztec",
+        "Caged",
+        "Ghost Town",
+        "Baron's Lair",
+        "Caughtyard",
+        "Realm",
+        "Abattoire",
+        "Onslaught",
+        "Hunted",
+        "Speed",
+        "The Crypt",
+        "Genesis",
+        "The Twilight",
+        "The Omen",
+        "Compound",
+        "Neurosphere",
+        "NME",
+        "The Death Domain",
+        "Slayer",
+        "Impossible Mission",
+        "Tombstone",
+        "The Final Frontier",
+        "The Temple Of Darkness",
+        "Bunker",
+        "Anti-Christ",
+        "The Sewers",
+        "Odyssey Of Noises",
+        "The Gateway Of Hell",
+        "Cyberden",
+        "Go 2 It",
+    ]
     func mapTitle(_ map: String) -> String {
         if isSigil, map.hasPrefix("E5M"), let number=Int(map.suffix(1)), (1...9).contains(number) {
             let names=["Baphomet's Demesne","Sheol","Cages of the Damned","Paths of Wretchedness","Abaddon's Void","Unspeakable Persecution","Nightmare Underworld","Halls of Perdition","Realm of Iblis"]
@@ -78,6 +146,10 @@ extension WAD {
         }
         // Do not give replacement maps the base game's canonical title.
         if sourceURLs.count>1 && !isSigil { return map }
+        if finalDoom != 0, map.hasPrefix("MAP"), let number=Int(map.dropFirst(3)), (1...32).contains(number) {
+            let names=finalDoom == 1 ? Self.tntNames : Self.plutoniaNames
+            return "\(map): \(names[number-1])"
+        }
         guard let title = Self.mapNames[map] else { return map }
         return "\(map): \(title)"
     }

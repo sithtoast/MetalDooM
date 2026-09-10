@@ -43,8 +43,18 @@ struct WAD {
     let engineOrder: [Int32]
     let lumps: [Lump]
     let maps: [String]
-    // Match the engine's map-based game detection; filenames may be renamed.
+    // Detect from the base IWAD resources, before any add-on can override them.
+    // These campaign-specific patch sets also identify renamed original IWADs.
+    let finalDoom: Int // 0: other, 1: TNT, 2: Plutonia
+    private static func finalDoomProfile(_ names: Set<String>) -> Int {
+        guard names.contains("MAP01") else { return 0 }
+        if Set(["REDTNT2", "BLUTNT", "BTNTCRAT"]).isSubset(of:names) { return 1 }
+        if Set(["CAMO1", "CAMO4", "MC5"]).isSubset(of:names) { return 2 }
+        return 0
+    }
     var gameName: String {
+        if finalDoom == 1 { return "Final Doom: TNT: Evilution" }
+        if finalDoom == 2 { return "Final Doom: The Plutonia Experiment" }
         if maps.contains("MAP01") { return "Doom II" }
         if maps.contains("E4M1") { return "The Ultimate Doom" }
         if maps.contains("E2M1") { return "Doom" }
@@ -67,6 +77,7 @@ struct WAD {
             try b.check(offset, size)
             found.append(Lump(name: try b.name(entry + 8), bytes: Bytes(data: b.data.subdata(in: offset..<offset+size))))
         }
+        finalDoom=Self.finalDoomProfile(Set(found.map(\.name)))
         lumps = found
         engineOrder=found.indices.map(Int32.init)
         maps = found.indices.compactMap { i in
@@ -84,6 +95,7 @@ struct WAD {
         guard !base.maps.contains("E1M1") || base.maps.contains("E2M1") else { throw PortError("Add-ons require the registered or Ultimate Doom IWAD.") }
         let extras=try addOns.map { try WAD(url:$0) }
         guard extras.allSatisfy({$0.signature=="PWAD"}) else { throw PortError("Add-ons must be PWAD files; choose only one base IWAD.") }
+        finalDoom=base.finalDoom
         self.url=base.url; signature="IWAD"
         sourceURLs=[base.url]+extras.map(\.url);sourceData=base.sourceData+extras.flatMap(\.sourceData)
         guard sourceURLs.count<=33, Set(sourceURLs).count==sourceURLs.count,
@@ -130,6 +142,16 @@ struct WAD {
             throw PortError("The add-on's map format does not match the base game.")
         }
         guard !maps.contains(where:{$0.hasPrefix("E6")}) else { throw PortError("Episode 6 / SIGIL II is not supported yet.") }
+    }
+    func skyName(for map: String) -> String {
+        if isSigil && map.hasPrefix("E5") { return "SKY5" }
+        if map.hasPrefix("E2") { return "SKY2" }
+        if map.hasPrefix("E3") { return "SKY3" }
+        if map.hasPrefix("E4") { return "SKY4" }
+        if map.hasPrefix("MAP"), let number=Int(map.dropFirst(3)) {
+            return number > 20 ? "SKY3" : number > 11 ? "SKY2" : "SKY1"
+        }
+        return "SKY1"
     }
     var isSigil: Bool { sourceURLs.count>1 && maps.contains("E5M1") && lump("E5TEXT") != nil }
     var displayFiles: String { sourceURLs.map(\.lastPathComponent).joined(separator:" + ") }

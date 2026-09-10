@@ -301,6 +301,10 @@ int MD_LoadSkill(const char *path, int episode, int map, int skill) {
         myargc = 1; myargv = arguments;
         Z_Init();
         if (!W_AddFile((char *)path)) I_Error("Cannot open IWAD: %s",path);
+        // Inspect only the base IWAD: add-on art must not change game rules.
+        int finalDoom = W_CheckNumForName("MAP01") < 0 ? 0 :
+            W_CheckNumForName("REDTNT2") >= 0 && W_CheckNumForName("BLUTNT") >= 0 && W_CheckNumForName("BTNTCRAT") >= 0 ? 1 :
+            W_CheckNumForName("CAMO1") >= 0 && W_CheckNumForName("CAMO4") >= 0 && W_CheckNumForName("MC5") >= 0 ? 2 : 0;
         if (stackPaths) {
             char *paths=strdup(stackPaths), *save=NULL, *part=strtok_r(paths,"\n",&save);
             if (!part || strcmp(part,path)) I_Error("WAD stack base does not match IWAD");
@@ -319,9 +323,9 @@ int MD_LoadSkill(const char *path, int episode, int map, int skill) {
         }
         W_GenerateHashTable();
         sigilEpisode=W_CheckNumForName("E5M1")>=0 && W_CheckNumForName("E5TEXT")>=0;
-        gamemission = W_CheckNumForName("MAP01") >= 0 ? doom2 : doom;
-        gamemode = gamemission == doom2 ? commercial : W_CheckNumForName("E4M1") >= 0 ? retail : W_CheckNumForName("E2M1") >= 0 ? registered : shareware;
-        gameversion = gamemode == retail ? exe_ultimate : exe_doom_1_9;
+        gamemission = finalDoom == 1 ? pack_tnt : finalDoom == 2 ? pack_plut : W_CheckNumForName("MAP01") >= 0 ? doom2 : doom;
+        gamemode = gamemission != doom ? commercial : W_CheckNumForName("E4M1") >= 0 ? retail : W_CheckNumForName("E2M1") >= 0 ? registered : shareware;
+        gameversion = finalDoom ? exe_final : gamemode == retail ? exe_ultimate : exe_doom_1_9;
         R_InitData(); CacheTextureNames(); P_Init();
         strcpy(loadedPath,path); initialized = 1;
     }

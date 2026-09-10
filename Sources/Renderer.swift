@@ -135,7 +135,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     var playerStatus: String {
         guard engineReady else { return "" }
         if progress.phase != 0 {
-            if progress.phase==3 { return "Doom II story · Enter / Use to reveal text, then continue · Esc for menu" }
+            if progress.phase==3 { return "\(wad?.gameName ?? "Campaign") story · Enter / Use to reveal text, then continue · Esc for menu" }
             if progress.phase==4 { return "The cast · Fire / Enter to play death animation · Esc for menu" }
             if progress.phase == 2 { return "Episode complete · Kills \(progress.kills)/\(progress.maxKills) · Items \(progress.items)/\(progress.maxItems) · Secrets \(progress.secrets)/\(progress.maxSecrets) · Esc for menu · Enter / Use to advance story" }
             return "\(intermission.entering ? "Entering next level" : "Level complete") · Kills \(progress.kills)/\(progress.maxKills) · Items \(progress.items)/\(progress.maxItems) · Secrets \(progress.secrets)/\(progress.maxSecrets) · Time \(progress.seconds)s · Enter to continue"
@@ -288,14 +288,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         for material in materials { try cacheMaterial(material) }
         let loaded = try makeBatches(geometry,textures:cached)
-        let skyName: String
-        if wad.isSigil && name.hasPrefix("E5") { skyName = "SKY5" }
-        else if name.hasPrefix("E2") { skyName = "SKY2" }
-        else if name.hasPrefix("E3") { skyName = "SKY3" }
-        else if name.hasPrefix("E4") { skyName = "SKY4" }
-        else if name.hasPrefix("MAP"), let number = Int(name.dropFirst(3)), number > 20 { skyName = "SKY3" }
-        else if name.hasPrefix("MAP"), let number = Int(name.dropFirst(3)), number > 11 { skyName = "SKY2" }
-        else { skyName = "SKY1" }
+        let skyName = wad.skyName(for:name)
         var loadedSky: MTLTexture?
         if let pixels = try art.image(MaterialKey(name:skyName,flat:false)) {
             let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba8Unorm,width:pixels.width,height:pixels.height,mipmapped:false)
@@ -529,7 +522,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                 _ = finale.update(seconds:delta,pressed:pressed)
                 if finale.art {
                     if progress.map==30 {
-                        guard MD_StartCast() != 0 else { throw PortError("Cannot begin Doom II cast.") }
+                        guard MD_StartCast() != 0 else { throw PortError("Cannot begin the cast ending.") }
                         progress=MD_GetProgress(); accumulator=0; castAttackQueued=false; try music?.select("D_EVIL")
                     } else if let wad {
                         let name=String(format:"MAP%02d",progress.nextMap)
