@@ -103,3 +103,7 @@ void AM_Stop(void) { automapactive = false; }
 boolean I_ConsoleStdout(void) { return false; }
 void I_Tactile(int on, int off, int total) {}
 void V_BeginRead(size_t bytes) {}
+
+// Native presentation selects the music track when its copied phase changes.
+void S_ChangeMusic(int music, boolean looping) {}
+void S_StartMusic(int music) {}

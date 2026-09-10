@@ -4,9 +4,9 @@ import AVFoundation
 @main struct MusicValidation {
     static func main() throws {
         setbuf(stdout,nil)
-        let wad=try WAD(url:URL(fileURLWithPath:CommandLine.arguments[1]))
+        let wad=try WAD(url:URL(fileURLWithPath:CommandLine.arguments[1]),addOns:CommandLine.arguments.dropFirst(2).map{URL(fileURLWithPath:$0)})
         let commercial=wad.maps.contains("MAP01")
-        let first=commercial ? "D_RUNNIN":"D_E1M1", second=commercial ? "D_STALKS":"D_E1M2"
+        let second=wad.isSigil ? "D_E5M2":commercial ? "D_STALKS":"D_E1M2"
         let inter=commercial ? "D_DM2INT":"D_INTER"
         var count=0
         for lump in wad.lumps where lump.name.hasPrefix("D_") {
@@ -17,7 +17,7 @@ import AVFoundation
             count += 1
         }
         print("PASS: converted and loaded all \(count) WAD music tracks into Apple's MIDI player")
-        let original=wad.lump(first)!.data
+        let original=wad.lumps.first { $0.bytes.data.starts(with:[77,85,83,26]) }!.bytes.data
         for damaged in [Data(),Data(original.prefix(15)),Data(original.dropLast())] {
             var rejected=false; do { _ = try MUS.midi(damaged) } catch { rejected=true }
             precondition(rejected)
@@ -33,7 +33,7 @@ import AVFoundation
         let aliases=["E3M4","E3M2","E3M3","E1M5","E2M7","E2M4","E2M6","E2M5","E1M9"]
         for i in 1...9 { precondition(MusicPlayer.levelTrack("E4M\(i)")=="D_"+aliases[i-1]) }
         precondition(MusicPlayer.levelTrack("MAP01")=="D_RUNNIN" && MusicPlayer.levelTrack("MAP32")=="D_ULTIMA")
-        let player=try MusicPlayer(wad:wad,map:commercial ? "MAP01":"E1M1")
+        let player=try MusicPlayer(wad:wad,map:wad.isSigil ? "E5M1":commercial ? "MAP01":"E1M1")
         func advance(_ seconds: Double) { RunLoop.current.run(until:Date().addingTimeInterval(seconds)) }
         player.update(active:true); advance(0.3)
         precondition(player.isPlaying && player.position>0)

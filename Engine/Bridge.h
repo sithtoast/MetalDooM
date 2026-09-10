@@ -44,7 +44,7 @@ int MD_CopyThings(MD_Thing *output, int capacity, float cameraX, float cameraY);
 MD_HUD MD_GetHUD(void);
 typedef struct { float x,y; char upper[9],lower[9],middle[9]; } MD_Side;
 MD_Side MD_GetSide(int index);
-// phase 0 = playing, 1 = intermission, 2 = episode/game complete.
+// phase 0 = playing, 1 = stats, 2 = Doom episode ending, 3 = Doom II story, 4 = cast.
 typedef struct {
     int phase, episode, map, nextMap, commercial, didSecret;
     int kills, maxKills, items, maxItems, secrets, maxSecrets, seconds, parSeconds;
@@ -87,3 +87,20 @@ int MD_CopyMapLines(MD_MapLine *output,int capacity);
 
 // Original Doom episode story text; static storage.
 const char *MD_FinaleText(int episode);
+
+// Doom II: stats -> story -> next map, or the original interactive cast.
+int MD_BeginStory(void);
+const char *MD_StoryText(void);
+const char *MD_StoryFlat(void);
+int MD_StartCast(void);
+int MD_CastTick(int attack);
+typedef struct { char name[64], patch[9]; int member, flip, dying; } MD_Cast;
+MD_Cast MD_GetCast(void);
+#ifdef MD_TESTING
+int MD_TestDamageType(int type, int damage, int limit);
+int MD_TestSectorTag(int sector);
+int MD_TestWakeBrain(void);
+#endif
+
+// Configure before the first map load; later calls must describe the same stack.
+int MD_ConfigureWADStack(const char *paths, const int32_t *order, int count);

@@ -3,7 +3,7 @@ import Foundation
 /// Builds a transparent menu header from the loaded IWAD, without bundling game art.
 enum MenuLogo {
     static func ultimate(art: Art) throws -> PixelImage? {
-        guard art.wad.maps.contains("E4M1"), let title=try art.patch(named:"TITLEPIC")?.image,
+        guard art.wad.sourceURLs.count==1, art.wad.maps.contains("E4M1"), let title=try art.patch(named:"TITLEPIC")?.image,
               let doom=try art.patch(named:"M_DOOM")?.image,
               title.width==320, title.height==200, doom.width==123, doom.height==60 else { return nil }
         // Gold caption above the title's blue Doom letters. The title's lower logo

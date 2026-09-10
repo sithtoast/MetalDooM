@@ -10,7 +10,11 @@ struct SavedGame: Codable {
 }
 enum SaveStore {
     static func digest(_ data: Data) -> String { SHA256.hash(data:data).map { String(format:"%02x",$0) }.joined() }
-    static func wadDigest(_ wad: WAD) throws -> String { digest(try Data(contentsOf:wad.url,options:.mappedIfSafe)) }
+    static func wadDigest(_ wad: WAD) throws -> String {
+        if wad.sourceData.count==1 { return digest(wad.sourceData[0]) }
+        // Fixed-length per-file digests preserve order and avoid concatenation ambiguity.
+        return digest(Data(("MetalDooM WAD stack v1\n"+wad.sourceData.map(digest).joined(separator:"\n")).utf8))
+    }
     static func quickURL(wad: WAD) throws -> URL {
         let base = try FileManager.default.url(for:.applicationSupportDirectory,in:.userDomainMask,appropriateFor:nil,create:true)
         let folder = base.appendingPathComponent("MetalDooM/Saves",isDirectory:true)
@@ -26,7 +30,7 @@ enum SaveStore {
     }
     static func temporaryURL() -> URL { FileManager.default.temporaryDirectory.appendingPathComponent("MetalDooM-\(UUID().uuidString).payload") }
     static func write(to url: URL, wad: WAD, map: String, pitch: Float, title: String? = nil) throws {
-        guard url.standardizedFileURL.resolvingSymlinksInPath() != wad.url.resolvingSymlinksInPath() else { throw PortError("Choose a save file, not the WAD itself.") }
+        guard !wad.sourceURLs.contains(where:{$0.resolvingSymlinksInPath() == url.standardizedFileURL.resolvingSymlinksInPath()}) else { throw PortError("Choose a save file, not the WAD itself.") }
         let temporary = temporaryURL(); defer { try? FileManager.default.removeItem(at:temporary) }
         guard MD_WriteSave(temporary.path) != 0 else { throw PortError(String(cString:MD_LastError())) }
         let payload = try Data(contentsOf:temporary)
@@ -42,7 +46,7 @@ enum SaveStore {
         do { save = try PropertyListDecoder().decode(SavedGame.self,from:Data(contentsOf:url)) }
         catch { throw PortError("This is not a valid MetalDooM save file.") }
         guard save.format == "MetalDooM Save", save.version == 1 else { throw PortError("Unsupported MetalDooM save version.") }
-        guard save.wadSHA256 == (try wadDigest(wad)) else { throw PortError("This save belongs to a different WAD. Open the matching WAD first.") }
+        guard save.wadSHA256 == (try wadDigest(wad)) else { throw PortError("This save belongs to a different WAD stack. Open the same base, add-ons and load order first.") }
         guard save.payload.count >= 50, digest(save.payload) == save.payloadSHA256,
               save.pitch.isFinite, (-1.2...1.2).contains(save.pitch) else { throw PortError("This save is damaged; its integrity check failed.") }
         let episode = Int(save.payload[41]), number = Int(save.payload[42])

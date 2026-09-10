@@ -20,6 +20,7 @@
 #include "i_system.h"
 #include "d_items.h"
 #include "d_englsh.h"
+#include "f_finale.h"
 
 const char *MD_FinaleText(int episode) {
     switch (episode) { case 1: return E1TEXT; case 2: return E2TEXT; case 3: return E3TEXT; case 4: return E4TEXT; default: return ""; }
@@ -32,6 +33,10 @@ const char *MD_FinaleText(int episode) {
 static jmp_buf errorBoundary;
 static int guarded, initialized, poisoned, loaded;
 static char errorText[1024], loadedPath[4096];
+static char *stackPaths;
+static int32_t *stackOrder;
+static int stackCount;
+static int sigilEpisode;
 static char *arguments[] = {"MetalDooM", NULL};
 static char lastMessage[128];
 static int messageSerial;
@@ -141,16 +146,23 @@ static void CompleteLevel(void) {
         .commercial=gamemode == commercial,.kills=players[0].killcount,.maxKills=totalkills,
         .items=players[0].itemcount,.maxItems=totalitems,.secrets=players[0].secretcount,
         .maxSecrets=totalsecret,.seconds=leveltime/TICRATE};
-    G_DoCompleted();
+    // SIGIL follows episode 3's secret return, without episode 3's boss action.
+    int originalEpisode=gameepisode;
+    if(sigilEpisode && gameepisode==5) gameepisode=3;
+    G_DoCompleted(); gameepisode=originalEpisode;
+    if(sigilEpisode && gameepisode==5) {
+        static const int pars[]={90,150,360,420,780,420,780,300,660};
+        wminfo.epsd=4;wminfo.partime=pars[gamemap-1]*TICRATE;
+    }
     progress.didSecret = players[0].didsecret;
-    if (gameaction == ga_victory || (gamemode == commercial && gamemap == 30)) {
+    if (gameaction == ga_victory) {
         progress.phase = 2; gameaction = ga_nothing;
     } else {
         progress.nextMap = wminfo.next+1; progress.parSeconds = wminfo.partime/TICRATE;
     }
 }
 int MD_Continue(void) {
-    if (!loaded || poisoned || progress.phase != 1) return 0;
+    if (!loaded || poisoned || (progress.phase != 1 && progress.phase != 3) || (gamemode == commercial && gamemap == 30)) return 0;
     char name[16];
     if (gamemode == commercial) snprintf(name,sizeof(name),"MAP%02d",progress.nextMap);
     else snprintf(name,sizeof(name),"E%dM%d",gameepisode,progress.nextMap);
@@ -200,7 +212,7 @@ int MD_ReadSave(const char *path) {
     unsigned char header[50];int32_t extra[MD_SAVE_WORDS];char version[16]={0};
     snprintf(version,sizeof(version),"version %i",G_VanillaVersionCode());
     int ok=fread(header,sizeof(header),1,save_stream)==1;
-    ok=ok && !memcmp(header+24,version,16) && header[40]<=4 && header[41]>=1 && header[41]<=4
+    ok=ok && !memcmp(header+24,version,16) && header[40]<=4 && header[41]>=1 && header[41]<=(sigilEpisode ? 5:4)
         && header[42]>=1 && header[42]<=(gamemode==commercial ? 32 : 9)
         && header[43]==1 && !header[44] && !header[45] && !header[46];
     ok=ok && !fseek(save_stream,-(long)sizeof(extra),SEEK_END) && fread(extra,sizeof(extra),1,save_stream)==1
@@ -289,7 +301,24 @@ int MD_LoadSkill(const char *path, int episode, int map, int skill) {
         myargc = 1; myargv = arguments;
         Z_Init();
         if (!W_AddFile((char *)path)) I_Error("Cannot open IWAD: %s",path);
+        if (stackPaths) {
+            char *paths=strdup(stackPaths), *save=NULL, *part=strtok_r(paths,"\n",&save);
+            if (!part || strcmp(part,path)) I_Error("WAD stack base does not match IWAD");
+            while((part=strtok_r(NULL,"\n",&save))) if(!W_AddFile(part)) I_Error("Cannot open PWAD: %s",part);
+            free(paths);
+            lumpinfo_t **ordered=malloc(stackCount*sizeof(*ordered));
+            byte *used=calloc(numlumps,1);
+            if(!ordered || !used) I_Error("Cannot allocate WAD directory");
+            for(int i=0;i<stackCount;i++) {
+                int index=stackOrder[i];
+                if(index<0 || (unsigned)index>=numlumps || used[index]) I_Error("Invalid WAD directory plan");
+                used[index]=1; ordered[i]=lumpinfo[index];
+            }
+            free(used);free(lumpinfo);lumpinfo=ordered;numlumps=stackCount;
+            modifiedgame=true;
+        }
         W_GenerateHashTable();
+        sigilEpisode=W_CheckNumForName("E5M1")>=0 && W_CheckNumForName("E5TEXT")>=0;
         gamemission = W_CheckNumForName("MAP01") >= 0 ? doom2 : doom;
         gamemode = gamemission == doom2 ? commercial : W_CheckNumForName("E4M1") >= 0 ? retail : W_CheckNumForName("E2M1") >= 0 ? registered : shareware;
         gameversion = gamemode == retail ? exe_ultimate : exe_doom_1_9;
@@ -568,7 +597,7 @@ int MD_StartDemo(const char *name) {
     byte *data=malloc(size); if(!data) return 0;
     guarded=1;if(setjmp(errorBoundary)) { free(data);guarded=0;return 0; }
     W_ReadLump(lump,data);
-    int valid=(data[0]==108 || data[0]==109) && data[1]<=4 && data[2]>=1 && data[2]<=4 && data[3]>=1
+    int valid=(data[0]==108 || data[0]==109) && data[1]<=4 && data[2]>=1 && data[2]<=(sigilEpisode ? 5:4) && data[3]>=1
         && data[3]<=(gamemode==commercial ? 32:9) && !data[4] && data[5]<=1 && data[6]<=1 && data[7]<=1
         && !data[8] && data[9]==1 && !data[10] && !data[11] && !data[12];
     int end=13;while(end<size && data[end]!=0x80) end+=4;
@@ -635,4 +664,75 @@ int MD_CopyMapLines(MD_MapLine *output,int capacity) {
             (float)l->v2->x/FRACUNIT,(float)l->v2->y/FRACUNIT,kind,!!(l->flags & ML_MAPPED)};
     }
     return numlines;
+}
+
+extern const char *finaletext, *finaleflat;
+extern void F_StartCast(void), F_CastTicker(void);
+extern boolean F_CastResponder(event_t *event);
+extern state_t *caststate;
+extern int castnum;
+extern boolean castdeath;
+extern struct { const char *name; mobjtype_t type; } castorder[];
+int MD_BeginStory(void) {
+    if (!loaded || poisoned || progress.phase!=1 || gamemode!=commercial) return 0;
+    G_WorldDone();
+    if (gamestate!=GS_FINALE) return 0;
+    progress.phase=3; memset(&players[0].cmd,0,sizeof(players[0].cmd)); return 1;
+}
+const char *MD_StoryText(void) { return progress.phase>=3 && finaletext ? finaletext : ""; }
+const char *MD_StoryFlat(void) { return progress.phase>=3 && finaleflat ? finaleflat : ""; }
+int MD_StartCast(void) {
+    if (!loaded || poisoned || progress.phase!=3 || gamemap!=30) return 0;
+    F_StartCast(); progress.phase=4; return 1;
+}
+int MD_CastTick(int attack) {
+    if (!loaded || poisoned || progress.phase!=4) return 0;
+    guarded=1; if(setjmp(errorBoundary)) { guarded=0;return 0; }
+    if (attack) { event_t event={.type=ev_keydown}; F_CastResponder(&event); }
+    F_CastTicker(); guarded=0; return 1;
+}
+MD_Cast MD_GetCast(void) {
+    MD_Cast result={0}; if (!loaded || poisoned || progress.phase!=4) return result;
+    result.member=castnum;result.dying=castdeath;
+    snprintf(result.name,sizeof(result.name),"%s",castorder[castnum].name);
+    spriteframe_t *frame=&sprites[caststate->sprite].spriteframes[caststate->frame & FF_FRAMEMASK];
+    int lump=firstspritelump+frame->lump[0]; result.flip=frame->flip[0];
+    memcpy(result.patch,lumpinfo[lump]->name,8); return result;
+}
+#ifdef MD_TESTING
+int MD_TestDamageType(int type,int damage,int limit) {
+    int count=0;
+    for(thinker_t *t=thinkercap.next;t!=&thinkercap;t=t->next) {
+        if(t->function.acp1!=(actionf_p1)P_MobjThinker) continue;
+        mobj_t *mo=(mobj_t *)t;
+        if(mo->type==type && mo->health>0 && count<limit) { P_DamageMobj(mo,players[0].mo,players[0].mo,damage);count++; }
+    }
+    return count;
+}
+int MD_TestSectorTag(int sector) { return sectors[sector].tag; }
+#endif
+
+#ifdef MD_TESTING
+extern void A_BrainAwake(mobj_t *), A_BrainSpit(mobj_t *);
+extern int numbraintargets;
+int MD_TestWakeBrain(void) {
+    for(thinker_t *t=thinkercap.next;t!=&thinkercap;t=t->next) {
+        if(t->function.acp1==(actionf_p1)P_MobjThinker && ((mobj_t *)t)->type==MT_BOSSSPIT) {
+            A_BrainAwake((mobj_t *)t); A_BrainSpit((mobj_t *)t); return numbraintargets;
+        }
+    }
+    return 0;
+}
+#endif
+
+int MD_ConfigureWADStack(const char *paths,const int32_t *order,int count) {
+    if(!paths || !order || count<1 || count>200000 || strlen(paths)>131072) return 0;
+    if(initialized) {
+        if(stackPaths && !strcmp(paths,stackPaths) && stackCount==count && !memcmp(order,stackOrder,count*sizeof(*order))) return 1;
+        snprintf(errorText,sizeof(errorText),"Restart MetalDooM to change the WAD stack.");return 0;
+    }
+    char *newPaths=strdup(paths);int32_t *newOrder=malloc(count*sizeof(*order));
+    if(!newPaths || !newOrder) { free(newPaths);free(newOrder);return 0; }
+    memcpy(newOrder,order,count*sizeof(*order));free(stackPaths);free(stackOrder);
+    stackPaths=newPaths;stackOrder=newOrder;stackCount=count;return 1;
 }

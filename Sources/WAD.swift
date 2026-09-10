@@ -38,6 +38,9 @@ struct Lump { let name: String; let bytes: Bytes }
 struct WAD {
     let url: URL
     let signature: String
+    let sourceURLs: [URL]
+    let sourceData: [Data]
+    let engineOrder: [Int32]
     let lumps: [Lump]
     let maps: [String]
     // Match the engine's map-based game detection; filenames may be renamed.
@@ -51,6 +54,7 @@ struct WAD {
     init(url: URL) throws {
         self.url = url.standardizedFileURL
         let b = Bytes(data: try Data(contentsOf: url))
+        sourceURLs=[self.url]; sourceData=[b.data]
         signature = try b.name(0, 4)
         guard signature == "IWAD" || signature == "PWAD" else { throw PortError("This is not an IWAD or PWAD file.") }
         let count = try b.i32(4), directory = try b.i32(8)
@@ -64,20 +68,82 @@ struct WAD {
             found.append(Lump(name: try b.name(entry + 8), bytes: Bytes(data: b.data.subdata(in: offset..<offset+size))))
         }
         lumps = found
+        engineOrder=found.indices.map(Int32.init)
         maps = found.indices.compactMap { i in
             guard i + 1 < found.count, found[i+1].name == "THINGS" else { return nil }
             return found[i].name
         }
-        guard !maps.isEmpty else { throw PortError("No classic Doom maps found in this WAD.") }
+        guard signature == "PWAD" || !maps.isEmpty else { throw PortError("No classic Doom maps found in this WAD.") }
     }
+    // One shared directory plan preserves native lump indices without copying
+    // game data into a stitched file. Only the directory is reordered.
+    init(url: URL, addOns: [URL]) throws {
+        if addOns.isEmpty { self=try WAD(url:url);return }
+        let base=try WAD(url:url)
+        guard base.signature=="IWAD" else { throw PortError("Choose an IWAD as the base game.") }
+        guard !base.maps.contains("E1M1") || base.maps.contains("E2M1") else { throw PortError("Add-ons require the registered or Ultimate Doom IWAD.") }
+        let extras=try addOns.map { try WAD(url:$0) }
+        guard extras.allSatisfy({$0.signature=="PWAD"}) else { throw PortError("Add-ons must be PWAD files; choose only one base IWAD.") }
+        self.url=base.url; signature="IWAD"
+        sourceURLs=[base.url]+extras.map(\.url);sourceData=base.sourceData+extras.flatMap(\.sourceData)
+        guard sourceURLs.count<=33, Set(sourceURLs).count==sourceURLs.count,
+              !sourceURLs.contains(where:{$0.path.contains("\n")}) else { throw PortError("Invalid, duplicate or excessive WAD paths.") }
+        let all=([base]+extras).flatMap(\.lumps)
+        guard all.count<=200_000 else { throw PortError("Too many combined WAD resources.") }
+        var general=[Int](), sprite=[String:Int](), flat=[String:Int](), mode=0
+        let spriteStart=base.lumps.firstIndex{$0.name=="S_START"}, spriteEnd=base.lumps.firstIndex{$0.name=="S_END"}
+        let flatStart=base.lumps.firstIndex{$0.name=="F_START"}, flatEnd=base.lumps.firstIndex{$0.name=="F_END"}
+        guard let spriteStart,let spriteEnd,let flatStart,let flatEnd else { throw PortError("Base IWAD is missing sprite or flat namespaces.") }
+        var offset=0
+        for file in [base]+extras {
+            mode=0
+            for (local,lump) in file.lumps.enumerated() {
+                let i=offset+local, name=lump.name
+                if ["S_START","SS_START"].contains(name) { mode=1;continue }
+                if ["F_START","FF_START"].contains(name) { mode=2;continue }
+                if ["S_END","SS_END","F_END","FF_END"].contains(name) { mode=0;continue }
+                if name.range(of:"^[SF][1-9]_(START|END)$",options:.regularExpression) != nil { continue }
+                if mode==1 { if lump.bytes.count>0 { sprite[name]=i } }
+                else if mode==2 { if lump.bytes.count>0 { flat[name]=i } }
+                else if sprite[name] != nil { sprite[name]=i }
+                else if flat[name] != nil { flat[name]=i }
+                else { general.append(i) }
+            }
+            guard mode==0 else { throw PortError("Unclosed WAD resource namespace in \(file.url.lastPathComponent).") }
+            offset += file.lumps.count
+        }
+        let order=general+[spriteStart]+sprite.values.sorted()+[spriteEnd,flatStart]+flat.values.sorted()+[flatEnd]
+        engineOrder=order.map(Int32.init);let effective=order.map{all[$0]};lumps=effective
+        maps=Array(Set(effective.indices.compactMap { i -> String? in
+            guard i+1<effective.count,effective[i+1].name=="THINGS" else { return nil };return effective[i].name
+        })).sorted()
+        if maps.contains("E5M1") {
+            guard base.maps.contains("E4M1"),!base.maps.contains("MAP01"),
+                  lumps.contains(where:{$0.name=="E5TEXT"}),lumps.contains(where:{$0.name=="SIGILINT"}) else {
+                throw PortError("Episode 5 currently supports standard SIGIL with Ultimate Doom.")
+            }
+        }
+        if extras.contains(where:{ ($0.lump("DEHACKED") != nil || $0.lump("UMAPINFO") != nil || $0.lump("MAPINFO") != nil) && !(isSigil && $0.lump("E5TEXT") != nil && $0.lump("SIGILINT") != nil) }) {
+            throw PortError("This add-on requires unsupported map metadata or DeHackEd changes. Standard SIGIL v1.23 has a dedicated Episode 5 profile.")
+        }
+        guard extras.flatMap(\.maps).allSatisfy({base.maps.contains("MAP01") ? $0.hasPrefix("MAP") : $0.hasPrefix("E")}) else {
+            throw PortError("The add-on's map format does not match the base game.")
+        }
+        guard !maps.contains(where:{$0.hasPrefix("E6")}) else { throw PortError("Episode 6 / SIGIL II is not supported yet.") }
+    }
+    var isSigil: Bool { sourceURLs.count>1 && maps.contains("E5M1") && lump("E5TEXT") != nil }
+    var displayFiles: String { sourceURLs.map(\.lastPathComponent).joined(separator:" + ") }
+    var sigilStory: String { String(data:lump("E5TEXT")?.data ?? Data(),encoding:.utf8) ?? "" }
     func lump(_ name: String) -> Bytes? { lumps.last { $0.name == name }?.bytes }
     func mapLump(_ map: String, _ name: String) throws -> Bytes {
         guard let marker = lumps.lastIndex(where: { $0.name == map }) else { throw PortError("Map \(map) not found.") }
-        let next = min(marker + 12, lumps.count)
-        guard let item = lumps[(marker+1)..<next].first(where: { $0.name == name }) else {
-            throw PortError("\(map) is missing \(name). Only classic Doom map data is supported.")
+        let fields=["THINGS","LINEDEFS","SIDEDEFS","VERTEXES","SEGS","SSECTORS","NODES","SECTORS","REJECT","BLOCKMAP"]
+        guard let field=fields.firstIndex(of:name) else { throw PortError("Unsupported map lump: \(name)") }
+        let index=marker+1+field
+        guard index<lumps.count, lumps[index].name==name else {
+            throw PortError("\(map) is missing \(name). Supply a complete classic Doom map block.")
         }
-        return item.bytes
+        return lumps[index].bytes
     }
 }
 

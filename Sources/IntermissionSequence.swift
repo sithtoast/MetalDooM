@@ -13,10 +13,11 @@ struct IntermissionSequence {
     private var enteringTicks = 0
     private let targets: [Int32]
     private let canAdvance: Bool
+    private let commercial: Bool
     init(_ state: MD_Progress = MD_Progress()) {
         func percent(_ value: Int32, _ total: Int32) -> Int32 { Int32(Int64(value)*100/Int64(max(1,total))) }
         targets = [percent(state.kills,state.maxKills),percent(state.items,state.maxItems),percent(state.secrets,state.maxSecrets),state.seconds,state.parSeconds]
-        canAdvance = state.phase == 1
+        canAdvance = state.phase == 1; commercial=state.commercial != 0
     }
     // Sound codes: 0 pistol count, 1 barrel explosion completion, 2 shotgun cock.
     mutating func update(seconds: Double, pressed: Bool) -> [Int32] {
@@ -33,7 +34,7 @@ struct IntermissionSequence {
             elapsed -= 1.0/35.0; tick += 1
             if entering {
                 enteringTicks += 1
-                if enteringTicks >= 4*35 { advance = true }
+                if enteringTicks >= (commercial ? 10:4*35) { advance = true }
             } else if stage < 10 {
                 if stage % 2 == 1 {
                     pause -= 1
@@ -70,7 +71,8 @@ struct FinaleSequence {
     private var elapsed = 0.0
     let episode: Int32
     let textLength: Int
-    init(episode: Int32 = 1, textLength: Int = 0) { self.episode=episode; self.textLength=textLength }
+    let commercial: Bool
+    init(episode: Int32 = 1, textLength: Int = 0, commercial: Bool = false) { self.episode=episode; self.textLength=textLength; self.commercial=commercial }
     var visibleCharacters: Int { min(textLength,max(0,(tick-10)/3)) }
     var scroll: Int { max(0,min(320,320-(tick-230)/2)) }
     var endFrame: Int? { tick < 1130 ? nil : min(6,max(0,(tick-1180)/5)) }
@@ -79,7 +81,7 @@ struct FinaleSequence {
         var sounds: [Int32]=[]
         func beginArt(_ sequence: inout Self) {
             sequence.art=true; sequence.tick=0; sequence.elapsed=0
-            if sequence.episode==3 { sounds.append(3) }
+            if !sequence.commercial && sequence.episode==3 { sounds.append(3) }
         }
         if pressed && !art {
             if visibleCharacters < textLength { tick=textLength*3+10 }
@@ -90,7 +92,7 @@ struct FinaleSequence {
             elapsed -= 1.0/35.0
             let oldFrame=endFrame
             tick += 1
-            if !art && tick > textLength*3+250 { beginArt(&self) }
+            if !commercial && !art && tick > textLength*3+250 { beginArt(&self) }
             else if art && episode==3 && tick>=1180 && endFrame != oldFrame { sounds.append(0) }
         }
         return sounds

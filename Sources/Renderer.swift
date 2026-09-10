@@ -81,6 +81,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var sprites: SpriteRenderer?
     private var sound: SoundPlayer?
     private var music: MusicPlayer?
+    private var castAttackQueued=false
     private var demoPlayback=false
     var paused = false { didSet { if paused { pauseAudio() } } }
     var skill: Int32 = 2
@@ -134,6 +135,8 @@ final class Renderer: NSObject, MTKViewDelegate {
     var playerStatus: String {
         guard engineReady else { return "" }
         if progress.phase != 0 {
+            if progress.phase==3 { return "Doom II story · Enter / Use to reveal text, then continue · Esc for menu" }
+            if progress.phase==4 { return "The cast · Fire / Enter to play death animation · Esc for menu" }
             if progress.phase == 2 { return "Episode complete · Kills \(progress.kills)/\(progress.maxKills) · Items \(progress.items)/\(progress.maxItems) · Secrets \(progress.secrets)/\(progress.maxSecrets) · Esc for menu · Enter / Use to advance story" }
             return "\(intermission.entering ? "Entering next level" : "Level complete") · Kills \(progress.kills)/\(progress.maxKills) · Items \(progress.items)/\(progress.maxItems) · Secrets \(progress.secrets)/\(progress.maxSecrets) · Time \(progress.seconds)s · Enter to continue"
         }
@@ -242,7 +245,16 @@ final class Renderer: NSObject, MTKViewDelegate {
         super.init()
     }
     func load(wad: WAD, map name: String, continuing: Bool = false, restorePath: String? = nil, demo: String? = nil) throws -> (triangles:Int,missing:[String]) {
-        guard wad.signature == "IWAD" else { throw PortError("The gameplay prototype requires a standalone Doom IWAD. PWAD merging is not connected yet.") }
+        if let current=self.wad, current.sourceURLs != wad.sourceURLs || current.sourceData != wad.sourceData {
+            throw PortError("Restart MetalDooM to change the WAD stack.")
+        }
+        guard wad.signature == "IWAD" else { throw PortError("Choose a base IWAD before adding PWADs.") }
+        if wad.sourceURLs.count>1 {
+            let configured=wad.sourceURLs.map(\.path).joined(separator:"\n").withCString { paths in
+                wad.engineOrder.withUnsafeBufferPointer { MD_ConfigureWADStack(paths,$0.baseAddress,Int32($0.count)) }
+            }
+            guard configured != 0 else { throw PortError(String(cString:MD_LastError())) }
+        }
         let map = try DoomMap(wad:wad,name:name), art = try Art(wad:wad)
         let heights = try art.textureHeights(), geometry = try Geometry(map:map,textureHeights:heights)
         let loadedSprites = try SpriteRenderer(device:device,wad:wad)
@@ -277,7 +289,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         for material in materials { try cacheMaterial(material) }
         let loaded = try makeBatches(geometry,textures:cached)
         let skyName: String
-        if name.hasPrefix("E2") { skyName = "SKY2" }
+        if wad.isSigil && name.hasPrefix("E5") { skyName = "SKY5" }
+        else if name.hasPrefix("E2") { skyName = "SKY2" }
         else if name.hasPrefix("E3") { skyName = "SKY3" }
         else if name.hasPrefix("E4") { skyName = "SKY4" }
         else if name.hasPrefix("MAP"), let number = Int(name.dropFirst(3)), number > 20 { skyName = "SKY3" }
@@ -504,7 +517,26 @@ final class Renderer: NSObject, MTKViewDelegate {
             intermissionTime += delta
             let pressed = (view.continueQueued || view.useQueued) && intermissionTime >= 0.3
             view.continueQueued = false; view.useQueued = false
-            if progress.phase==2 && progress.commercial==0 {
+            if progress.phase==4 {
+                accumulator += delta
+                let attack=view.consumeAttack() != 0
+                castAttackQueued = castAttackQueued || pressed || attack
+                while accumulator>=1.0/35.0 {
+                    guard MD_CastTick(castAttackQueued ? 1:0) != 0 else { throw PortError(String(cString:MD_LastError())) }
+                    castAttackQueued=false; accumulator -= 1.0/35.0
+                }
+            } else if progress.phase==3 {
+                _ = finale.update(seconds:delta,pressed:pressed)
+                if finale.art {
+                    if progress.map==30 {
+                        guard MD_StartCast() != 0 else { throw PortError("Cannot begin Doom II cast.") }
+                        progress=MD_GetProgress(); accumulator=0; castAttackQueued=false; try music?.select("D_EVIL")
+                    } else if let wad {
+                        let name=String(format:"MAP%02d",progress.nextMap)
+                        view.releaseMouse(); _ = try load(wad:wad,map:name,continuing:true); onMapChanged?(name)
+                    }
+                }
+            } else if progress.phase==2 && progress.commercial==0 {
                 for event in finale.update(seconds:delta,pressed:pressed) {
                     if event==3 { try music?.select("D_BUNNY") } else { MD_IntermissionSound(event) }
                 }
@@ -512,7 +544,12 @@ final class Renderer: NSObject, MTKViewDelegate {
                 for event in intermission.update(seconds:delta,pressed:pressed) { MD_IntermissionSound(event) }
             }
             sound?.drain()
-            if intermission.advance, let wad {
+            if progress.phase==1 && intermission.advance, let wad {
+                if MD_BeginStory() != 0 {
+                    progress=MD_GetProgress(); intermissionTime=0
+                    finale=FinaleSequence(textLength:String(cString:MD_StoryText()).count,commercial:true)
+                    try music?.select("D_READ_M");return
+                }
                 let name = progress.commercial != 0 ? String(format:"MAP%02d",progress.nextMap) : "E\(progress.episode)M\(progress.nextMap)"
                 view.releaseMouse(); _ = try load(wad:wad,map:name,continuing:true); onMapChanged?(name)
             }
@@ -558,7 +595,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             if progress.phase != 0 {
                 view.releaseMouse(); accumulator = 0; intermissionTime = 0; messageUntil = 0
                 intermission = IntermissionSequence(progress)
-                finale = FinaleSequence(episode:progress.episode,textLength:String(cString:MD_FinaleText(progress.episode)).count)
+                finale = FinaleSequence(episode:progress.episode,textLength:(progress.episode==5 ? (wad?.sigilStory ?? "") : String(cString:MD_FinaleText(progress.episode))).count)
                 try music?.select(MusicPlayer.endTrack(progress))
                 break
             }

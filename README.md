@@ -2,7 +2,7 @@
 
 A native Apple Silicon / Metal source-port project for classic Doom and Doom II.
 
-**Current milestone: Doom II core validation and MIDI state isolation.**
+**Current milestone: Doom II finales and ordered PWAD loading with SIGIL Episode 5.**
 Original gameplay and exit routing run in the Doom engine, with Metal world,
 weapon, HUD, intermission and Doom episode-finale rendering.
 The world is drawn as triangles by Metal. No software framebuffer, SDL, OpenGL, or
@@ -20,9 +20,10 @@ bash scripts/build.sh
 open build/MetalDooM.app --args -iwad "$HOME/Downloads/doom1.WAD"
 ```
 
-Or open the app and choose **Open WAD…**. `-warp E1M3` selects a map at startup.
-Supply your own standalone IWAD. One IWAD is supported per session: restart the app
-to change IWADs. Switching or restarting maps within that IWAD is supported.
+Or open the app and choose **Open WAD…**. `-warp E1M3` selects a map at startup. `-file first.wad second.wad` adds ordered PWADs.
+Supply your own IWAD. The load-order dialog accepts optional PWADs, with later
+files taking priority. One fixed stack is supported per session: restart to
+change its files or ordering. Maps within that stack can be switched or restarted.
 No game WAD assets are included.
 
 ### Build numbers
@@ -137,8 +138,9 @@ The original engine decoder has not been hardened for deliberately crafted paylo
   physical speaker output has not been independently recorded.
 - Progression uses original completion/load-level functions rather than the full
   G_Ticker loop. Networking is not connected.
-- Doom II story breaks and the cast ending are not presented. All 32 maps have
-  load/tick/geometry coverage; special encounters and full playthroughs remain unvalidated.
+- Doom II has original story breaks and the interactive cast ending. All 32 maps,
+  MAP07 boss triggers and MAP30 spawning/death have focused checks. Full manual
+  playthroughs remain unvalidated.
 - Automated checks cover all Ultimate Doom map loads, normal and secret episode
   routes, plus representative doors, lifts, crushers, switches, secrets and saves.
   This does not replace full manual episode playthroughs or cover every map special.
@@ -151,7 +153,9 @@ The original engine decoder has not been hardened for deliberately crafted paylo
   and death expressions across health bands. Power-up scene effects and spectre/weapon
   fuzz are implemented as Metal approximations rather than exact palette/software output.
 - Classic binary Doom maps only; no UDMF, Hexen format, extended/compressed nodes,
-  Boom/MBF extensions, GZDoom mods, or IWAD+PWAD merging.
+  Boom/MBF extensions or GZDoom mods. General MAPINFO/UMAPINFO and DeHackEd
+  behavior are unsupported; standard SIGIL v1.23 uses a dedicated Episode 5 profile.
+  SIGIL COMPAT, SIGIL II and compressed/MP3 music are outside this implementation.
 - All geometry is submitted each frame. Sector height/light changes rebuild geometry
   while retaining textures; visibility culling and selective updates are pending.
 - Fatal engine errors require restarting the app. Malformed-file checks do not mean
@@ -373,3 +377,41 @@ checks, not full playthroughs or verification of the reported startup music timb
 bash scripts/test-doom2.sh "$HOME/Downloads/doom2.wad"
 bash scripts/test-music.sh "$HOME/Downloads/doom2.wad"
 ```
+
+## SIGIL and WAD load order
+
+Open WAD… selects the base IWAD, then shows a load-order dialog. Add PWAD… adds
+files; Move Up / Move Down changes priority. Play starts the chosen stack. The
+files remain separate and are never modified. Sprites and flats use merged
+namespaces with exact-name overrides; maps must supply complete classic map blocks.
+This does not promise compatibility with every mod or sprite-rotation replacement.
+
+For the supplied standard SIGIL v1.23, select Ultimate Doom's DOOM.WAD as the base
+and SIGIL_V1_23.wad as the add-on. New Game lists SIGIL as Episode 5 alongside the
+original four episodes. Its nine map names, MIDI music, SKY5, SIGIL intermission
+art, E5M6 secret exit/E5M9 return and story/credit ending are supported.
+
+```sh
+open build/MetalDooM.app --args \
+  -iwad "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD" \
+  -file "$HOME/Downloads/SIGIL_V1_23/SIGIL_V1_23.wad"
+bash scripts/test-stack.sh "$HOME/Downloads/The_Ultimate_Doom/DOOM.WAD" \
+  "$HOME/Downloads/SIGIL_V1_23/SIGIL_V1_23.wad"
+```
+
+Saves and quick slots identify every file's contents and the load order. A save
+from a different stack is rejected. Existing single-IWAD saves retain their
+identity and format. Save destinations cannot overwrite any file in the stack.
+
+Doom II now shows stats before story breaks after MAP06, MAP11, MAP20, MAP30 and
+the secret exits from MAP15/MAP31. Enter/Use reveals the text, then continues.
+MAP30 proceeds to the original 17-member cast: Fire/Enter plays each death;
+Escape opens the menu. Cast attacks, deaths and sounds use the upstream state machine.
+
+Build 51 validation covers Doom II routes, inventory, MAP07 tag 666/667 triggers,
+Icon of Sin monster spawning and brain death, cast cycle/deaths, all SIGIL maps,
+materials, native sprite indices, Episode 5 saves, overlay precedence and load-order
+identity. Native checks use a local exit-position PWAD for Doom II presentation;
+actual special encounters are checked separately with the original maps in C.
+Ultimate Doom geometry/progression/saves and loaded-WAD shutdown remain regressions.
+These checks do not replace complete manual playthroughs.

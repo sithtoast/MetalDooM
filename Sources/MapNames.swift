@@ -72,6 +72,12 @@ extension WAD {
         "MAP32": "Grosse",
     ]
     func mapTitle(_ map: String) -> String {
+        if isSigil, map.hasPrefix("E5M"), let number=Int(map.suffix(1)), (1...9).contains(number) {
+            let names=["Baphomet's Demesne","Sheol","Cages of the Damned","Paths of Wretchedness","Abaddon's Void","Unspeakable Persecution","Nightmare Underworld","Halls of Perdition","Realm of Iblis"]
+            return "\(map): \(names[number-1])"
+        }
+        // Do not give replacement maps the base game's canonical title.
+        if sourceURLs.count>1 && !isSigil { return map }
         guard let title = Self.mapNames[map] else { return map }
         return "\(map): \(title)"
     }

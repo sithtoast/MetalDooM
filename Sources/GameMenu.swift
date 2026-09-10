@@ -128,8 +128,8 @@ final class GameMenu: NSView {
     }
     private func newGame() {
         if app.wad?.maps.contains("MAP01")==true { chosenMap="MAP01"; chooseSkill(); return }
-        let names=["Knee-Deep in the Dead","The Shores of Hell","Inferno","Thy Flesh Consumed"]
-        let items=(1...4).filter { app.wad?.maps.contains("E\($0)M1")==true }.map { i in
+        let names=["Knee-Deep in the Dead","The Shores of Hell","Inferno","Thy Flesh Consumed","SIGIL"]
+        let items=(1...5).filter { app.wad?.maps.contains("E\($0)M1")==true }.map { i in
             ClassicMenuCanvas.Item(title:names[i-1],patch:"M_EPI\(i)",x:48,y:CGFloat(63+(i-1)*16),action:{ [weak self] in
                 self?.chosenMap="E\(i)M1"; self?.chooseSkill()
             })

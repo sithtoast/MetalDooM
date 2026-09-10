@@ -3,6 +3,7 @@ doom/doomdef.c
 doom/doomstat.c
 doom/dstrings.c
 doom/g_game.c
+doom/f_finale.c
 doom/info.c
 doom/m_random.c
 doom/deh_misc.c

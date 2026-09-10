@@ -62,6 +62,14 @@
             precondition(effects==(episode==3 ? Array(repeating:0,count:6) : []))
             _ = finale.update(seconds:0,pressed:true); precondition(finale.art && finale.tick==1220)
         }
+        state.phase=1;state.commercial=1
+        var commercial=IntermissionSequence(state)
+        _=commercial.update(seconds:0,pressed:true);_=commercial.update(seconds:0,pressed:true)
+        _=commercial.update(seconds:9.0/35,pressed:false);precondition(!commercial.advance)
+        _=commercial.update(seconds:1.01/35,pressed:false);precondition(commercial.advance)
+        var story=FinaleSequence(textLength:20,commercial:true)
+        _=story.update(seconds:60,pressed:false);precondition(!story.art)
+        _=story.update(seconds:0,pressed:true);precondition(story.art)
         var automatic=FinaleSequence(episode:1,textLength:20)
         for _ in 0..<310 { _ = automatic.update(seconds:1.0/35,pressed:false) }
         precondition(!automatic.art)

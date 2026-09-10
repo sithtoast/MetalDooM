@@ -32,17 +32,18 @@ The full `G_Ticker` state machine is not connected. A completed exit invokes
 simulation for the native intermission. `MD_Continue` calls `G_DoWorldDone` to retain
 inventory, then ticks once to initialize the new view height. It does not call
 `G_InitNew`. Normal/secret routing and removal of keys/powers remain upstream rules.
-Episode endings produce a terminal stats summary; original finales are deferred. Monsters, projectiles, pickups, and decorations keep
+Doom episode endings and Doom II story/cast phases use native Metal presentation.
+Monsters, projectiles, pickups, and decorations keep
 their original thinker lifecycles. Native attack/change buttons drive unchanged
-weapon code. A dead player stays dead until R reloads; use is masked after death
-to avoid entering rebirth without G_Ticker. Software HUD and automap hooks are silent.
+weapon code. A fresh Use/Enter restarts after the death delay; R reloads immediately. Native
+input stays outside the upstream rebirth path. Software HUD and automap hooks are silent.
 The bridge copies inventory values and captures/clears engine player messages after
 each tic, with a serial so repeated pickups of the same type still renew the notice.
 
 Everything runs on the main thread. Swift never owns pointers into Doom's arena;
 snapshots copy scalars through C. Fatal errors unwind to `setjmp` wholly within C,
 poison the instance, and become native error messages. Restart after a fatal error.
-One IWAD initializes per process; map restarts reuse those resources. Rejected WAD
+One fixed IWAD/PWAD stack initializes per process; map restarts reuse those resources. Rejected WAD
 changes and absent-map requests preserve the active engine.
 
 ## Rendering and input
@@ -79,7 +80,7 @@ The first viewport click captures the mouse without shooting.
 ## Sprites and HUD
 
 The bridge walks live mobj thinkers, omits the player, resolves the original sprite
-frame/rotation/flip, and returns copied positions, light/fullbright, and IWAD lump
+frame/rotation/flip, and returns copied positions, light/fullbright, and combined-directory lump
 indices. No object pointers cross into Swift. All sprite patches are decoded and
 uploaded at WAD load, so animations do not upload textures during a frame. Removed
 pickups disappear from the next snapshot. Transparent fragments are discarded before
@@ -289,3 +290,33 @@ monitor. Attract callbacks check shutdown state before accessing window state.
 Ending attract mode also invalidates its timer during normal gameplay transitions.
 `test-shutdown.sh` drains the run loop after loaded-WAD closure and checks that
 late callbacks and repeated cleanup are harmless.
+
+## Ordered WAD stacks and SIGIL
+
+WAD retains the source file URLs and byte snapshots. Add-on loading builds a
+single directory plan: general lumps retain file order, sprite/flat namespaces
+combine exact-name replacements, and later files win. MD_ConfigureWADStack opens
+the separate files and applies that same index plan before R_InitData/P_Init.
+Swift texture/audio/sprite lookups and native engine indices therefore agree;
+no stitched WAD or bundled game assets are created. The active renderer and bridge
+reject changes to an initialized stack. Malformed replacement maps cannot borrow
+lumps from a following map. Save identity hashes ordered, fixed-length per-file
+digests with a domain prefix, preserving single-IWAD identity unchanged.
+
+Standard SIGIL v1.23 is a deliberate compatibility profile, not a general metadata
+parser. E5 keeps its native map identifiers and disables the original E3 boss-exit
+semantics. Completion borrows E3's secret return with E5 par times, then restores
+the episode number; native save headers accept E5 only with SIGIL loaded. Swift
+selects its map titles, SKY5, intermission artwork and E5TEXT/credit ending. Other
+metadata/DeHackEd-dependent add-ons are rejected rather than silently ignored.
+
+## Doom II story and cast phases
+
+After stats, MD_BeginStory calls the original G_WorldDone/F_StartFinale to choose
+story text and background. Non-story exits proceed directly. Phases 3 and 4 denote
+commercial story and cast; Doom's existing episode finale remains phase 2. Story
+input reveals text and then continues, preserving inventory through G_DoWorldDone.
+MAP30 enters upstream F_StartCast/F_CastTicker/F_CastResponder. The bridge copies
+cast name, sprite patch, flip and death state; Metal presents BOSSBACK, text and
+sprite quads without calling software drawers. Fire taps are retained until a cast
+tic. Swift selects D_READ_M/D_EVIL; native finale music hooks are presentation stubs.

@@ -18,6 +18,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var maps: NSPopUpButton!
     var message: MessageLabel!
     var wad: WAD?
+    var stackPanel: WADStackPanel?
     var menuAudio: SoundPlayer?
     var automapView: AutomapView?
     var attractActive=false, attractDemo=false, attractIndex=0, attractElapsed=0.0
@@ -130,7 +131,11 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.center(); window.makeKeyAndOrderFront(nil); window.makeFirstResponder(view); NSApp.activate(ignoringOtherApps:true)
             let arguments = CommandLine.arguments
             if let index = arguments.firstIndex(of:"-iwad"), index+1 < arguments.count {
-                load(URL(fileURLWithPath:NSString(string:arguments[index+1]).expandingTildeInPath),showTitle:!arguments.contains("-warp"))
+                let addOns: [URL]
+                if let files=arguments.firstIndex(of:"-file") {
+                    addOns=arguments.dropFirst(files+1).prefix(while:{!$0.hasPrefix("-")}).map { URL(fileURLWithPath:NSString(string:$0).expandingTildeInPath) }
+                } else { addOns=[] }
+                load(URL(fileURLWithPath:NSString(string:arguments[index+1]).expandingTildeInPath),addOns:addOns,showTitle:!arguments.contains("-warp"))
             }
             if let index = arguments.firstIndex(of:"-warp"), index+1 < arguments.count {
                 maps.selectItem(withTitle:arguments[index+1].uppercased()); changeMap()
@@ -175,15 +180,22 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
     @objc func openWAD() {
+        guard wad == nil else { show(PortError("Restart MetalDooM to choose a different base game or add-on stack."));return }
         view.releaseMouse()
         let panel = NSOpenPanel(); panel.allowedContentTypes = [UTType(filenameExtension:"wad") ?? .data]
         panel.canChooseDirectories = false; panel.allowsMultipleSelection = false
-        panel.beginSheetModal(for:window) { [weak self] response in if response == .OK, let url = panel.url { self?.load(url) } }
+        panel.beginSheetModal(for:window) { [weak self] response in
+            guard let self, response == .OK, let url=panel.url else { return }
+            let stack=WADStackPanel(base:url)
+            self.stackPanel=stack
+            stack.onPlay={ [weak self] extras in self?.load(url,addOns:extras);self?.stackPanel=nil }
+            self.window.beginSheet(stack)
+        }
     }
-    func load(_ url: URL, showTitle:Bool=true) {
+    func load(_ url: URL, addOns: [URL] = [], showTitle:Bool=true) {
         do {
-            let candidate = try WAD(url:url)
-            let selected = candidate.maps.contains("E1M1") ? "E1M1" : candidate.maps[0]
+            let candidate = try WAD(url:url,addOns:addOns)
+            let selected = candidate.isSigil ? "E5M1" : candidate.maps.contains("E1M1") ? "E1M1" : candidate.maps[0]
             let result = try renderer.load(wad:candidate,map:selected)
             wad = candidate; maps.removeAllItems(); maps.addItems(withTitles:candidate.maps); maps.selectItem(withTitle:selected); maps.isEnabled = true
             describe(selected,result)
@@ -199,7 +211,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     func updateTitle(map name: String) {
         guard let wad else { return }
-        window.title = "\(appTitle) — \(wad.gameName) — \(wad.url.lastPathComponent) — \(wad.mapTitle(name))"
+        window.title = "\(appTitle) — \(wad.gameName) — \(wad.displayFiles) — \(wad.mapTitle(name))"
     }
     func describe(_ name: String, _ result: (triangles:Int,missing:[String])) {
         closeAutomap();updateTitle(map:name)

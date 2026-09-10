@@ -4,6 +4,19 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 51 — Doom II finales, WAD stacks and SIGIL
+
+- Add Doom II story breaks and the original interactive, animated 17-member cast
+  with attack/death sounds and final music; retain inventory through story breaks.
+- Validate MAP07 boss triggers, Icon of Sin spawning/death, secret routes and cast.
+- Add a base-IWAD/add-on load-order dialog and ordered `-file` PWAD arguments.
+  Keep files separate; later resources override earlier ones in shared namespaces.
+- Support standard SIGIL v1.23 as Episode 5 with maps, names, sky, MIDI music,
+  secret routing, intermission art, story ending and native saves.
+- Key saves/slots by the entire ordered stack while preserving single-IWAD saves.
+- Preserve Ultimate Doom and clean-exit regression coverage. General metadata,
+  DeHackEd mods, SIGIL COMPAT, SIGIL II and MP3 music remain unsupported.
+
 ## Build 48 — Clean exit with a loaded WAD
 
 - Stop the title/demo timer, input monitor, rendering and audio before window
