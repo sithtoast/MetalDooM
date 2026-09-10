@@ -417,6 +417,9 @@ int MD_CopyThings(MD_Thing *output, int capacity, float cameraX, float cameraY) 
     for (thinker_t *thinker=thinkercap.next; thinker!=&thinkercap; thinker=thinker->next) {
         if (thinker->function.acp1 != (actionf_p1)P_MobjThinker) continue;
         mobj_t *object = (mobj_t *)thinker;
+        // The software renderer visits sector-linked objects only. Teleport
+        // destinations use S_NULL (an imp placeholder) but must stay invisible.
+        if (object->flags & MF_NOSECTOR) continue;
         if (object->player || object->sprite < 0 || object->sprite >= numsprites) continue;
         spritedef_t *definition = &sprites[object->sprite];
         int frameIndex = object->frame & FF_FRAMEMASK;

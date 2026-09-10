@@ -4,6 +4,14 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 68 — Invisible teleport destinations
+
+- Stop drawing non-sector objects as world sprites. Invisible teleport
+  destinations were appearing as frozen imps, notably in SIGIL's demo openings.
+- Preserve teleport/gameplay behavior; filter only the renderer's object list.
+- Validate both SIGIL DEMO1/DEMO2 openings, real imp visibility and death frames;
+  verify the installed E5M5 spawn scene against the supplied Crispy Doom recording.
+
 ## Build 67 — WAD hashes in diagnostics
 
 - Include SHA-256 hashes for every loaded IWAD/PWAD, in load order, in copied
