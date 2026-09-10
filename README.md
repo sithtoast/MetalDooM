@@ -481,3 +481,8 @@ regression checks. Complete manual campaign playthroughs remain outstanding.
 This is dedicated Final Doom support, not general GAMECONF/UMAPINFO or DeHackEd
 support. Classic/enhanced mode selection, SIGIL II, Legacy of Rust/ID24 and Doom 64
 remain future milestones.
+
+## Signed releases
+
+See [RELEASING.md](RELEASING.md) for Developer ID signing, Apple notarization,
+stapling and release ZIP verification.

@@ -4,6 +4,15 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 70 — Developer ID release packaging
+
+- Add separate local signing and Apple notarization steps, using a Developer ID
+  Application identity, Hardened Runtime, secure timestamps and Keychain credentials.
+- Prepare release copies without modifying local builds; retain notarization receipts,
+  staple accepted tickets, verify Gatekeeper and generate ZIP/SHA-256 artifacts.
+- Document release setup and source/archive publication. Verify the local signature
+  and native Doom II launch; Apple submission is pending upload approval.
+
 ## Version 0.2.1 — Build 69 — Patch version update
 
 - Bump the app version to 0.2.1 for the invisible-teleport-destination rendering
