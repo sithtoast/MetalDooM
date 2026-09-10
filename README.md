@@ -40,10 +40,10 @@ menu provides the Metal HUD, WAD hashes, benchmarks and session-log exports.
 ## Documentation
 
 - [Player guide](PLAYER_GUIDE.md) — controls, saves, music, demos and WAD load order
-- [Testing and bug reports](TESTING.md)
-- [Build and development notes](DEVELOPMENT.md) · [Architecture](ARCHITECTURE.md)
-- [Validation history](VALIDATION.md) · [Changelog](CHANGELOG.md)
-- [Release packaging](RELEASING.md) · [GitHub Actions setup](GITHUB_SETUP.md)
+- [Bug reports](BUG_REPORT.md) · [Contributor testing](docs/TESTING.md)
+- [Build and development notes](docs/DEVELOPMENT.md) · [Architecture](docs/ARCHITECTURE.md)
+- [Validation history](docs/VALIDATION.md) · [Changelog](CHANGELOG.md)
+- [Release packaging](docs/RELEASING.md) · [GitHub Actions setup](docs/GITHUB_SETUP.md)
 
 ## Credits and license
 

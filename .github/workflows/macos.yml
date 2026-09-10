@@ -104,7 +104,7 @@ jobs:
             fi
             echo
             echo "Source commit: $(git rev-parse HEAD)"
-            echo 'Includes a matching source ZIP and checksums. See CHANGELOG.md for changes and TESTING.md for bug reports.'
+            echo 'Includes a matching source ZIP and checksums. See CHANGELOG.md in the source repository for changes and BUG_REPORT.md in the app ZIP for bug reports.'
           } > build/artifacts/RELEASE_NOTES.md
           (cd build/artifacts && shasum -a 256 ./*.zip > SHA256SUMS.txt)
           python3 - <<'PY'

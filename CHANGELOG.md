@@ -4,6 +4,14 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 75 — Player-focused release archive
+
+- Move contributor setup, release, development, architecture, testing and validation
+  documents into docs/, retaining them in the public repository and source archive.
+- Trim the app ZIP to the app, installation/player guides, short bug-report guide,
+  license notices and signing status. Update documentation and CI release-note links.
+- Verify documentation links, the packaged file list and extracted app signature.
+
 ## Build 74 — GitHub Actions builds and tagged releases
 
 - Add macOS builds and WAD-free checks on main pushes/pull requests, with downloadable

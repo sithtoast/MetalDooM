@@ -1,6 +1,6 @@
 # MetalDooM player guide
 
-See [README.md](README.md) for installation and [TESTING.md](TESTING.md) for bug reports.
+See [INSTALL.md](INSTALL.md) for installation and [BUG_REPORT.md](BUG_REPORT.md) for bug reports.
 
 ## Music playback
 

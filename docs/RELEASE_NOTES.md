@@ -27,4 +27,4 @@ Rust are not supported. Full manual campaign playthrough coverage remains ongoin
 Attach the binary ZIP, matching source ZIP and SHA-256 files to the GitHub release.
 The source archive includes the vendored engine, build scripts and licenses.
 For bugs, include Diagnostics → Copy Diagnostic Report and reproduction steps.
-Never attach commercial WADs. See CHANGELOG.md and TESTING.md for details.
+Never attach commercial WADs. See CHANGELOG.md in the repository and BUG_REPORT.md in the app ZIP for details.

@@ -12,7 +12,7 @@ Choose Open WAD… and supply your own Doom/Ultimate Doom, Doom II, TNT or Pluto
 IWAD. Standard SIGIL can be added as a PWAD with Ultimate Doom. No game data is
 included. Restart the app to change the WAD stack.
 
-See PLAYER_GUIDE.md for controls and TESTING.md for reports. When reporting a bug,
+See PLAYER_GUIDE.md for controls and BUG_REPORT.md for reports. When reporting a bug,
 include Diagnostics → Copy Diagnostic Report; never attach commercial WADs.
 
 The matching source archive is provided alongside the app release. License and

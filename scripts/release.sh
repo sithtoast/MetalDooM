@@ -30,12 +30,10 @@ PACKAGE="MetalDooM-$VERSION-build$BUILD-macOS-arm64-unnotarized"
 PAYLOAD="$RELEASE_DIR/$PACKAGE"
 mkdir "$PAYLOAD"
 ditto "$APP" "$PAYLOAD/MetalDooM.app"
-for DOC in README.md INSTALL.md PLAYER_GUIDE.md TESTING.md DEVELOPMENT.md ARCHITECTURE.md VALIDATION.md RELEASING.md GITHUB_SETUP.md CHANGELOG.md LICENSE; do
+for DOC in INSTALL.md PLAYER_GUIDE.md BUG_REPORT.md LICENSE; do
   cp "$PROJECT_DIR/$DOC" "$PAYLOAD/$DOC"
 done
-mkdir -p "$PAYLOAD/Vendor/ChocolateDoom/opl"
-cp "$PROJECT_DIR/Vendor/ChocolateDoom/UPSTREAM.md" "$PAYLOAD/Vendor/ChocolateDoom/UPSTREAM.md"
-cp "$PROJECT_DIR/Vendor/ChocolateDoom/opl/COPYING.LESSER" "$PAYLOAD/Vendor/ChocolateDoom/opl/COPYING.LESSER"
+cp "$PROJECT_DIR/Vendor/ChocolateDoom/UPSTREAM.md" "$PAYLOAD/ChocolateDoom.txt"
 cp "$PROJECT_DIR/Vendor/ChocolateDoom/opl/COPYING.LESSER" "$PAYLOAD/Nuked-OPL3-LICENSE.txt"
 printf '%s\n' "Developer ID signed; NOT notarized by Apple." > "$PAYLOAD/SIGNING-STATUS.txt"
 ditto -c -k --sequesterRsrc --keepParent "$PAYLOAD" "$RELEASE_DIR/$PACKAGE.zip"

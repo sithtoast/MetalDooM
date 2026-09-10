@@ -42,7 +42,7 @@ submission, inspect it with `xcrun notarytool info ID --keychain-profile PROFILE
 `xcrun notarytool log ID --keychain-profile PROFILE`; do not describe an unaccepted or unstapled artifact as notarized.
 For a deliberately unnotarized preview, use package-unnotarized instead. A failed run preserves its files for diagnosis.
 
-The unnotarized package includes the app, installation/player/tester guides and
+The unnotarized package includes the app, installation/player guides and a short bug-report guide and
 license notices. Its filename and SIGNING-STATUS.txt explicitly identify it as
 unnotarized. Gatekeeper may block first launch; INSTALL.md explains the per-app
 exception. Do not require users to disable Gatekeeper globally.
@@ -68,5 +68,9 @@ git archive --format=zip --prefix=MetalDooM-source/ \
 Attach that source archive with the binary ZIP and checksums so recipients have
 the corresponding source, including the vendored engine and build scripts.
 Never create source archives from the entire working directory (which can contain
-WADs, saves or credentials). Draft the GitHub release from RELEASE_NOTES.md, link
+WADs, saves or credentials). Draft the GitHub release from docs/RELEASE_NOTES.md, link
 the exact source commit, and label this early preview as a prerelease.
+
+Contributor documentation lives in docs/ and remains in the source archive.
+The app ZIP contains only the app, INSTALL.md, PLAYER_GUIDE.md, BUG_REPORT.md,
+license/attribution notices and SIGNING-STATUS.txt.

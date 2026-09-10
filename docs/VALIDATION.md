@@ -68,7 +68,7 @@ restart into E1M2, Quick Load restored the persisted E1M1 save and its map title
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for module boundaries.
 
-See [CHANGELOG.md](CHANGELOG.md) for the build-by-build history.
+See [CHANGELOG.md](../CHANGELOG.md) for the build-by-build history.
 
 Intermission regression checks: `bash scripts/test-intermission.sh` covers original
 counter timing, sound cues, skipping, map timeout, animated backgrounds, secret
