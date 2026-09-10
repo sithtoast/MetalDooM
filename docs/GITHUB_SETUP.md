@@ -1,5 +1,29 @@
 # First GitHub build and release
 
+## Routine publishing
+
+After committing your changes on `main`, run:
+
+```sh
+bash scripts/publish.sh --dry-run
+bash scripts/publish.sh
+```
+
+The script reads the app version from `Info.plist`. If that version is newer than
+published version tags, it creates an annotated `v<version>` tag and pushes the
+branch and tag together to `origin`. If that tag already exists, it pushes only
+`main`, keeping the existing release unchanged. With no published versions, it
+tags the current version as the first release. It never increments the version
+or commits files for you. Dirty checkouts, branches other than `main`, older
+versions and conflicting tags stop publication.
+
+The dry run reads remote tags but makes no changes. A failed actual push retains
+the local tag for inspection and retry; no tags or branches are force-pushed.
+The existing tagged-release workflow then builds/signs the assets and creates a
+GitHub prerelease. Check Actions for success before sharing the release. Set up
+the signing secrets below before your first tagged push.
+
+
 The workflow is `.github/workflows/macos.yml`. It uses GitHub's hosted Apple Silicon
 `xcode-27` runner (currently a preview image), matching the locally tested compiler
 generation. The first hosted run must pass before treating CI as validated.

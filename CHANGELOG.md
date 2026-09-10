@@ -4,6 +4,17 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.3.0 — Publishing helper (app build 81 unchanged)
+
+- Add scripts/publish.sh with a read-only dry run, a clean-main requirement and
+  version lookup from Info.plist. Push main alone for an existing version, or
+  atomically push main with a new annotated version tag to trigger GitHub Actions.
+- Reject older versions and conflicting tags; never force-push or auto-commit.
+- Document the routine publishing command and validate against disposable local
+  remotes, including first release, unchanged/bumped versions, dirty checkouts,
+  conflicting tags, detached/other branches and atomic push rejection.
+- No GitHub push or hosted release was performed as part of this change.
+
 ## 0.3.0 · Build 81 — WAD picker feature preview
 
 - Bump the minor version for the new folder/drop WAD picker, game switching and

@@ -1,5 +1,12 @@
 # Signed macOS releases
 
+For the normal GitHub Actions release path, commit the version and changes on
+`main`, preview with `bash scripts/publish.sh --dry-run`, then run
+`bash scripts/publish.sh`. See [GitHub setup](GITHUB_SETUP.md#routine-publishing).
+A new version tag triggers the hosted release workflow; an existing version
+pushes only the branch. The commands below cover local/manual packaging.
+
+
 For automatic builds and tagged releases, follow [GITHUB_SETUP.md](GITHUB_SETUP.md).
 
 Release apps target Apple Silicon and macOS 14 or later. Local builds remain
