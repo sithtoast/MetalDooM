@@ -73,6 +73,8 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             diagnosticsMenu.addItem(withTitle:"Run Benchmark…",action:#selector(runBenchmark),keyEquivalent:"").target=self
             diagnosticsMenu.addItem(withTitle:"Cancel Benchmark",action:#selector(cancelBenchmark),keyEquivalent:"").target=self
             diagnosticsMenu.addItem(withTitle:"Export Benchmark Result…",action:#selector(exportBenchmarkResult),keyEquivalent:"").target=self
+            let oplItem=audioMenu.addItem(withTitle:"Classic OPL",action:#selector(selectOPL(_:)),keyEquivalent:"");oplItem.target=self
+            let appleItem=audioMenu.addItem(withTitle:"Apple MIDI",action:#selector(selectAppleMIDI(_:)),keyEquivalent:"");appleItem.target=self
             NSApp.mainMenu = menu
             window = NSWindow(contentRect:NSRect(x:0,y:0,width:1100,height:760),styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)
             window.title = "\(appTitle) — Gameplay Preview"; window.minSize = NSSize(width:720,height:640)
@@ -158,6 +160,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 self?.sessionLog.append(text)
                 self?.finishBenchmark(reason:"Metal command failed.")
             }
+            MusicPlayer.onError = { [weak self] error in self?.show(error) }
             sessionLog.append("Started " + appTitle + "; GPU: " + renderer.device.name)
             renderer.onError = { [weak self] error in self?.show(error) }
             let sizes=[NSSize(width:960,height:720),NSSize(width:1100,height:760),NSSize(width:1280,height:720),NSSize(width:1600,height:900),NSSize(width:1920,height:1080)]
@@ -387,6 +390,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         view?.delegate = nil
         renderer?.paused = true
         renderer?.pauseAudio()
+        renderer?.releaseMusic()
         try? menuAudio?.setActive(false)
         if let menuKeyMonitor { NSEvent.removeMonitor(menuKeyMonitor); self.menuKeyMonitor = nil }
     }

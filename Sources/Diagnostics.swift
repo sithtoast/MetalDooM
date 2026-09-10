@@ -11,6 +11,8 @@ extension App {
         metalHUDMenuItem?.state = metalHUDEnabled ? .on : .off
     }
 
+    @objc func selectOPL(_ sender:NSMenuItem) { UserDefaults.standard.set("opl",forKey:"musicBackend");sessionLog.append("Music backend: Classic OPL") }
+    @objc func selectAppleMIDI(_ sender:NSMenuItem) { UserDefaults.standard.set("apple",forKey:"musicBackend");sessionLog.append("Music backend: Apple MIDI") }
     @objc func toggleMetalHUD() {
         metalHUDEnabled.toggle()
         configureMetalHUD()
@@ -53,6 +55,7 @@ extension App {
         Fullscreen: \(window.styleMask.contains(.fullScreen))
         Frame limit: \(view.preferredFramesPerSecond) FPS
         Recent renderer FPS: \(fps) (not a benchmark)
+        Music backend: \(MusicPlayer.preferredBackend == "opl" ? "Classic OPL" : "Apple MIDI")
         Metal HUD: \(metalHUDEnabled ? "On" : "Off")
         Campaign: \(wad?.gameName ?? "No WAD loaded")
         Map: \(wad == nil ? "None" : (maps.titleOfSelectedItem ?? "None"))

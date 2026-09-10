@@ -45,3 +45,7 @@ w_wad.c
 w_file.c
 w_file_stdc.c
 z_zone.c
+
+midifile.c
+memio.c
+mus2mid.c

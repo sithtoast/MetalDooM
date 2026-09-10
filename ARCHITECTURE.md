@@ -167,8 +167,18 @@ loading and rejection of bad native headers before live state changes.
 
 `MUS.swift` translates bounded MUS scores into type-0 MIDI at 70 ticks per beat
 (140 ticks per second), following the pinned upstream converter's event mapping.
-Conversion state is local; MIDI lumps pass through to Apple's parser.
-`MusicPlayer.swift` owns an AVAudioSequencer and Apple DLS synth on an independent
+Conversion state is local; MIDI lumps pass through to the selected backend's parser.
+Classic OPL is the default. `Engine/OPLMusic.c` adapts the unchanged pinned
+Chocolate Doom `i_oplmusic.c` sequencer and Nuked OPL chip emulator to offline
+44.1 kHz stereo PCM, using the loaded stack's GENMIDI bank and Doom 1.9 OPL2
+voice rules. The main-thread renderer caps each score at ten minutes and bounds
+callback/event counts. `OPLPlayer.swift` owns the temporary MIDI/WAV directory
+and an AVAudioPlayer with native looping; release and orderly shutdown delete
+its files. No global gameplay WAD/zone state or SDL audio is used by rendering.
+Switching the persistent Audio menu choice restarts the current track. A failed
+switch reports an error and restores the previous backend preference.
+
+In Apple MIDI mode, `MusicPlayer.swift` owns an AVAudioSequencer and Apple DLS synth on an independent
 AVAudioEngine mixer, with the built-in macOS General MIDI sound bank. The renderer selects level/intermission/completion tracks
 and pauses music alongside gameplay. Duration-based polling loops the score because
 the sequencer can continue advancing after the last MIDI event. No completion

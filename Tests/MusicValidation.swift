@@ -3,6 +3,9 @@ import AVFoundation
 
 @main struct MusicValidation {
     static func main() throws {
+        let previousBackend=UserDefaults.standard.object(forKey:"musicBackend")
+        UserDefaults.standard.set("apple",forKey:"musicBackend")
+        defer { if let previousBackend { UserDefaults.standard.set(previousBackend,forKey:"musicBackend") } else { UserDefaults.standard.removeObject(forKey:"musicBackend") } }
         setbuf(stdout,nil)
         let wad=try WAD(url:URL(fileURLWithPath:CommandLine.arguments[1]),addOns:CommandLine.arguments.dropFirst(2).map{URL(fileURLWithPath:$0)})
         let commercial=wad.maps.contains("MAP01")

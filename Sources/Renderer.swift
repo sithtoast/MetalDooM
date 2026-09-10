@@ -102,6 +102,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var deathTime: Double = 0
     private var lastGeometryTick: Int32 = -1
     var onMapChanged: ((String) -> Void)?
+    func releaseMusic() { music?.update(active:false);music=nil }
     func pauseAudio() { try? sound?.setActive(false); music?.update(active:false) }
     private var hud = MD_HUD()
     var notice = ""

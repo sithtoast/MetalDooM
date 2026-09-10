@@ -104,3 +104,6 @@ int MD_TestWakeBrain(void);
 
 // Configure before the first map load; later calls must describe the same stack.
 int MD_ConfigureWADStack(const char *paths, const int32_t *order, int count);
+
+// Main-thread offline OPL2 rendering; 44.1 kHz stereo WAV, maximum ten minutes.
+int MD_RenderOPL(const void *genmidi, int length, const char *midiPath, const char *wavPath);

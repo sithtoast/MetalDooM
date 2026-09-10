@@ -105,3 +105,15 @@ Finder and `open build/MetalDooM.app` apply the app-local HUD launch environment
 If you launch `Contents/MacOS/MetalDooM` directly from a debugger or shell, provide
 `MTL_HUD_ENABLED=1` at process startup to make the toggle available. Changing this
 after launch is too late on the tested macOS version. No global settings are used.
+
+## Music comparison
+
+Select **Audio → Classic OPL** or **Audio → Apple MIDI**. Changing backend
+restarts the current song and is saved for future launches. Classic OPL is the
+default; it targets Doom 1.9 Sound Blaster/OPL2 playback, not original Mac QuickTime.
+Compare title, level, intermission and ending tracks, then check music volume,
+mute, focus loss, resume and backend switching. Classic OPL requires GENMIDI
+and pre-renders tracks up to ten minutes into temporary PCM files.
+
+`bash scripts/test-opl.sh /path/to/doom2.wad` checks deterministic OPL PCM,
+looping, native playback and switching; `test-music.sh` covers Apple MIDI.

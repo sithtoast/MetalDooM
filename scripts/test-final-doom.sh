@@ -10,7 +10,7 @@ xcrun clang -DMD_TESTING -include "$PROJECT_DIR/Engine/NativeHeaders.h" -I"$PROJ
  "$PROJECT_DIR/Tests/FinalDoomValidation.c" "$TEST_DIR/engine/libDoom.a" -Wl,-dead_strip -o "$TEST_DIR/routes"
 xcrun swiftc -swift-version 5 -O -target arm64-apple-macosx14.0 -module-cache-path "$PROJECT_DIR/build/module-cache" -Xcc -DMD_TESTING \
  -import-objc-header "$PROJECT_DIR/Engine/Bridge.h" \
- "$PROJECT_DIR/Sources/WAD.swift" "$PROJECT_DIR/Sources/MapNames.swift" "$PROJECT_DIR/Sources/Geometry.swift" "$PROJECT_DIR/Sources/SaveStore.swift" "$PROJECT_DIR/Sources/MusicPlayer.swift" "$PROJECT_DIR/Sources/MUS.swift" \
+ "$PROJECT_DIR/Sources/WAD.swift" "$PROJECT_DIR/Sources/MapNames.swift" "$PROJECT_DIR/Sources/Geometry.swift" "$PROJECT_DIR/Sources/SaveStore.swift" "$PROJECT_DIR/Sources/MusicPlayer.swift" "$PROJECT_DIR/Sources/OPLPlayer.swift" "$PROJECT_DIR/Sources/MUS.swift" \
  "$PROJECT_DIR/Tests/FinalDoomValidation.swift" "$TEST_DIR/engine/libDoom.a" -Xlinker -dead_strip -o "$TEST_DIR/assets"
 "$TEST_DIR/routes" "$TNT" 1
 "$TEST_DIR/routes" "$PLUTONIA" 2

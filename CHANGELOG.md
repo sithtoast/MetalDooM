@@ -4,6 +4,21 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Version 0.2.0 — Build 65 — Classic OPL music
+
+- Add persistent Audio menu choices for Classic OPL (default) and Apple MIDI;
+  switching restarts the current track while preserving volume/mute settings.
+- Use pinned Chocolate Doom Doom 1.9 OPL2/Sound Blaster sequencing, the loaded
+  GENMIDI bank and Nuked OPL chip emulation, with native Core Audio playback.
+- Keep Apple General MIDI available without labelling it original Mac QuickTime.
+- Render OPL scores into temporary PCM (up to ten minutes); clean up players on
+  release/quit and report failed switches while restoring the previous backend.
+- Validate deterministic PCM, native playback, loops, pause/resume, mute,
+  backend switching and loaded-WAD shutdown. All 35 Doom II tracks render as
+  OPL PCM; Apple MIDI pitch/reset tests pass.
+- Bump the marketing version for the accumulated classic-campaign, WAD-stack,
+  diagnostics and selectable music milestone; update tester documentation.
+
 ## Build 62 — Benchmarks and session logs
 
 - Add a base-IWAD DEMO1 benchmark from the title screen: 5-second warm-up,

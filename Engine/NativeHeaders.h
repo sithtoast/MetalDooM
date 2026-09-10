@@ -10,3 +10,5 @@
 #define MAX_MOUSE_BUTTONS 8
 #define __I_JOYSTICK__
 extern int use_analog, joystick_move_sensitivity, joystick_turn_sensitivity;
+#define SDL_SwapBE16(x) OSSwapBigToHostInt16(x)
+#define SDL_SwapBE32(x) OSSwapBigToHostInt32(x)

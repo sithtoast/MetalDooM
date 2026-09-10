@@ -31,6 +31,7 @@ xcrun swiftc -swift-version 5 -O -target arm64-apple-macosx14.0 \
   -o "$APP_DIR/Contents/MacOS/MetalDooM"
 mkdir -p "$APP_DIR/Contents/Resources"
 cp "$PROJECT_DIR/LICENSE" "$APP_DIR/Contents/Resources/LICENSE"
+cp "$PROJECT_DIR/Vendor/ChocolateDoom/opl/COPYING.LESSER" "$APP_DIR/Contents/Resources/Nuked-OPL3-LICENSE.txt"
 cp "$PROJECT_DIR/Vendor/ChocolateDoom/UPSTREAM.md" "$APP_DIR/Contents/Resources/ChocolateDoom.txt"
 cp "$PROJECT_DIR/Info.plist" "$APP_DIR/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEXT_BUILD" "$APP_DIR/Contents/Info.plist"

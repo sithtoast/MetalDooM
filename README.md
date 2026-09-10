@@ -32,8 +32,23 @@ No game WAD assets are included.
 increments it and sets the app's `CFBundleVersion`. The version/build appear in the
 window title and About window; About includes a UTC build timestamp. Failed builds
 preserve the previous app and counter. Concurrent builds are rejected. Marketing
-version `0.1.0` is maintained separately in `Info.plist`. Commit `BUILD_NUMBER` with
+version `0.2.0` is maintained separately in `Info.plist`. Commit `BUILD_NUMBER` with
 releases; independent checkouts do not share a global numbering sequence.
+
+## Music playback
+
+**Audio → Classic OPL** (default) uses Chocolate Doom's Doom 1.9 OPL2/Sound
+Blaster instrument mapping, the loaded WAD's GENMIDI bank and the pinned Nuked
+OPL chip emulator. **Audio → Apple MIDI** uses Apple's General MIDI instruments.
+The selection persists and switching restarts the current track. Neither is
+labelled as a recreation of the original Macintosh QuickTime instrument bank.
+
+OPL scores are rendered into temporary 44.1 kHz stereo PCM before native Core
+Audio playback. Loading/switching may briefly pause while a score renders. Files
+are removed when their player is released; title and level playback remain
+independent. Tracks over ten minutes or missing/invalid GENMIDI are rejected;
+choose Apple MIDI for those scores. Volume, mute, pause/resume and looping work
+with both backends. No instrument banks or game music are bundled.
 
 ## Testing and diagnostics
 
@@ -123,12 +138,12 @@ The original engine decoder has not been hardened for deliberately crafted paylo
   projectiles, monster AI, damage, deaths, and automatic empty-ammo fallback.
 - Metal held-weapon/muzzle-flash overlays, number-key switching, damage/pickup tint,
   and an accessible kill count.
-- Original WAD music converted from MUS to MIDI in memory and played by Apple's
-  native sequencer and DLS synth, using the built-in General MIDI bank. Level, intermission
+- Original WAD music converted from MUS to MIDI in memory and played through
+  Classic OPL (default) or Apple's native General MIDI synth. Level, intermission
   and completion tracks loop; episode 4 uses the original reused tracks.
   Audio → Music (Cmd–Shift–M) toggles music and remembers the setting. Music pauses
   on focus loss and during file dialogs. Loading a save restarts its level track;
-  music position is not saved. This is General MIDI synthesis, not AdLib emulation.
+  music position is not saved. The Audio menu selects the music backend.
 - Native AVAudioEngine sound effects decoded from the IWAD's DMX samples, with
   16 voices, distance attenuation, stereo pan, and focus pause/resume.
 - Map switching/restarting, focus pause, and queued movement/use/fire/weapon taps.
