@@ -35,6 +35,12 @@ preserve the previous app and counter. Concurrent builds are rejected. Marketing
 version `0.1.0` is maintained separately in `Info.plist`. Commit `BUILD_NUMBER` with
 releases; independent checkouts do not share a global numbering sequence.
 
+## Testing and diagnostics
+
+Use **Diagnostics → Metal Performance HUD** to toggle Apple’s graphics overlay,
+and **Copy Diagnostic Report** to copy hardware, build and game details for a bug
+report. See [TESTING.md](TESTING.md) for setup, comparisons and reporting steps.
+
 ## Controls
 
 | Input | Action |

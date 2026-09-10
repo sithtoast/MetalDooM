@@ -4,6 +4,16 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 60 — Tester diagnostics
+
+- Add Diagnostics menu controls for Apple's Metal Performance HUD and a copyable
+  report with app/build, Mac/macOS/GPU/RAM, rendering settings and campaign/map.
+- Include ordered WAD filenames without full filesystem paths or game data.
+- Enable HUD support for normal app launches with a process-local launch
+  environment; start the overlay hidden and allow live on/off toggling.
+- Add a testing guide and GitHub bug-report template. Verify installed build 60
+  HUD visibility, empty/ordered-stack reports, clipboard output and shutdown.
+
 ## Build 55 — Rerelease HUD alignment
 
 - Center extended rerelease status-bar backgrounds around the classic HUD so

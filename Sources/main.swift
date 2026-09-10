@@ -32,6 +32,9 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var gameMenu: GameMenu?
     var menuKeyMonitor: Any?
     var musicMenuItem: NSMenuItem?
+    var metalHUDMenuItem: NSMenuItem?
+    var metalHUDEnabled = false
+    var diagnosticFPS: Double?
     var summary = "Open a Doom WAD to explore a map"
     func applicationDidFinishLaunching(_ notification: Notification) {
         do {
@@ -56,6 +59,11 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             musicMenuItem=musicItem
             musicItem.target=self; musicItem.keyEquivalentModifierMask=[.command,.shift]
             musicItem.state=UserDefaults.standard.bool(forKey:"musicMuted") ? .off : .on
+            let diagnosticsItem = NSMenuItem(), diagnosticsMenu = NSMenu(title:"Diagnostics")
+            diagnosticsItem.submenu = diagnosticsMenu; menu.addItem(diagnosticsItem)
+            metalHUDMenuItem = diagnosticsMenu.addItem(withTitle:"Metal Performance HUD",action:#selector(toggleMetalHUD),keyEquivalent:"")
+            metalHUDMenuItem?.target = self
+            diagnosticsMenu.addItem(withTitle:"Copy Diagnostic Report",action:#selector(copyDiagnosticReport),keyEquivalent:"").target = self
             NSApp.mainMenu = menu
             window = NSWindow(contentRect:NSRect(x:0,y:0,width:1100,height:760),styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)
             window.title = "\(appTitle) — Gameplay Preview"; window.minSize = NSSize(width:720,height:640)
@@ -66,6 +74,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             view.colorPixelFormat = .bgra8Unorm; view.depthStencilPixelFormat = .depth32Float
             view.clearColor = MTLClearColor(red:0,green:0,blue:0,alpha:1)
             view.preferredFramesPerSecond = 120; view.framebufferOnly = false
+            configureMetalHUD()
             renderer = try Renderer(view:view); view.delegate = renderer
             view.onEscape = { [weak self] in self?.openGameMenu() }
             view.onBlockedClick = { [weak self] in if self?.attractActive==true && self?.consoleVisible==false { self?.openGameMenu() } }
@@ -115,6 +124,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             ])
             renderer.onFrame = { [weak self] fps in
                 guard let self else { return }
+                self.diagnosticFPS = fps
                 self.layoutAutomap()
                 self.status.stringValue = "\(self.summary) · \(self.renderer.playerStatus) · \(Int(fps)) FPS"
                 self.message.stringValue = self.renderer.pickupMessage; self.message.isHidden = self.message.stringValue.isEmpty
