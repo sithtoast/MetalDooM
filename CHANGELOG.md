@@ -4,6 +4,16 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.4.0 · Build 92 — Level stats feature release
+
+- Bump the minor version for the new compact level stats, whole-second clock,
+  optional par time and secret notifications introduced in build 91.
+- Synchronize current version/install/release documentation and record the
+  versioning rule in AGENTS.md: minor for features, patch for fixes, independent
+  of the build counter; intermediate release refinements keep the same version.
+- Verify the bundled and running app report 0.4.0, build 92. Gameplay code is
+  unchanged from the validated build 91; no publishing or notarization performed.
+
 ## 0.3.0 · Build 91 — Level stats and secret notifications
 
 - Add compact, color-coded live kills/items/secrets counters and a whole-second

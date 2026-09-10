@@ -13,7 +13,7 @@ commit was `279ed70` (publishing helper). This document is committed afterward.
 Only local `main` existed; none of the proposed experimental branches has been
 created. Check `git log`, `git status`, and remote state before starting work.
 
-Current version: **0.3.0**, successful local app **build 91**. `Info.plist` owns
+Current version: **0.4.0**, successful local app **build 92**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
 Main now includes a small level-stats HUD (kills/items/secrets and whole-second
 clock), optional campaign par time, and independent secret notifications. Controls
@@ -160,6 +160,8 @@ without a new request. No credentials belong in source or this document.
 Read [AGENTS.md](AGENTS.md): validate each implementation, update the changelog
 with the actual successful app build, and make a local commit before replying.
 No push unless requested; do not infer permission from release bookkeeping.
-Do not bump the semantic version for every build. Fixes can be patches; a coherent
-new feature milestone can justify a minor version. Leave prior changelog entries
-intact. Keep WADs, app bundles, signing material and generated artifacts out of Git.
+Bump the semantic version for delivered user-visible changes: minor for new
+features, patch for fixes. Build numbers alone do not satisfy this requirement.
+Keep intermediate builds/refinements within the same feature release on its
+chosen version; documentation-only changes need no bump. `Info.plist` is the source
+of truth. Synchronize current release docs and retain historical changelog entries. Keep WADs, app bundles, signing material and generated artifacts out of Git.

@@ -1,4 +1,4 @@
-# MetalDooM 0.3.0 — Apple Silicon preview
+# MetalDooM 0.4.0 — Apple Silicon preview
 
 A native Metal source port for classic Doom, powered by Chocolate Doom.
 Requires Apple Silicon and macOS 14 or later. This is an early preview.
@@ -13,6 +13,12 @@ and confirm. See INSTALL.md inside the ZIP.
 Supply your own Doom/Ultimate Doom, Doom II, TNT or Plutonia IWAD. Standard SIGIL
 Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
+## New in 0.4.0
+
+- Compact live kills/items/secrets counters and a calmer whole-second level clock.
+- Independent secret-found notifications and optional campaign par time.
+- Remembered controls in View and Options → HUD.
+
 ## Included in this preview
 
 - Two-column WAD picker with folder browsing, drag-and-drop, recognized game names
@@ -25,8 +31,11 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 - Fixed phantom imps caused by drawing invisible teleport destinations.
 - Shorter About credits and separate player, developer and testing guides.
 
-Local validation build: **81**. GitHub artifacts use their own CI build number. Multiplayer, general GZDoom/Boom/MBF mods, SIGIL II and Legacy of
-Rust are not supported. Full manual campaign playthrough coverage remains ongoing.
+Local validation build: **92**. Version display verified in 0.4.0; the HUD,
+secret notification, engine counters/save restoration and Doom II regressions
+were validated for this feature release before the metadata-only rebuild. GitHub
+artifacts use their own CI build number. Multiplayer, general GZDoom/Boom/MBF mods,
+SIGIL II and Legacy of Rust are not supported. Full manual campaign playthrough coverage remains ongoing.
 
 Attach the binary ZIP, matching source ZIP and SHA-256 files to the GitHub release.
 The source archive includes the vendored engine, build scripts and licenses.

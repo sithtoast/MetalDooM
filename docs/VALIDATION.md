@@ -3,6 +3,13 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.4.0, build 92 — Semantic version correction
+
+The app rebuilt successfully. Source/bundled plist checks, current release-doc
+consistency, plist lint and code-signature verification passed. The native window
+visibly reports MetalDooM 0.4.0 (build 92). Gameplay source is unchanged from build
+91, so this metadata/documentation correction did not rerun gameplay suites.
+
 ## Build 91 — Compact level stats and secret notifications
 
 - `test-level-stats.sh` passed with the original Ultimate Doom IWAD: live item
