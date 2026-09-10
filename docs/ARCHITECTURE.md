@@ -331,3 +331,14 @@ MAP30 enters upstream F_StartCast/F_CastTicker/F_CastResponder. The bridge copie
 cast name, sprite patch, flip and death state; Metal presents BOSSBACK, text and
 sprite quads without calling software drawers. Fire taps are retained until a cast
 tic. Swift selects D_READ_M/D_EVIL; native finale music hooks are presentation stubs.
+
+## Experimental ray-traced ambient occlusion
+
+`AmbientOcclusion.swift` owns the optional shader and primitive acceleration
+structure. The View menu enables it for the current session; classic rendering
+is the default. Opaque world positions build the structure on the same command
+buffer before rendering. Replacement buffers/structures keep queued frames
+immutable. Position equality avoids builds for light-only or UV-only changes.
+World fragments trace eight short hemisphere rays; sky, sprite and HUD paths
+remain independent. See [Metal experiments](METAL_EXPERIMENTS.md) for exclusions,
+comparison controls and measurement boundaries.

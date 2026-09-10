@@ -27,6 +27,22 @@ are never included in the repository.
   maps without defined pars. Hide the overlay during title demos and endings.
 - Validate engine counts, time, saves, transitions, secret notice timing and
   Doom II par coverage; verify the HUD and controls in the running app.
+## 0.3.0 · Build 84 — Experimental ray-traced ambient occlusion
+
+- Add View → Ray-Traced Ambient Occlusion (Experimental), off at launch, with
+  Metal capability checks and classic-rendering fallback on failure.
+- Add subtle nearby shading to world surfaces using eight rays per fragment;
+  update ray geometry for moving sectors and map/save loads. Preserve classic
+  sector lighting, power-up fullbright effects, sprite/weapon shading and HUD.
+- Omit sky, billboard sprites and transparent materials as occluders in this
+  first version; masked materials do not become solid ray blockers.
+- Include AO state in diagnostics and benchmark comparisons. Document the
+  experiment, its visual limits and GPU measurement workflow.
+- Validate actual GPU pixels, exact restoration when disabled, unchanged HUD,
+  paused stability in Doom/Doom II, a moving Ultimate Doom door, map replacement
+  and shutdown;
+  retain all 36 Ultimate Doom geometry/art regression passes. Paired build 83
+  DEMO1 runs stay near the 120 FPS cap; final build 84 hardens encoder failure.
 
 ## 0.3.0 — Next-chat handoff (app build 81 unchanged)
 

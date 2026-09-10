@@ -79,6 +79,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             parTimeMenuItem?.target=self
             secretMenuItem=viewMenu.addItem(withTitle:"Secret Notifications",action:#selector(toggleSecretNotifications),keyEquivalent:"")
             secretMenuItem?.target=self
+            viewMenu.addItem(withTitle:"Ray-Traced Ambient Occlusion (Experimental)",action:#selector(toggleAmbientOcclusion),keyEquivalent:"").target=self
             let audioItem=NSMenuItem(), audioMenu=NSMenu(title:"Audio")
             audioItem.submenu=audioMenu; menu.addItem(audioItem)
             let musicItem=audioMenu.addItem(withTitle:"Music",action:#selector(toggleMusic(_:)),keyEquivalent:"m")

@@ -125,3 +125,11 @@ service. No game data is required: temporary signature fixtures exercise folder
 filtering and the actual drop-destination callbacks using file-URL pasteboard
 items, plus wrong-type rejection, duplicates, reordering and the Play callback.
 This is separate from manually dragging files from Finder into the running app.
+
+### Experimental ambient occlusion
+
+On the Metal experiments branch, use **View → Ray-Traced Ambient Occlusion
+(Experimental)**. It starts off each launch. Compare the same paused scene, then
+run matching DEMO1 benchmarks with it off/on. The report records AO state. See
+[Metal experiments](METAL_EXPERIMENTS.md) for the native GPU regression, current
+material/sprite exclusions and timing limits.

@@ -26,6 +26,46 @@ visibly reports MetalDooM 0.4.0 (build 92). Gameplay source is unchanged from bu
   SECRET FOUND! with S advancing from 0/4 to 1/4 in an ignored local IWAD fixture.
 - Source WADs were unchanged. Generated fixture/game data and app bundles remain
   ignored. This is targeted validation, not a complete campaign playthrough.
+## Ambient occlusion experiment — 2026-09-10
+
+Final app: 0.3.0 build 84 on `codex/metal-experiments`. The preceding build 83
+was used for the paired native benchmark; build 84 only adds submission of an
+already-encoded acceleration-structure build if render-encoder creation fails.
+
+- Real GPU regression with Metal API validation: Ultimate Doom E1M1 and Doom II
+  MAP01 shade world pixels, leave the HUD identical, remain stable while paused,
+  and exactly restore classic pixels when disabled. Map replacement and shutdown
+  pass. Ultimate Doom also opens an original door and verifies mesh rebuilds
+  during motion, with no additional rebuilds when paused.
+- `scripts/test.sh` passes all 36 Ultimate Doom maps, malformed fixtures,
+  material/patch decoding and sky/surface checks.
+- Native build 83 View toggle was visually checked with original E1M1 artwork.
+  Build 84 passed the final GPU regression and native menu/build check; the
+  app was left open in E1M1 with AO enabled.
+- At 1280×800, corrected single-frame readback tests sampled approximately
+  4.8 ms AO / 0.18 ms classic for E1M1 and 4.0 ms AO / 0.19–0.31 ms classic for
+  MAP01 (32 GPU command-duration samples each). These include API validation,
+  and readback pacing affects GPU clocks; they are not gameplay FPS estimates.
+
+Paired **native app build 83** DEMO1 runs, 5-second warm-up and 15-second sample:
+
+| Rendering | Average FPS | 1% low FPS | Mean interval | p99 | Maximum |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Classic | 118.00 | 38.14 | 8.47 ms | 22.05 ms | 33.60 ms |
+| Ray-traced AO | 118.80 | 44.50 | 8.42 ms | 18.53 ms | 28.93 ms |
+
+Both use M5 Pro / macOS 27.0 (26A428), 2200×1400 drawable, 100% render scale,
+120 FPS cap and 120 Hz display, windowed, Metal HUD off and Classic OPL.
+The Ultimate Doom IWAD SHA-256 is
+`6fdf361847b46228cfebd9f3af09cd844282ac75f3edbb61ca4cb27103ce2e7f`.
+Reports are local ignored files `build/classic-benchmark-build83.txt` and
+`build/ao-benchmark-build83.txt`. These measure capped CPU submission intervals;
+the small difference is run-to-run variation, not evidence that AO improves
+performance. Power mode/AC state were not recorded, and this is one paired run.
+
+Other GPUs, full campaigns, worst-case moving-sector maps and forced GPU/resource
+allocation failures are untested. Transparent surfaces and sprites are explicitly
+excluded as occluders. See [Metal experiments](METAL_EXPERIMENTS.md).
 
 ## Validation
 

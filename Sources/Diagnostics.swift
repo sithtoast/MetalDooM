@@ -14,6 +14,12 @@ extension App {
 
     @objc func selectOPL(_ sender:NSMenuItem) { UserDefaults.standard.set("opl",forKey:"musicBackend");sessionLog.append("Music backend: Classic OPL") }
     @objc func selectAppleMIDI(_ sender:NSMenuItem) { UserDefaults.standard.set("apple",forKey:"musicBackend");sessionLog.append("Music backend: Apple MIDI") }
+    @objc func toggleAmbientOcclusion() {
+        do {
+            try renderer.setAmbientOcclusion(!renderer.ambientOcclusionEnabled)
+            sessionLog.append("Ray-traced ambient occlusion: \(renderer.ambientOcclusionEnabled ? "On" : "Off")")
+        } catch { show(error) }
+    }
     @objc func toggleMetalHUD() {
         metalHUDEnabled.toggle()
         configureMetalHUD()
@@ -62,6 +68,10 @@ extension App {
         Frame limit: \(view.preferredFramesPerSecond) FPS
         Recent renderer FPS: \(fps) (not a benchmark)
         Music backend: \(MusicPlayer.preferredBackend == "opl" ? "Classic OPL" : "Apple MIDI")
+        Ray-traced AO: \(renderer.ambientOcclusionEnabled ? "On (8 rays, radius 48, strength 0.5, opaque world only)" : "Off")
+        AO occluder triangles: \(renderer.ambientOcclusion?.triangleCount ?? 0)
+        Ray tracing in render shaders: \(renderer.ambientOcclusionSupported)
+        Recent GPU command duration: \(String(format:"%.3f",renderer.recentGPUTime*1000)) ms (not a benchmark)
         Metal HUD: \(metalHUDEnabled ? "On" : "Off")
         Campaign: \(wad?.gameName ?? "No WAD loaded")
         Base WAD edition: \(wad == nil ? "No WAD loaded" : (wad!.isKEXEdition ? "KEX Edition" : "Not identified as KEX"))

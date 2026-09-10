@@ -2,43 +2,55 @@
 
 ## Where to resume
 
-The active repository is `/Users/wmh/Dev/MetalDooM`, on `main`.
+The active repository is `/Users/wmh/Dev/MetalDooM`, on `codex/metal-experiments`.
 The saved project for this conversation points to
 `/Users/wmh/Documents/ChatGPT/MetalDooM`, a separate outer repository used for
 staging. Do not commit that outer repository or copy its staging tree over newer
 source. Open the active Dev repository in the next chat and inspect its status.
 
-At handoff preparation, the active tree was clean and the latest implementation
-commit was `279ed70` (publishing helper). This document is committed afterward.
-Only local `main` existed; none of the proposed experimental branches has been
-created. Check `git log`, `git status`, and remote state before starting work.
+The active experiment is on `codex/metal-experiments`; check Git status/log before
+continuing. The user selected **ray-traced ambient occlusion**. It is implemented
+as a per-session View menu option, with classic rendering still the default.
 
 Current version: **0.4.0**, successful local app **build 92**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
-Main now includes a small level-stats HUD (kills/items/secrets and whole-second
-clock), optional campaign par time, and independent secret notifications. Controls
-are in View and Options → HUD; preferences persist. The user requested a smaller
-HUD and found hundredths distracting, so retain the compact, whole-second display.
-See CHANGELOG.md and docs/VALIDATION.md for this change's evidence.
+This is an experimental branch, not a published release. No push was requested.
 
-## Previously discussed branch directions
+Main also supplies the compact level-stats HUD (kills/items/secrets and a whole-second
+clock), optional campaign par time and independent secret notifications. Keep its
+View and Options → HUD controls and persistent preferences.
 
-The user previously discussed starting one of the separate branch directions below.
-They have not selected which one yet. Establish that choice before implementation;
-do not combine all three or introduce a broad advanced-mode toggle first.
-Branch names below are proposals, not existing branches or requested exact names.
+## Where the experiment stands
 
-| Direction | Suggested branch | Bounded first step |
-| --- | --- | --- |
-| Broader KEX add-on compatibility | `codex/kex-compatibility` | Inventory one chosen add-on's requirements and implement one supported compatibility milestone with regression coverage. |
-| Optional Metal rendering enhancements | `codex/metal-experiments` | Choose one optional effect or performance feature, keep classic presentation as the default, and compare identical scenes with the benchmark. |
-| Picker inside the main window | `codex/window-picker` | Move the picker presentation into the window while retaining its selection, load-order, cancellation and game-switch behavior. |
+Read [Metal experiments](docs/METAL_EXPERIMENTS.md). `AmbientOcclusion.swift`
+adds eight short hemisphere rays per world fragment using a Metal acceleration
+structure built from opaque world triangles. Moving geometry gets a fresh
+structure; unchanged positions avoid rebuilds for light-only changes. Sky,
+billboard sprites and masked materials do not cast occlusion. Original sprite,
+weapon and HUD shading remain unchanged.
 
-The user specifically floated an in-window picker as later UI polish, and an
-advanced/experimental direction for other WADs supplied with the KEX rerelease
-and optional Metal features. Keep compatibility changes separate from rendering
-experiments so failures can be attributed. External testing of 0.3.0 can continue
-while a focused experiment proceeds on its own branch.
+The View option is disabled when Metal ray tracing in render shaders is absent.
+The M5 Pro used locally reports support. Other GPU families are untested.
+Diagnostics and benchmark settings include AO state. The existing benchmark is
+still a capped CPU-submission benchmark, not a GPU throughput measurement.
+
+The focused Metal API-validation regression passed on Ultimate Doom E1M1:
+paused AO pixels remain stable, HUD pixels are unchanged, disabling AO restores
+identical classic pixels, a real door updates the ray mesh, map replacement
+rebuilds it, and shutdown completes. A corrected single-frame 1280×800 paused
+sample measured approximately 4.8 ms AO versus 0.18 ms classic GPU command time;
+API validation/readback pacing limit performance conclusions. The original
+geometry/art regression passed all 36 Ultimate Doom maps. See validation docs
+for final native checks and Doom II coverage. Build 83's paired DEMO1 benchmark
+at 2200×1400 returned 118.8 FPS AO / 118.0 FPS classic under the 120 FPS cap;
+this does not establish uncapped throughput or an AO speedup. Build 84 hardens
+the path where render-encoder creation fails after encoding a ray-mesh build.
+Its final GPU regression passed, and the running build 84 View toggle/presentation
+were verified. The app was left in E1M1 with AO enabled for this session.
+
+Potential follow-ups are alpha-tested ray intersections, static/moving mesh
+separation, sample-quality tuning and measurements on more maps/GPUs. Keep KEX
+compatibility and the future in-window WAD picker on their own branches.
 
 ## Current behavior and important boundaries
 
@@ -160,8 +172,6 @@ without a new request. No credentials belong in source or this document.
 Read [AGENTS.md](AGENTS.md): validate each implementation, update the changelog
 with the actual successful app build, and make a local commit before replying.
 No push unless requested; do not infer permission from release bookkeeping.
-Bump the semantic version for delivered user-visible changes: minor for new
-features, patch for fixes. Build numbers alone do not satisfy this requirement.
-Keep intermediate builds/refinements within the same feature release on its
-chosen version; documentation-only changes need no bump. `Info.plist` is the source
-of truth. Synchronize current release docs and retain historical changelog entries. Keep WADs, app bundles, signing material and generated artifacts out of Git.
+Do not bump the semantic version for every build. Fixes can be patches; a coherent
+new feature milestone can justify a minor version. Leave prior changelog entries
+intact. Keep WADs, app bundles, signing material and generated artifacts out of Git.

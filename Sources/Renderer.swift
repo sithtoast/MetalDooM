@@ -71,6 +71,30 @@ private struct Uniforms { var matrix: simd_float4x4 }
 final class Renderer: NSObject, MTKViewDelegate {
     let device: MTLDevice, queue: MTLCommandQueue, pipeline: MTLRenderPipelineState, skyPipeline: MTLRenderPipelineState, skySurfacePipeline: MTLRenderPipelineState, spritePipeline: MTLRenderPipelineState, tintPipeline: MTLRenderPipelineState, fuzzPipeline: MTLRenderPipelineState, depth: MTLDepthStencilState, fuzzDepth: MTLDepthStencilState
     private var batches: [GPUBatch] = []
+    private var worldShader = ""
+    private var worldFormat: MTLPixelFormat = .bgra8Unorm
+    private var opaqueMaterials = Set<MaterialKey>()
+    private var aoGeometryDirty = true
+    private(set) var ambientOcclusion: AmbientOcclusion?
+    var ambientOcclusionEnabled: Bool { ambientOcclusion != nil }
+    var ambientOcclusionSupported: Bool { device.supportsRaytracing && device.supportsRaytracingFromRender }
+    var onGPUFrame: ((Double) -> Void)?
+    private(set) var recentGPUTime: Double = 0
+    func setAmbientOcclusion(_ enabled: Bool) throws {
+        guard enabled != ambientOcclusionEnabled else { return }
+        ambientOcclusion = enabled ? try AmbientOcclusion(device:device,shader:worldShader,format:worldFormat) : nil
+        aoGeometryDirty=true
+    }
+    private func prepareAmbientOcclusion(command: MTLCommandBuffer) throws {
+        guard let ao=ambientOcclusion, aoGeometryDirty else { return }
+        var positions: [SIMD4<Float>] = []
+        for batch in batches where opaqueMaterials.contains(batch.material) {
+            let vertices=batch.vertices.contents().bindMemory(to:WorldVertex.self,capacity:batch.count)
+            positions.append(contentsOf:(0..<batch.count).map { vertices[$0].position })
+        }
+        try ao.prepare(positions:positions,device:device,command:command)
+        aoGeometryDirty=false
+    }
     private var sceneSnapshot: MTLTexture?
     private var sky: MTLTexture?
     private var skyGeometry: MTLBuffer?
@@ -223,6 +247,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             return float4(powerColor(skyColor(float3(cos(camera.x)*f+sin(camera.x)*x,h,-sin(camera.x)*f+cos(camera.x)*x),tex).rgb,power),1);
         }
         """
+        worldShader=shader;worldFormat=view.colorPixelFormat
         let library = try device.makeLibrary(source:shader,options:nil)
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.vertexFunction = library.makeFunction(name:"worldVertex")
@@ -278,11 +303,13 @@ final class Renderer: NSObject, MTKViewDelegate {
             }
         }
         var cached: [MaterialKey:MTLTexture] = [:], missing: [String] = []
+        var opaque = Set<MaterialKey>()
         func cacheMaterial(_ material: MaterialKey) throws {
             if cached[material] != nil { return }
             let source = try art.image(material)
             if source == nil { missing.append(material.name) }
             let pixels = source ?? Art.fallback
+            if stride(from:3,to:pixels.rgba.count,by:4).allSatisfy({ pixels.rgba[$0] >= 128 }) { opaque.insert(material) }
             let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba8Unorm,width:pixels.width,height:pixels.height,mipmapped:false)
             descriptor.usage = .shaderRead; descriptor.storageMode = .shared
             guard let texture = device.makeTexture(descriptor:descriptor) else {
@@ -324,12 +351,16 @@ final class Renderer: NSObject, MTKViewDelegate {
             try cacheMaterial(key); animationIDs[key]=frame.index
             if key.flat { flats[frame.index]=cached[key] } else { walls[frame.index]=cached[key] }
         }
+        // Conservatively omit animated walls if any animation frame is masked.
+        let maskedWallAnimation=animationIDs.contains { !$0.key.flat && !opaque.contains($0.key) }
+        if maskedWallAnimation { for key in animationIDs.keys where !key.flat { opaque.remove(key) } }
         animatedIDs=animationIDs; animatedWalls=walls; animatedFlats=flats
         demoPlayback = demo != nil
         skill=MD_GetSkill()
         progress = MD_GetProgress(); intermission = IntermissionSequence(progress); intermissionTime = 0; deathTime = 0; finale = FinaleSequence(); lastGeometryTick = -1
         intermissionArt = loadedIntermission
         textureHeights = heights
+        opaqueMaterials=opaque;aoGeometryDirty=true
         self.map = map; self.wad = wad; textures = cached; batches = loaded; sky = loadedSky; sprites = loadedSprites; pitch = 0
         music?.update(active:false); music=loadedMusic; music?.enabled=musicEnabled; music?.volume=musicVolume
         sound = loadedSound; sound?.volume=effectsVolume; sound?.drain()
@@ -404,6 +435,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         if changed {
             let geometry = try Geometry(map:map,textureHeights:textureHeights)
             batches = try makeBatches(geometry,textures:textures)
+            aoGeometryDirty=true
             try uploadSkyGeometry(geometry)
             self.map = map
         }
@@ -421,12 +453,27 @@ final class Renderer: NSObject, MTKViewDelegate {
         let semaphore = inFlight
         command.addCompletedHandler { [weak self] buffer in
             if let error = buffer.error {
-                DispatchQueue.main.async { [weak self] in self?.onWarning?("Metal command error: \(error)") }
+                DispatchQueue.main.async { [weak self] in
+                    self?.ambientOcclusion=nil
+                    self?.onWarning?("Metal command error (ambient occlusion disabled): \(error)")
+                }
+            }
+            let gpuTime=max(0,buffer.gpuEndTime-buffer.gpuStartTime)
+            DispatchQueue.main.async { [weak self] in
+                self?.recentGPUTime=gpuTime
+                self?.onGPUFrame?(gpuTime)
             }
             semaphore.signal()
         }
+        do { try prepareAmbientOcclusion(command:command) }
+        catch {
+            ambientOcclusion=nil
+            DispatchQueue.main.async { [weak self] in self?.onWarning?("Ambient occlusion disabled: \(error)") }
+        }
         pass.depthAttachment.storeAction = .store
-        guard var encoder = command.makeRenderCommandEncoder(descriptor:pass) else { inFlight.signal(); return }
+        // A BVH build may already be encoded. Submit it even if the render
+        // encoder fails, so the next frame never consumes an unbuilt structure.
+        guard var encoder = command.makeRenderCommandEncoder(descriptor:pass) else { command.commit(); return }
         var power=SIMD4<Float>(hud.fixedColorMap==32 ? 1:0,hud.fixedColorMap==1 ? 1:0,Float(hud.tick),0)
         var noPower=SIMD4<Float>.zero
         encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
@@ -460,6 +507,12 @@ final class Renderer: NSObject, MTKViewDelegate {
                 encoder.setFragmentTexture(sky,index:0)
                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:skyVertexCount)
                 encoder.setRenderPipelineState(pipeline)
+            }
+            if let ao=ambientOcclusion, let structure=ao.structure {
+                var aoEye=SIMD4(eye,1)
+                encoder.setRenderPipelineState(ao.pipeline)
+                encoder.setFragmentBytes(&aoEye,length:MemoryLayout<SIMD4<Float>>.stride,index:3)
+                encoder.setFragmentAccelerationStructure(structure,bufferIndex:4)
             }
             for batch in batches {
                 encoder.setVertexBuffer(batch.vertices,offset:0,index:0); encoder.setFragmentTexture(animatedTexture(batch),index:0)
