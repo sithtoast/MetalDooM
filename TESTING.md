@@ -48,7 +48,37 @@ which display is used. Allow loading to settle before taking screenshots.
 
 A 60 FPS cap can hide differences between faster Macs. Frame cap and render scale
 are adjustable in the game options (or console `fps 120`, `render_scale 100`).
-There is currently no automated benchmark or session-log export.
+### Repeatable benchmark
+
+Save active gameplay first, choose **File → Return to Title Screen**, then
+**Diagnostics → Run Benchmark…**. Use a base IWAD without add-ons. The benchmark
+restarts that IWAD's DEMO1, warms up for 5 seconds and measures for 15 seconds.
+It returns to the title screen; normal frame cap, render scale, audio and skill
+settings are retained. Escape cancels. Losing focus, resizing, changing display
+settings or a demo ending early cancels the run without publishing partial results.
+
+The result reports average FPS, slowest-1% FPS, mean/p99/max frame intervals,
+settings, build, hardware and ordered SHA-256 WAD fingerprints. Use **Copy Full
+Result** in the completion dialog or **Diagnostics → Export Benchmark Result…**.
+Cancelled runs retain the previous completed result, if any.
+
+This measures CPU frame-submission intervals, not GPU time or actual on-screen
+presentation. It uses the current FPS cap and display synchronization, so it is
+not a maximum-throughput benchmark. Compare the same benchmark version, WAD hash,
+settings and display configuration. Very slow runs can also advance Doom's
+simulation differently because the renderer limits catch-up time per frame.
+
+### Session log export
+
+Choose **Diagnostics → Export Session Log…** to save a text report with current
+diagnostics and recent app events. The in-memory log keeps at most 256 entries,
+up to 1024 message characters each, and reports how many older entries were dropped.
+It records map/WAD loads, missing-texture warnings, rendering-setting changes,
+app/Metal errors and benchmark start/completion/cancellation. Filesystem paths are
+conservatively redacted. No WAD contents are exported and nothing is uploaded.
+
+Export before quitting: the session log is not persisted automatically and cannot
+replace a macOS crash report. Review exported text before posting it.
 
 ## Gameplay checks
 

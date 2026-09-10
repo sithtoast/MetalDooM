@@ -4,6 +4,19 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 62 — Benchmarks and session logs
+
+- Add a base-IWAD DEMO1 benchmark from the title screen: 5-second warm-up,
+  15-second measurement, average/slowest-1% FPS and mean/p99/max intervals.
+- Record current capped rendering settings, hardware/build and WAD SHA-256;
+  label CPU submission timing explicitly and export completed results as text.
+- Preserve normal settings, return to title, and discard interrupted runs when
+  cancelled, unfocused, resized or affected by playback/Metal errors.
+- Export bounded, path-redacted session logs with map/WAD loads, missing textures,
+  errors, settings and benchmark events; update the testing guide/issue template.
+- Validate statistics, log bounds/redaction, cancellation/settings preservation,
+  shutdown, native Doom II/TNT runs and exported reports in installed builds.
+
 ## Build 60 — Tester diagnostics
 
 - Add Diagnostics menu controls for Apple's Metal Performance HUD and a copyable

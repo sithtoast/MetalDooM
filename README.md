@@ -39,7 +39,8 @@ releases; independent checkouts do not share a global numbering sequence.
 
 Use **Diagnostics → Metal Performance HUD** to toggle Apple’s graphics overlay,
 and **Copy Diagnostic Report** to copy hardware, build and game details for a bug
-report. See [TESTING.md](TESTING.md) for setup, comparisons and reporting steps.
+report. **Run Benchmark…** replays DEMO1 from the title screen; export completed
+results or a bounded session log from the same menu. See [TESTING.md](TESTING.md) for setup, comparisons and reporting steps.
 
 ## Controls
 

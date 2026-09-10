@@ -131,6 +131,8 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var frames = 0
     private var reportTime = CACurrentMediaTime()
     var onFrame: ((Double) -> Void)?
+    var onSubmittedFrame: ((Double) -> Void)?
+    var onWarning: ((String) -> Void)?
     var onError: ((Error) -> Void)?
     var playerStatus: String {
         guard engineReady else { return "" }
@@ -410,8 +412,10 @@ final class Renderer: NSObject, MTKViewDelegate {
               let command = queue.makeCommandBuffer() else { return }
         inFlight.wait()
         let semaphore = inFlight
-        command.addCompletedHandler { buffer in
-            if let error = buffer.error { fputs("Metal command error: \(error)\n",stderr) }
+        command.addCompletedHandler { [weak self] buffer in
+            if let error = buffer.error {
+                DispatchQueue.main.async { [weak self] in self?.onWarning?("Metal command error: \(error)") }
+            }
             semaphore.signal()
         }
         pass.depthAttachment.storeAction = .store
@@ -495,6 +499,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             }
         }
         encoder.endEncoding(); command.present(drawable); command.commit(); renderedFrames += 1
+        onSubmittedFrame?(CACurrentMediaTime())
         frames += 1
         if time-reportTime >= 0.5 { onFrame?(Double(frames)/(time-reportTime)); frames = 0; reportTime = time }
     }

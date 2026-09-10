@@ -35,7 +35,16 @@ let restored = previous.map { entries -> NSPasteboardItem in
 pasteboard.writeObjects(restored)
 subject.toggleMetalHUD()
 precondition(!subject.metalHUDEnabled && layer.developerHUDProperties?["mode"] as? String == "disabled")
+let cap=subject.view.preferredFramesPerSecond, scale=subject.view.renderScale
+subject.lastBenchmarkReport="previous completed result"
+subject.benchmark=BenchmarkRun(context:"fixture",settings:subject.benchmarkSettings)
+subject.finishBenchmark(reason:"test cancellation",notify:false)
+precondition(subject.benchmark == nil && subject.lastBenchmarkReport == "previous completed result")
+precondition(subject.view.preferredFramesPerSecond == cap && subject.view.renderScale == scale)
+precondition(subject.sessionLog.text.contains("test cancellation"))
+subject.benchmark=BenchmarkRun(context:"late shutdown fixture",settings:subject.benchmarkSettings)
 subject.window.performClose(nil)
+precondition(subject.benchmark == nil)
 subject.advanceAttract()
 precondition(subject.shuttingDown)
 print("PASS: diagnostics default/toggle, report context, filename-only WAD order, clipboard and shutdown")

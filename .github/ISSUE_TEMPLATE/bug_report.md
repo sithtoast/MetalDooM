@@ -24,6 +24,9 @@ Paste report here
 
 ## Screenshots or crash report
 
+Attach **Diagnostics → Export Session Log…** when available. For comparisons,
+attach **Export Benchmark Result…** from the same WAD/settings.
+
 For performance issues, enable **Diagnostics → Metal Performance HUD** and
 include a screenshot. Mention power mode, power adapter and display used.
 For crashes, attach the MetalDooM crash report from macOS Console after reviewing

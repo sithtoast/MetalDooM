@@ -35,6 +35,10 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var metalHUDMenuItem: NSMenuItem?
     var metalHUDEnabled = false
     var diagnosticFPS: Double?
+    let sessionLog = SessionLog()
+    var benchmark: BenchmarkRun?
+    var lastBenchmarkReport: String?
+    var loggedSettings = ""
     var summary = "Open a Doom WAD to explore a map"
     func applicationDidFinishLaunching(_ notification: Notification) {
         do {
@@ -64,6 +68,11 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             metalHUDMenuItem = diagnosticsMenu.addItem(withTitle:"Metal Performance HUD",action:#selector(toggleMetalHUD),keyEquivalent:"")
             metalHUDMenuItem?.target = self
             diagnosticsMenu.addItem(withTitle:"Copy Diagnostic Report",action:#selector(copyDiagnosticReport),keyEquivalent:"").target = self
+            diagnosticsMenu.addItem(withTitle:"Export Session Log…",action:#selector(exportSessionLog),keyEquivalent:"").target=self
+            diagnosticsMenu.addItem(.separator())
+            diagnosticsMenu.addItem(withTitle:"Run Benchmark…",action:#selector(runBenchmark),keyEquivalent:"").target=self
+            diagnosticsMenu.addItem(withTitle:"Cancel Benchmark",action:#selector(cancelBenchmark),keyEquivalent:"").target=self
+            diagnosticsMenu.addItem(withTitle:"Export Benchmark Result…",action:#selector(exportBenchmarkResult),keyEquivalent:"").target=self
             NSApp.mainMenu = menu
             window = NSWindow(contentRect:NSRect(x:0,y:0,width:1100,height:760),styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)
             window.title = "\(appTitle) — Gameplay Preview"; window.minSize = NSSize(width:720,height:640)
@@ -82,6 +91,10 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             view.preferredFramesPerSecond=UserDefaults.standard.object(forKey:"frameLimit") as? Int ?? 120
             menuKeyMonitor=NSEvent.addLocalMonitorForEvents(matching:.keyDown) { [weak self] event in
                 guard let self, !self.shuttingDown, self.window.isKeyWindow, self.window.attachedSheet == nil else { return event }
+                if self.benchmark != nil {
+                    if event.keyCode == 53 { self.cancelBenchmark() }
+                    return nil
+                }
                 let modified = !event.modifierFlags.intersection([.command,.control,.option]).isEmpty
                 if !modified, ["`","~"].contains(event.characters ?? "") {
                     if !event.isARepeat { self.toggleConsole() }; return nil
@@ -125,6 +138,11 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             renderer.onFrame = { [weak self] fps in
                 guard let self else { return }
                 self.diagnosticFPS = fps
+                let settings=self.benchmarkSettings
+                if settings != self.loggedSettings {
+                    self.loggedSettings=settings
+                    self.sessionLog.append("Rendering settings: " + settings)
+                }
                 self.layoutAutomap()
                 self.status.stringValue = "\(self.summary) · \(self.renderer.playerStatus) · \(Int(fps)) FPS"
                 self.message.stringValue = self.renderer.pickupMessage; self.message.isHidden = self.message.stringValue.isEmpty
@@ -133,7 +151,14 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 guard let self else { return }
                 self.closeAutomap();self.maps.selectItem(withTitle:name); self.summary = self.wad?.mapTitle(name) ?? name
                 self.updateTitle(map:name)
+                self.sessionLog.append("Map changed: \(name)")
             }
+            renderer.onSubmittedFrame = { [weak self] time in self?.benchmarkFrame(time) }
+            renderer.onWarning = { [weak self] text in
+                self?.sessionLog.append(text)
+                self?.finishBenchmark(reason:"Metal command failed.")
+            }
+            sessionLog.append("Started " + appTitle + "; GPU: " + renderer.device.name)
             renderer.onError = { [weak self] error in self?.show(error) }
             let sizes=[NSSize(width:960,height:720),NSSize(width:1100,height:760),NSSize(width:1280,height:720),NSSize(width:1600,height:900),NSSize(width:1920,height:1080)]
             let preset=UserDefaults.standard.object(forKey:"windowPreset") as? Int ?? 1
@@ -207,6 +232,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let candidate = try WAD(url:url,addOns:addOns)
             let selected = candidate.isSigil ? "E5M1" : candidate.maps.contains("E1M1") ? "E1M1" : candidate.maps[0]
             let result = try renderer.load(wad:candidate,map:selected)
+            sessionLog.append("Loaded WAD stack: " + candidate.displayFiles)
             wad = candidate; maps.removeAllItems(); maps.addItems(withTitles:candidate.maps); maps.selectItem(withTitle:selected); maps.isEnabled = true
             describe(selected,result)
             if showTitle { beginAttract() }
@@ -228,6 +254,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         summary = wad?.mapTitle(name) ?? name
         if !result.missing.isEmpty { summary += " · \(result.missing.count) missing textures" }
         status.stringValue = summary
+        sessionLog.append("Loaded \(name): \(result.triangles) triangles; missing textures: \(result.missing)")
         print("Loaded \(name): \(result.triangles) triangles. Missing textures: \(result.missing)")
     }
     @objc func about() {
@@ -238,6 +265,8 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         alert.runModal()
     }
     func show(_ error: Error) {
+        sessionLog.append("Error: \(error)")
+        if benchmark != nil { finishBenchmark(reason:"Renderer error",notify:false) }
         view?.releaseMouse()
         let alert = NSAlert(); alert.messageText = "MetalDooM"; alert.informativeText = String(describing:error); alert.runModal()
     }
@@ -349,6 +378,8 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func shutdown() {
         guard !shuttingDown else { return }
         shuttingDown = true
+        finishBenchmark(reason:"Application closed",notify:false)
+        sessionLog.append("Application shutdown")
         endAttract()
         view?.releaseMouse()
         view?.inputBlocked = true
