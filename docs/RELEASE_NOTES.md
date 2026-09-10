@@ -18,6 +18,9 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 - Compact live kills/items/secrets counters and a calmer whole-second level clock.
 - Independent secret-found notifications and optional campaign par time.
 - Remembered controls in View and Options → HUD.
+- On `codex/metal-experiments`: optional ray-traced AO with strength/radius
+  controls, masked-grille intersections and repaired ceiling seams, rebased onto
+  the 0.4.0 HUD release. Classic rendering remains the default.
 
 ## Included in this preview
 
@@ -31,9 +34,10 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 - Fixed phantom imps caused by drawing invisible teleport destinations.
 - Shorter About credits and separate player, developer and testing guides.
 
-Local validation build: **92**. Version display verified in 0.4.0; the HUD,
-secret notification, engine counters/save restoration and Doom II regressions
-were validated for this feature release before the metadata-only rebuild. GitHub
+Local experimental integration build: **93**, version **0.4.0**. Level-stats,
+secret timing/save tests and the AO/48-view ceiling GPU regression pass. The
+native HUD and AO controls were verified together. Build 92's main-release and
+earlier Doom II results remain recorded in docs/VALIDATION.md. GitHub
 artifacts use their own CI build number. Multiplayer, general GZDoom/Boom/MBF mods,
 SIGIL II and Legacy of Rust are not supported. Full manual campaign playthrough coverage remains ongoing.
 

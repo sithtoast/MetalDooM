@@ -12,13 +12,20 @@ The active experiment is on `codex/metal-experiments`; check Git status/log befo
 continuing. The user selected **ray-traced ambient occlusion**. It is implemented
 as a per-session View menu option, with classic rendering still the default.
 
-Current version: **0.4.0**, successful local app **build 92**. `Info.plist` owns
+Current version: **0.4.0**, successful local app **build 93**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
 This is an experimental branch, not a published release. No push was requested.
 
 Main also supplies the compact level-stats HUD (kills/items/secrets and a whole-second
 clock), optional campaign par time and independent secret notifications. Keep its
 View and Options → HUD controls and persistent preferences.
+
+The experiment branch was rebased onto main commit `771625e`. Its three original
+experiment commits were replayed; `codex/metal-experiments-before-771625e` preserves
+the old tip `1730d4c` locally. Main and remotes were not modified. Build 93 passes
+the level-stats/secret/save tests and the AO/48-view ceiling GPU suite, and its
+native window was checked with live counters/par time and AO together. The
+separate validation instance was closed afterward.
 
 ## Where the experiment stands
 
@@ -57,8 +64,10 @@ MetalFX spatial/temporal/denoised upscaling and frame interpolation support.
 These optional MetalFX paths are not implemented. Other GPUs remain untested.
 The prior build 83 benchmark is historical; see validation docs for timing limits.
 
-The discussed next visible experiment is one shadow-casting light, before
-projectile/torch lighting. It has not been implemented. Keep compatibility and
+The user is comparing dynamic lights/shadows against emissive surfaces/bloom.
+The recommendation is one moving shadow-casting light using the current ray mesh,
+then projectile/torch lighting, followed by emissive texture masks and restrained
+bloom. These are proposals, not an implemented or selected next feature. Keep compatibility and
 in-window picker work on separate branches. No push has been requested.
 
 ## Current behavior and important boundaries

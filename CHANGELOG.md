@@ -4,6 +4,16 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.4.0 · Build 93 — Integrate main into Metal experiments
+
+- Rebase the AO, masked-grille and ceiling-seam work onto main commit `771625e`,
+  retaining compact time/kills/items/secrets counters, optional par time, secret
+  notifications and all existing HUD/AO controls.
+- Keep the current 0.4.0 feature release and continue above main's build 92.
+  No additional lighting effect is introduced by this integration.
+- Validate level stats/secret timing and saves, the AO/48-view ceiling GPU
+  regression, and the combined HUD/View menu in native build 93.
+
 ## 0.4.0 · Build 92 — Level stats feature release
 
 - Bump the minor version for the new compact level stats, whole-second clock,

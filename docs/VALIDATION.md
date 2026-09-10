@@ -3,6 +3,23 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.4.0, build 93 — Rebase onto main `771625e`
+
+- Replayed all three Metal experiment commits atop the level-stats/secret feature
+  and its 0.4.0 version correction. Preserved both sets of View items and the new
+  renderer HUD callbacks, secret reset/update hooks and native overlay.
+- `test-level-stats.sh` passes: counts, one discovery per sector, clock, save
+  restoration, exit-stat agreement, map/reset behavior, missing par, and secret
+  expiry/refresh and restore suppression.
+- `AO_CEILING=1 ... test-ambient-occlusion.sh` passes on original Ultimate Doom:
+  alpha rays, settings, exact classic restoration, stable paused/HUD pixels,
+  all 48 ceiling captures, moving door, map replacement and shutdown.
+- Native 0.4.0 build 93 visibly shows time/par and K/I/S with AO enabled; the View
+  menu includes stats, par, secret notifications and AO strength/radius. The test
+  instance was closed without replacing the user's running game.
+- No new lighting effect, full campaign playthrough or performance benchmark was
+  included. Earlier Doom II/map-wide results remain historical.
+
 ## 0.4.0, build 92 — Semantic version correction
 
 The app rebuilt successfully. Source/bundled plist checks, current release-doc
