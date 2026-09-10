@@ -58,6 +58,7 @@ extension App {
         Music backend: \(MusicPlayer.preferredBackend == "opl" ? "Classic OPL" : "Apple MIDI")
         Metal HUD: \(metalHUDEnabled ? "On" : "Off")
         Campaign: \(wad?.gameName ?? "No WAD loaded")
+        Base WAD edition: \(wad == nil ? "No WAD loaded" : (wad!.isKEXEdition ? "KEX Edition" : "Not identified as KEX"))
         Map: \(wad == nil ? "None" : (maps.titleOfSelectedItem ?? "None"))
         Presentation: \(attractActive ? (attractDemo ? "Demo playback" : "Title/attract") : "Gameplay/menu")
         Ordered WAD files (base first):

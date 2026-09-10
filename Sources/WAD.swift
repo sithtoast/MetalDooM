@@ -45,6 +45,27 @@ struct WAD {
     let maps: [String]
     // Detect from the base IWAD resources, before any add-on can override them.
     // These campaign-specific patch sets also identify renamed original IWADs.
+    let isKEXEdition: Bool
+    var displayName: String { gameName + (isKEXEdition ? " (KEX Edition)" : "") }
+    // Identify the supported official rerelease profiles from the base file.
+    // GAMECONF is inspected for identity only; its load/options directives are
+    // never executed. PWAD metadata cannot relabel the base IWAD.
+    private static func kexProfile(_ lumps: [Lump], signature: String, finalDoom: Int) -> Bool {
+        guard signature == "IWAD",
+              let metadata=lumps.last(where:{$0.name == "GAMECONF"})?.bytes.data,
+              metadata.count <= 65536,
+              let json=(try? JSONSerialization.jsonObject(with:metadata)) as? [String:Any],
+              json["type"] as? String == "gameconf",
+              let data=json["data"] as? [String:Any] else { return false }
+        let names=Set(lumps.map(\.name))
+        let title: String, mode: String
+        if finalDoom == 1 { title="TNT: Evilution";mode="commercial" }
+        else if finalDoom == 2 { title="The Plutonia Experiment";mode="commercial" }
+        else if names.contains("MAP01") && names.contains("DMENUPIC") { title="Doom II";mode="commercial" }
+        else if names.contains("E1M1") && names.contains("E4M1") { title="Doom";mode="retail" }
+        else { return false }
+        return data["title"] as? String == title && data["mode"] as? String == mode
+    }
     let finalDoom: Int // 0: other, 1: TNT, 2: Plutonia
     private static func finalDoomProfile(_ names: Set<String>) -> Int {
         guard names.contains("MAP01") else { return 0 }
@@ -78,6 +99,7 @@ struct WAD {
             found.append(Lump(name: try b.name(entry + 8), bytes: Bytes(data: b.data.subdata(in: offset..<offset+size))))
         }
         finalDoom=Self.finalDoomProfile(Set(found.map(\.name)))
+        isKEXEdition=Self.kexProfile(found,signature:signature,finalDoom:finalDoom)
         lumps = found
         engineOrder=found.indices.map(Int32.init)
         maps = found.indices.compactMap { i in
@@ -96,6 +118,7 @@ struct WAD {
         let extras=try addOns.map { try WAD(url:$0) }
         guard extras.allSatisfy({$0.signature=="PWAD"}) else { throw PortError("Add-ons must be PWAD files; choose only one base IWAD.") }
         finalDoom=base.finalDoom
+        isKEXEdition=base.isKEXEdition
         self.url=base.url; signature="IWAD"
         sourceURLs=[base.url]+extras.map(\.url);sourceData=base.sourceData+extras.flatMap(\.sourceData)
         guard sourceURLs.count<=33, Set(sourceURLs).count==sourceURLs.count,

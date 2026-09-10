@@ -9,7 +9,7 @@ final class AttractScreen: NSView {
         guard let rep=NSBitmapImageRep(bitmapDataPlanes:nil,pixelsWide:pixels.width,pixelsHigh:pixels.height,bitsPerSample:8,samplesPerPixel:4,hasAlpha:true,isPlanar:false,colorSpaceName:.deviceRGB,bytesPerRow:pixels.width*4,bitsPerPixel:32), let data=rep.bitmapData else { throw PortError("Cannot decode title artwork.") }
         pixels.rgba.withUnsafeBytes { data.update(from:$0.baseAddress!.assumingMemoryBound(to:UInt8.self),count:pixels.rgba.count) }
         picture=NSImage(size:NSSize(width:pixels.width,height:pixels.height));picture.addRepresentation(rep)
-        super.init(frame:.zero);setAccessibilityLabel("\(wad.gameName) title screen. Press a key for the menu.")
+        super.init(frame:.zero);setAccessibilityLabel("\(wad.displayName) title screen. Press a key for the menu.")
     }
     required init?(coder:NSCoder) { fatalError("init(coder:) unavailable") }
     override func draw(_ dirtyRect:NSRect) {

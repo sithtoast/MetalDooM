@@ -4,6 +4,17 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 66 — KEX edition identification
+
+- Identify Doom, Doom II, TNT and Plutonia rerelease IWADs from their campaign
+  resources and GAMECONF metadata, including renamed copies.
+- Show KEX Edition in the window title, console status, title accessibility label,
+  benchmark summary and diagnostics/session reports.
+- Preserve the base IWAD edition when adding PWADs; identification does not enable
+  KEX gameplay extensions or change campaign/save identity.
+- Validate all four IWADs, renamed copies, malformed metadata, original IWADs and
+  mixed-edition stacks; verify the installed build's native window labels.
+
 ## Version 0.2.0 — Build 65 — Classic OPL music
 
 - Add persistent Audio menu choices for Classic OPL (default) and Apple MIDI;

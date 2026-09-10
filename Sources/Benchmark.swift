@@ -47,7 +47,7 @@ extension App {
         else { lastBenchmarkReport=run.result;sessionLog.append("Benchmark complete: \(run.intervals.count) measured intervals") }
         guard !shuttingDown else { return }
         beginAttract()
-        summary = "Title screen — " + (wad?.gameName ?? "MetalDooM")
+        summary = "Title screen — " + (wad?.displayName ?? "MetalDooM")
         guard notify else { return }
         // Leave the render callback before displaying a modal result.
         DispatchQueue.main.async { [weak self] in

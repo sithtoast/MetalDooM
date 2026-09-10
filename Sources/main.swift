@@ -235,7 +235,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let candidate = try WAD(url:url,addOns:addOns)
             let selected = candidate.isSigil ? "E5M1" : candidate.maps.contains("E1M1") ? "E1M1" : candidate.maps[0]
             let result = try renderer.load(wad:candidate,map:selected)
-            sessionLog.append("Loaded WAD stack: " + candidate.displayFiles)
+            sessionLog.append("Loaded " + candidate.displayName + "; WAD stack: " + candidate.displayFiles)
             wad = candidate; maps.removeAllItems(); maps.addItems(withTitles:candidate.maps); maps.selectItem(withTitle:selected); maps.isEnabled = true
             describe(selected,result)
             if showTitle { beginAttract() }
@@ -250,7 +250,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     func updateTitle(map name: String) {
         guard let wad else { return }
-        window.title = "\(appTitle) — \(wad.gameName) — \(wad.displayFiles) — \(wad.mapTitle(name))"
+        window.title = "\(appTitle) — \(wad.displayName) — \(wad.displayFiles) — \(wad.mapTitle(name))"
     }
     func describe(_ name: String, _ result: (triangles:Int,missing:[String])) {
         closeAutomap();updateTitle(map:name)
@@ -340,7 +340,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     endAttract();try renderer.reset(); return "Level restarted."
                 default:
                     let size=view.drawableSize
-                    return "\(appTitle)\n\(wad?.gameName ?? "No WAD") — \(summary)\n\(renderer.playerStatus)\nGPU: \(renderer.device.name)\nRender: \(Int(size.width))x\(Int(size.height)) at \(Int(view.renderScale*100))%; limit \(view.preferredFramesPerSecond) FPS\nEffects: \(renderer.effectsVolume); music: \(renderer.musicVolume) (\(renderer.musicEnabled ? "on" : "off"))"
+                    return "\(appTitle)\n\(wad?.displayName ?? "No WAD") — \(summary)\n\(renderer.playerStatus)\nGPU: \(renderer.device.name)\nRender: \(Int(size.width))x\(Int(size.height)) at \(Int(view.renderScale*100))%; limit \(view.preferredFramesPerSecond) FPS\nEffects: \(renderer.effectsVolume); music: \(renderer.musicVolume) (\(renderer.musicEnabled ? "on" : "off"))"
                 }
             case .map(let name):
                 guard let wad else { throw ConsoleError("No WAD loaded.") }

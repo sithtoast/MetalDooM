@@ -26,6 +26,13 @@ files taking priority. One fixed stack is supported per session: restart to
 change its files or ordering. Maps within that stack can be switched or restarted.
 No game WAD assets are included.
 
+Supported Doom, Doom II, TNT and Plutonia rerelease IWADs display **(KEX Edition)**
+in the title bar. Identification uses the base IWAD's campaign resources and
+GAMECONF identity metadata, so renamed files work and add-ons cannot change the
+base label. Diagnostics, benchmark/export context and console status include the
+edition. This is an identity label, not KEX engine emulation or support for its
+GAMECONF load directives, ID24, or Legacy of Rust.
+
 ### Build numbers
 
 `BUILD_NUMBER` records the last successful local build. Each successful build
