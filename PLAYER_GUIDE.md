@@ -158,9 +158,24 @@ Both effects start off at launch and require Metal ray tracing in render shaders
 
 Walls, floors, ceilings and grille bars block the light; transparent grille pixels
 let it through. Sprites, the weapon and HUD keep their original lighting. This
-is a test light, not torch/projectile lighting or bloom; it has no visible orb.
+test light has no visible orb; the additional effects below are independent.
 It follows your position and can become occluded when its orbit crosses a wall.
 Light/shadow choices last for the session and survive map/save loads.
+
+**View → More Metal Effects** adds six separate switches:
+
+- **Torch & Lamp Lights**: colored illumination from torches, candles, lamps and burning barrels.
+- **Projectile Lights**: moving illumination from rockets, plasma, BFG shots and monster fireballs.
+- **Muzzle Flash Light**: brief illumination when your weapon flashes.
+- **Gameplay Light Shadows**: world shadows for those three light categories.
+- **Emissive Surfaces**: glowing lamp, liquid, fire and colored computer-panel pixels.
+- **Bloom**: a subtle halo around bright world highlights.
+
+All six start off and can be combined with AO and the test light. The new lights
+require ray tracing; emission and bloom do not. Up to 16 nearby lights illuminate
+world surfaces. Sprites do not receive/cast their lighting or shadows. Bloom is
+applied before the weapon/HUD, keeping them crisp. Emission makes textures glow
+but does not light neighboring surfaces. Choices last until you quit.
 
 ## Developer console
 

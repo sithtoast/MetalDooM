@@ -135,3 +135,9 @@ run matching DEMO1 benchmarks with it off/on. The report records AO state. See
 sprite exclusions and timing limits. Strength and radius are separate View
 submenus. The validator does not need keyboard focus; failures should report a
 terminal error rather than creating a macOS crash dialog.
+
+**View → More Metal Effects** contains independent torch/projectile/muzzle lighting,
+gameplay shadows, emissive surfaces and bloom. Compare each at a paused viewpoint,
+then combine them with AO. Check weapon/HUD clarity, real firing, colored torches,
+resize, invisibility and fixed-colormap power-ups. The GPU regression covers these
+paths on Ultimate Doom and Doom II; see the current validation entry for results.

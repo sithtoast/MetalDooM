@@ -32,7 +32,7 @@ extension Renderer {
     }
 }
 """)
-(output/'main.swift').write_text(source+'\n'+(root/'Tests/AOAlphaValidation.swift').read_text()+'\n'+(root/'Tests/AmbientOcclusionValidation.swift').read_text())
+(output/'main.swift').write_text(source+'\n'+(root/'Tests/AOAlphaValidation.swift').read_text()+'\n'+(root/'Tests/AmbientOcclusionValidation.swift').read_text().replace('// Exercise map replacement', (root/'Tests/SceneEffectsValidation.swift').read_text()+'\n// Exercise map replacement'))
 PY
 SOURCES=()
 for source in "$PROJECT_DIR"/Sources/*.swift; do

@@ -12,7 +12,7 @@ The active experiment is on `codex/metal-experiments`; check Git status/log befo
 continuing. The user selected **ray-traced ambient occlusion**. It is implemented
 as a per-session View menu option, with classic rendering still the default.
 
-Current version: **0.5.0**, successful local app **build 94**. `Info.plist` owns
+Current version: **0.6.0**, successful local app **build 96**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
 This is an experimental branch, not a published release. No push was requested.
 
@@ -64,7 +64,7 @@ MetalFX spatial/temporal/denoised upscaling and frame interpolation support.
 These optional MetalFX paths are not implemented. Other GPUs remain untested.
 The prior build 83 benchmark is historical; see validation docs for timing limits.
 
-The selected next feature, one moving shadow-casting light, is now implemented.
+The first moving shadow-casting light is implemented.
 View → Moving Test Light (Experimental) enables an amber camera-relative light;
 Test Light Shadows compares masked world shadows with unshadowed lighting. It is
 independent of AO, shares its pipeline/mesh, starts off, and uses the level clock
@@ -76,8 +76,19 @@ Build 94's GPU validation covers analytical falloff/blockers, finite shadow rays
 animated masks, independent effects, paused/moving light, original-room shadows,
 shared-resource lifecycle, doors, save/load, map replacement and shutdown. Native
 View controls and the moving light were checked in a separate original-geometry
-pillar-room fixture. Follow-ups remain actual torch/projectile lights, emissive
-masks and restrained bloom; none of those is implemented. No push was requested.
+pillar-room fixture. The subsequent 0.6.0 work adds View → More Metal Effects:
+independent torch/lamp, projectile, muzzle-flash, gameplay-shadow, emissive-surface
+and bloom switches, all off by default. Scene lights have a shared 16-source cap;
+world surfaces receive/cast light, billboard sprites do not. Emission uses known
+material families and selective color thresholds; bloom is a world-only LDR pass
+before the weapon/HUD. No HDR, indirect surface lighting or soft shadows yet.
+Build 96 passes Ultimate Doom/Doom II GPU toggles, real flash/expiry, fixed-colormap
+powerups, invisibility, resize, save/load, map replacement/shutdown, the 48 ceiling
+captures, level stats and diagnostics. A separate build 96 preview remains open at
+`build/effects-preview/MetalDooM.app`, using `build/effects-preview.wad`; the generated
+fixture adds three torches to original pillar-room geometry. Native controls and
+combined torch/shadow/emission/bloom/AO were inspected. See docs/VALIDATION.md for
+performance limits and evidence. No push was requested.
 
 ## Current behavior and important boundaries
 

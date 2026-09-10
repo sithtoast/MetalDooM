@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 extension App {
     var benchmarkSettings: String {
-        "\(view.drawableSize)|\(view.renderScale)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)|\(renderer.aoSettings.strength)|\(renderer.aoSettings.radius)|\(renderer.dynamicLightEnabled)|\(renderer.dynamicLightShadows)"
+        "\(view.drawableSize)|\(view.renderScale)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)|\(renderer.aoSettings.strength)|\(renderer.aoSettings.radius)|\(renderer.dynamicLightEnabled)|\(renderer.dynamicLightShadows)|\(renderer.sceneEffectsKey)"
     }
     @objc func runBenchmark() {
         guard benchmark == nil else { return }
@@ -85,6 +85,10 @@ extension App {
         if item.action == #selector(selectAORadius(_:)) {
             item.state=Int(renderer.aoSettings.radius)==item.tag ? .on:.off
             return renderer.ambientOcclusionSupported
+        }
+        if item.action == #selector(toggleSceneEffect(_:)), let effect=SceneEffect(rawValue:item.tag) {
+            item.state=renderer.sceneEffects.contains(effect) ? .on:.off
+            return !effect.needsRays || renderer.ambientOcclusionSupported
         }
         if item.action == #selector(toggleAmbientOcclusion) {
             item.state=renderer.ambientOcclusionEnabled ? .on : .off

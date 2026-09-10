@@ -143,7 +143,8 @@ final class AmbientOcclusion {
             constant float4 &eye [[buffer(3)]], primitive_acceleration_structure world [[buffer(4)]],
             const device AOVertex *vertices [[buffer(5)]], const device uint4 *materials [[buffer(6)]],
             const device uchar *alpha [[buffer(7)]], constant float4 &settings [[buffer(8)]],
-            constant DynamicLight &light [[buffer(9)]]) {
+            constant DynamicLight *lights [[buffer(9)]], constant uint &lightCount [[buffer(10)]],
+            constant float4 &emission [[buffer(11)]]) {
         if (in.fullbright > 0.5 && !front) discard_fragment();
         constexpr sampler s(coord::normalized, address::repeat, filter::nearest);
         float4 c=tex.sample(s,in.uv/float2(tex.get_width(),tex.get_height()));
@@ -171,9 +172,10 @@ final class AmbientOcclusion {
             shade*=1.0-settings.y*(occlusion/8.0);
         }
         float3 illumination=float3(shade);
-        if (power.x==0 && power.y==0 && light.colorIntensity.w>0)
-            illumination+=directLight(in.world,n,light,world,vertices,materials,alpha);
-        return float4(powerColor(c.rgb*illumination,power),1);
+        if (power.x==0 && power.y==0)
+            for (uint i=0;i<min(lightCount,16u);i++)
+                illumination+=directLight(in.world,n,lights[i],world,vertices,materials,alpha);
+        return float4(powerColor(emissiveColor(c.rgb,c.rgb*illumination,emission,power),power),1);
     }
     """
 }

@@ -7,6 +7,7 @@ func validateAlphaRays(device: MTLDevice, queue: MTLCommandQueue) throws {
     struct Out { float4 position [[position]]; float2 uv; float light; float distance; float fullbright; float3 world; };
     vertex Out worldVertex(uint id [[vertex_id]]) { Out o={};o.position=float4(0,0,0,1);return o; }
     float3 powerColor(float3 rgb,float4 power) { return rgb; }
+    float3 emissiveColor(float3 color,float3 lit,float4 emission,float4 power) { return lit; }
     """
     let kernel="""
     kernel void probe(primitive_acceleration_structure world [[buffer(0)]],

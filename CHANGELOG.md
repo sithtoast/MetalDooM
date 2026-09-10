@@ -4,6 +4,28 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.6.0 · Build 96 — Independent scene effects
+
+- Add View → More Metal Effects with separate torch/lamp lighting, projectile
+  lighting, muzzle-flash lighting, gameplay light shadows, emissive surfaces and
+  bloom switches. All start off; existing AO/test-light controls stay independent.
+- Follow real actors and weapon flash timing. Colored lights illuminate world
+  surfaces with a shared 16-light budget; optional hard shadows respect walls,
+  moving doors and grille alpha. Flicker pauses with game time.
+- Make bright lamp/liquid/fire texels and colored computer-panel pixels glow.
+  Add restrained world-only LDR bloom before drawing the weapon, damage tint and
+  HUD. Preserve power-up colormaps, invisibility, stats and secret notifications.
+- Keep session choices through map/save loads, include every switch in diagnostics
+  and benchmark identity, and lock them during benchmarks. Turning effects off
+  restores classic pixels; resizing safely replaces bloom textures.
+- Pass Ultimate Doom and Doom II native GPU checks, real pistol flash/expiry,
+  individual/combined toggles, HUD isolation, resize, power-ups, save/load, map
+  changes and shutdown. Pass the existing 48 ceiling captures and level-stat
+  tests; inspect 0.6.0 build 96's native controls and combined effects on M5 Pro.
+- Lights/shadows affect world geometry; billboard sprites do not receive or cast
+  them. Material emission is selective by name/color, not indirect illumination.
+  Bloom is LDR. Other GPUs and sustained crowded-scene performance remain untested.
+
 ## 0.5.0 · Build 94 — Moving light and ray-traced shadows
 
 - Add an optional amber light orbiting just ahead of the player, with a separate

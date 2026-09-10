@@ -85,6 +85,8 @@ extension App {
         AO strength: \(Int(renderer.aoSettings.strength*100))%
         AO radius: \(Int(renderer.aoSettings.radius)) Doom units
         Moving test light: \(renderer.dynamicLightEnabled ? "On (amber, radius 256, intensity 2, 8-second orbit)":"Off")
+        Additional effects: \(SceneEffect.allCases.map { "\($0.title)=\(renderer.sceneEffects.contains($0) ? "On":"Off")" }.joined(separator:", "))
+        World light budget: 16 nearest sources including muzzle/test light; world receivers and world shadows only
         Test light shadows: \(renderer.dynamicLightShadows ? "On (alpha-tested world)":"Off")
         Shared ray occluder triangles: \(renderer.ambientOcclusion?.triangleCount ?? 0)
         Ray tracing in render shaders: \(renderer.ambientOcclusionSupported)
@@ -101,5 +103,15 @@ extension App {
 
         Add reproduction steps, expected/actual behavior and a screenshot if useful.
         """
+    }
+}
+
+extension App {
+    @objc func toggleSceneEffect(_ sender:NSMenuItem) {
+        guard let effect=SceneEffect(rawValue:sender.tag) else { return }
+        do {
+            try renderer.setSceneEffect(effect,enabled:!renderer.sceneEffects.contains(effect))
+            sessionLog.append("\(effect.title): \(renderer.sceneEffects.contains(effect) ? "On":"Off")")
+        } catch { show(error) }
     }
 }

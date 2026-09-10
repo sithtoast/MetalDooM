@@ -94,6 +94,12 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             viewMenu.addItem(withTitle:"Moving Test Light (Experimental)",action:#selector(toggleDynamicLight),keyEquivalent:"").target=self
             viewMenu.addItem(withTitle:"Test Light Shadows",action:#selector(toggleDynamicLightShadows),keyEquivalent:"").target=self
+            let effectsItem=NSMenuItem(title:"More Metal Effects",action:nil,keyEquivalent:"")
+            let effectsMenu=NSMenu(title:"More Metal Effects");effectsItem.submenu=effectsMenu;viewMenu.addItem(effectsItem)
+            for effect in SceneEffect.allCases {
+                let item=effectsMenu.addItem(withTitle:effect.title,action:#selector(toggleSceneEffect(_:)),keyEquivalent:"")
+                item.tag=effect.rawValue;item.target=self
+            }
             let audioItem=NSMenuItem(), audioMenu=NSMenu(title:"Audio")
             audioItem.submenu=audioMenu; menu.addItem(audioItem)
             let musicItem=audioMenu.addItem(withTitle:"Music",action:#selector(toggleMusic(_:)),keyEquivalent:"m")

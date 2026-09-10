@@ -9,7 +9,7 @@ current scene. The checkbox is per session and does not change game/save data.
 It is disabled on GPUs without Metal ray tracing in render shaders. Allocation,
 shader compilation and GPU failures report an error; the classic path remains
 available. The ray-tracing pipeline and acceleration structure are allocated only while
-AO or the moving test light is enabled.
+AO or any world light category is enabled.
 
 **View → AO Strength** offers 0–100% in 25% steps. **View → AO Radius** offers
 16, 32, 48 and 96 Doom units. The defaults are 50% strength and 48 units; choices
@@ -59,16 +59,16 @@ texture translation, wrapping and alpha threshold as AO. These are hard shadows.
 
 AO and the light share one pipeline, acceleration structure and immutable mask
 buffers but remain independently enabled. Moving the light or toggling shadows
-does not rebuild geometry. Turning both effects off releases ray resources and
-restores the original pipeline. Failure disables both with a warning. Both start
+does not rebuild geometry. Turning AO and all world light categories off releases ray resources and
+restores the original pipeline. Failure disables ray effects with a warning. AO and the test light start
 off; controls are per session, survive map/save loads, appear in diagnostics and
 benchmark identity, and are locked during a benchmark.
 
 Direct light is added after AO darkens ambient sector lighting. It affects world
 surfaces only: sprites/weapon/HUD/sky and fixed-colormap power-ups retain their
-existing paths. Billboard sprites neither receive nor cast light/shadows. No HDR,
-bloom, emissive textures, torch/projectile light collection, indirect illumination
-or soft-shadow sampling is included in this first experiment.
+existing paths. Billboard sprites neither receive nor cast light/shadows. The original 0.5.0 experiment had no other light sources or bloom; 0.6.0 adds
+the independent options below. HDR, indirect illumination and soft shadows remain
+unimplemented.
 
 The existing GPU script now also checks analytic light attenuation, opaque and
 masked blockers, geometry beyond the light, shadow bypass, independent toggles,
@@ -84,6 +84,58 @@ python3 Tests/make_surface_fixture.py /path/to/DOOM.WAD build/light.wad light
 
 Open the resulting WAD and enable the test light. It relocates the player near
 the E1M1 pillar/stairs and disables monsters; geometry/art remain original.
+
+## Gameplay lights, emission and bloom — 0.6.0
+
+**View → More Metal Effects** has six independent, session-local switches, all off
+at launch. A shadow switch can be selected before enabling a light category.
+
+| Switch | Visible behavior |
+| --- | --- |
+| Torch & Lamp Lights | Blue/green/red torches, candles, burning barrels and tech lamps illuminate nearby world surfaces. |
+| Projectile Lights | Plasma, BFG, rockets and selected monster fireballs carry colored lights, including their surviving explosion frames. |
+| Muzzle Flash Light | Brief warm, blue or green illumination while the engine weapon flash sprite is active. |
+| Gameplay Light Shadows | Finite, alpha-tested hard world shadows for the three categories above; the test light retains its own shadow switch. |
+| Emissive Surfaces | Bright texels on LITE/TLITE/GATE, NUKAGE/LAVA/FIRE families and saturated COMP panel pixels self-illuminate. |
+| Bloom | Soft halo around bright world highlights, independent of emissive surfaces. |
+
+Lighting follows authoritative actor snapshots and weapon flash state. It makes
+no simulation changes and needs no save-format change. Flicker freezes with game
+time. Emitters stay inside sector heights. At most 16 lights are submitted, with
+the test light and muzzle flash reserved first, then nearest eligible actors
+within 1024 units (engine order breaks equal-distance ties). Decorations have a
+224-unit radius, projectiles 176, muzzle flashes 192. Distant/budgeted-out sources
+can pop in; no screen-tiled light culling is implemented yet.
+
+Dynamic lights illuminate world triangles only; billboard sprites neither receive
+nor cast these lights/shadows. The three new light categories require ray tracing
+in render shaders, even with their shadows off. Emission and bloom work without
+ray tracing. Emission uses material names and color thresholds, not authored masks;
+custom replacement textures can be misclassified, and unknown families stay classic.
+Emission does not illuminate neighboring surfaces. Animated materials retain their
+family while sampling the current engine texture frame.
+
+Bloom copies only the world viewport, extracts highlights at quarter resolution,
+runs a separable nine-tap blur and adds a restrained 30% glow before the weapon,
+damage tint and HUD. It is LDR bloom, not HDR tone mapping. Skies and fullbright
+world sprites can bloom too. Invisibility uses the existing world snapshot and
+the weapon is drawn afterward. Fixed-colormap power-ups bypass bloom and added
+lighting/emission. There is no temporal history. Disabling bloom releases its
+textures; resize replaces them safely, and disabling all effects restores classic
+pixels. Session choices are logged, included in diagnostics/benchmark identity,
+locked during benchmarks, and retained through map/save loads.
+
+The GPU regression also exercises engine-spawned lights, real pistol flash/expiry,
+individual image changes, combined effects, HUD isolation, classic restoration,
+odd-sized resize, source budget, save/load, map replacement and shutdown. Additional
+captures use `effect-*.png`, `effect-muzzle.png` and `effects-combined.png`.
+For a native comparison with three colored torches in original E1M1 geometry:
+
+```sh
+python3 Tests/make_surface_fixture.py /path/to/DOOM.WAD build/effects-preview.wad effects
+```
+
+Open that local fixture and enable the switches. Keep the generated WAD private.
 
 ## Comparing and measuring
 

@@ -9,14 +9,15 @@ typedef struct {
 typedef struct { float floor, ceiling, light; } MD_Sector;
 typedef struct {
     float x, y, z, light, floorZ;
-    int lump, flip, fullbright, doomedType, shadow;
+    int lump, flip, fullbright, doomedType, shadow, lightKind;
+    float lightZ;
 } MD_Thing;
 typedef struct {
     int health, armor, readyAmmo, readyWeapon;
     int bullets, shells, cells, rockets;
     int maxBullets, maxShells, maxCells, maxRockets;
     uint32_t keys, weapons;
-    int weaponGrin, faceIndex;
+    int weaponGrin, faceIndex, weaponFlash;
     int fixedColorMap, suitFlash, berserkFlash, allmap, invisibility;
     int bonusFlash, messageSerial, tick, damageFlash, kills, totalKills;
     int items, totalItems, secrets, totalSecrets, levelTics, parSeconds;
@@ -59,6 +60,7 @@ int MD_ReadSave(const char *path);
 
 #ifdef MD_TESTING
 void MD_TestMonsters(int enabled);
+void MD_TestLightSource(int kind);
 int MD_TestCrossSpecial(int special);
 int MD_TestFindSecret(float *x,float *y);
 void MD_TestFaceState(int health, int damage, int attack, int invulnerable, int direction);

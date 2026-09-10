@@ -81,7 +81,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     func setAOSettings(strength: Float? = nil, radius: Float? = nil) {
         aoSettings=AOSettings(strength:strength ?? aoSettings.strength,radius:radius ?? aoSettings.radius)
     }
-    // The optional ray pipeline/mesh is shared by AO and the test light.
+    // The optional ray pipeline/mesh is shared by AO and all world lights.
     private(set) var ambientOcclusion: AmbientOcclusion?
     private(set) var ambientOcclusionEnabled = false
     private(set) var dynamicLightEnabled = false
@@ -96,16 +96,56 @@ final class Renderer: NSObject, MTKViewDelegate {
         try configureRayEffects(ao:ambientOcclusionEnabled,light:enabled)
     }
     func setDynamicLightShadows(_ enabled: Bool) { dynamicLightShadows=enabled }
+    private(set) var sceneEffects=Set<SceneEffect>()
+    private var bloom: Bloom?
+    private var lightThings:[MD_Thing]=[]
+    var sceneEffectsKey: String { SceneEffect.allCases.map { sceneEffects.contains($0) ? "1":"0" }.joined() }
+    func setSceneEffect(_ effect: SceneEffect, enabled: Bool) throws {
+        var next=sceneEffects
+        if enabled { next.insert(effect) } else { next.remove(effect) }
+        if next.contains(where: { $0.needsRays }) && ambientOcclusion == nil {
+            ambientOcclusion=try AmbientOcclusion(device:device,shader:worldShader,format:worldFormat)
+            aoGeometryDirty=true
+        }
+        if effect == .bloom {
+            bloom=enabled ? try Bloom(device:device,format:worldFormat):nil
+        }
+        sceneEffects=next
+        if !ambientOcclusionEnabled && !dynamicLightEnabled && !next.contains(where: { $0.needsRays }) { ambientOcclusion=nil }
+    }
+    private func sceneLights() -> [DynamicLightUniforms] {
+        var lights:[DynamicLightUniforms]=[]
+        if dynamicLightEnabled { lights.append(movingLightUniforms()) }
+        if sceneEffects.contains(where: { $0.needsRays }) {
+            if sceneEffects.contains(.torches) || sceneEffects.contains(.projectiles) {
+                lightThings=Array(repeating:MD_Thing(),count:Int(MD_CopyThings(nil,0,position.x,position.y)))
+                _=MD_CopyThings(&lightThings,Int32(lightThings.count),position.x,position.y)
+            } else { lightThings=[] }
+            lights += DynamicLightUniforms.gameplay(things:lightThings,hud:hud,
+                eye:SIMD3(position.x,eyeZ,-position.y),effects:sceneEffects)
+        }
+        lights=Array(lights.prefix(DynamicLightUniforms.limit))
+        // Keep decoration emitters inside their actual sector, including low ceilings.
+        if let map {
+            for i in lights.indices {
+                let s=map.sectors[map.sector(at:SIMD2(lights[i].positionRadius.x,-lights[i].positionRadius.z))]
+                if s.ceiling-s.floor>2 { lights[i].positionRadius.y=min(s.ceiling-1,max(s.floor+1,lights[i].positionRadius.y)) }
+                else { lights[i].colorIntensity.w=0 }
+            }
+        }
+        return lights
+    }
     private func configureRayEffects(ao: Bool, light: Bool) throws {
-        if (ao || light) && ambientOcclusion == nil {
+        if (ao || light || sceneEffects.contains(where: { $0.needsRays })) && ambientOcclusion == nil {
             ambientOcclusion=try AmbientOcclusion(device:device,shader:worldShader,format:worldFormat)
             aoGeometryDirty=true
         }
         ambientOcclusionEnabled=ao;dynamicLightEnabled=light
-        if !ao && !light { ambientOcclusion=nil }
+        if !ao && !light && !sceneEffects.contains(where: { $0.needsRays }) { ambientOcclusion=nil }
     }
     private func disableRayEffects() {
         ambientOcclusion=nil;ambientOcclusionEnabled=false;dynamicLightEnabled=false
+        sceneEffects=sceneEffects.filter { !$0.needsRays }
     }
     private func movingLightUniforms() -> DynamicLightUniforms {
         guard dynamicLightEnabled else { return DynamicLightUniforms() }
@@ -238,13 +278,22 @@ final class Renderer: NSObject, MTKViewDelegate {
             if (power.x > 0) return float3(floor((1.0-dot(rgb,float3(0.299,0.587,0.114)))*31.0)/31.0);
             return rgb;
         }
-        fragment float4 worldFragment(Out in [[stage_in]], bool front [[front_facing]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]]) {
+        float3 emissiveColor(float3 color, float3 lit, float4 emission, float4 power) {
+            if (emission.y<=0 || power.x>0 || power.y>0) return lit;
+            float mask=smoothstep(emission.x,min(1.0,emission.x+0.25),max(color.r,max(color.g,color.b)));
+            if (emission.z>0) {
+                float saturation=max(color.r,max(color.g,color.b))-min(color.r,min(color.g,color.b));
+                mask*=smoothstep(0.15,0.4,saturation);
+            }
+            return mix(lit,max(lit,color*emission.y),mask);
+        }
+        fragment float4 worldFragment(Out in [[stage_in]], bool front [[front_facing]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]], constant float4 &emission [[buffer(11)]]) {
             if (in.fullbright > 0.5 && !front) discard_fragment();
             constexpr sampler s(coord::normalized, address::repeat, filter::nearest);
             float4 c = tex.sample(s, in.uv / float2(tex.get_width(),tex.get_height()));
             if (c.a < 0.5) discard_fragment();
             float shade = (power.x>0 || power.y>0) ? 1.0 : in.light * clamp(1.0 - in.distance / 3200.0, 0.3, 1.0);
-            return float4(powerColor(c.rgb * shade,power), 1.0);
+            return float4(powerColor(emissiveColor(c.rgb,c.rgb*shade,emission,power),power), 1.0);
         }
         fragment float4 spriteFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]]) {
             constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::nearest);
@@ -508,7 +557,8 @@ final class Renderer: NSObject, MTKViewDelegate {
             if let error = buffer.error {
                 DispatchQueue.main.async { [weak self] in
                     self?.disableRayEffects()
-                    self?.onWarning?("Metal command error (ray-traced effects disabled): \(error)")
+                    self?.bloom=nil;self?.sceneEffects.remove(.bloom)
+                    self?.onWarning?("Metal command error (ray-traced effects and bloom disabled): \(error)")
                 }
             }
             let gpuTime=max(0,buffer.gpuEndTime-buffer.gpuStartTime)
@@ -572,10 +622,15 @@ final class Renderer: NSObject, MTKViewDelegate {
                 var settings=aoSettings.uniform
                 if !ambientOcclusionEnabled { settings.y=0 }
                 encoder.setFragmentBytes(&settings,length:MemoryLayout<SIMD4<Float>>.stride,index:8)
-                var light=movingLightUniforms()
-                encoder.setFragmentBytes(&light,length:MemoryLayout<DynamicLightUniforms>.stride,index:9)
+                var lights=sceneLights()
+                var count=UInt32(lights.count)
+                if lights.isEmpty { lights=[DynamicLightUniforms()] }
+                lights.withUnsafeBytes { encoder.setFragmentBytes($0.baseAddress!,length:$0.count,index:9) }
+                encoder.setFragmentBytes(&count,length:MemoryLayout<UInt32>.stride,index:10)
             }
             for batch in batches {
+                var emission=sceneEffects.contains(.emissive) ? emissionSettings(batch.material):.zero
+                encoder.setFragmentBytes(&emission,length:MemoryLayout<SIMD4<Float>>.stride,index:11)
                 encoder.setVertexBuffer(batch.vertices,offset:0,index:0); encoder.setFragmentTexture(animatedTexture(batch),index:0)
                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:batch.count)
             }
@@ -601,8 +656,27 @@ final class Renderer: NSObject, MTKViewDelegate {
                         encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
                         encoder.setFragmentTexture(snapshot,index:1);encoder.setRenderPipelineState(fuzzPipeline);encoder.setDepthStencilState(fuzzDepth)
                         try? sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw,fuzz:true)
-                        sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,fuzz:true)
                     }
+                }
+                // Complete world effects before either weapon pass and the HUD.
+                if let bloom, power.x==0 && power.y==0 {
+                    encoder.endEncoding()
+                    var ready=false
+                    do { try bloom.prepare(command:command,source:drawable.texture,worldHeight:Int(worldHeight));ready=true }
+                    catch {
+                        self.bloom=nil;sceneEffects.remove(.bloom)
+                        DispatchQueue.main.async { [weak self] in self?.onWarning?("Bloom disabled: \(error)") }
+                    }
+                    pass.colorAttachments[0].loadAction = .load;pass.depthAttachment.loadAction = .load
+                    guard let resumed=command.makeRenderCommandEncoder(descriptor:pass) else { command.commit();return }
+                    encoder=resumed;encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:worldHeight,znear:0,zfar:1))
+                    encoder.setCullMode(.none);encoder.setFrontFacing(.counterClockwise)
+                    if ready { bloom.draw(encoder:encoder,width:width,height:worldHeight) }
+                    encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
+                }
+                if (hud.invisibility>128 || (hud.invisibility&8) != 0), let snapshot=sceneSnapshot {
+                    encoder.setFragmentTexture(snapshot,index:1);encoder.setRenderPipelineState(fuzzPipeline)
+                    sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,fuzz:true)
                 }
                 encoder.setRenderPipelineState(spritePipeline)
                 sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight)

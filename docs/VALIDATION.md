@@ -3,6 +3,44 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.6.0, build 96 — Gameplay lights, emission and bloom
+
+- Final Ultimate Doom run: `AO_CEILING=1`, output `build/scene-effects-final`.
+  Doom II MAP01 run: `build/scene-effects-doom2`. Both pass Metal API validation,
+  analytical mask/shadow/falloff checks, original AO/test-light checks, individual
+  torch/projectile/emissive/bloom image changes and exact off restoration.
+- The test engine spawns an original blue torch, plasma and rocket actor to verify
+  source classification and GPU lighting. A real pistol firing sequence verifies
+  light presence during its flash and absence afterward. A 100-source collection
+  fixture confirms the 16-light cap. Torch time and paused frames remain stable.
+- Individual effects leave HUD bytes unchanged. All effects combine with AO and
+  the test light; shadow switches reuse the same world mesh. Odd-sized 641×403
+  resize and return to 1280×800 preserve the final image after drawable replacement.
+  Native save/load retains all switches; enabled map replacement and shutdown pass.
+- Actual invulnerability/light-amplification cheats produce identical pixels with
+  effects on/off; invisibility/fuzz renders stably with bloom. Menu check states
+  reflect individual choices and benchmark mode disables every new switch.
+- MAP01 starts away from known emissive materials, so its emissive comparison uses
+  the original LITE5 doorway at (800,504), eye height 137. E1M1 uses its original
+  computer panels. These checks do not broaden material classification to make
+  arbitrary surfaces emit. Torch actors are test fixtures, not map edits in the app.
+- All 48 original E1M1 ceiling captures pass with classic/maximum AO. Twelve
+  original room/phase comparisons still show hard world shadows; door motion
+  updates the shared ray mesh and paused geometry stops rebuilding.
+- Level stats/secret timing/save regression passes after extending engine snapshots.
+  Diagnostics pass with no WAD and Ultimate Doom loaded, including clipboard
+  restoration, report context, benchmark cancellation and window shutdown.
+- Native app identity verified as **0.6.0 build 96** in a separate preview bundle.
+  Original E1M1 pillar/stairs geometry with three added test torches visibly shows
+  blue/green illumination, gameplay shadows, selective emission, bloom and AO
+  together; weapon, HUD and existing time/par/counters remain intact. Preview:
+  `build/effects-preview/MetalDooM.app`, local WAD `build/effects-preview.wad`.
+- Full GPU command means with all switches selected were 6.59 ms (final E1M1)
+  and 4.06 ms (MAP01), 1280×800, 8 warm-up + 32 samples. Earlier E1M1 was 3.92 ms.
+  These are validation/readback samples amid other desktop GPU work, not isolated
+  effect cost, sustained FPS or a worst-case 16-source benchmark. Other GPUs,
+  crowded combat and long campaign sessions remain untested.
+
 ## 0.5.0, build 94 — Moving light and shadows
 
 - Native GPU checks with Metal API validation pass on original Ultimate Doom

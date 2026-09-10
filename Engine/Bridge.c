@@ -96,6 +96,13 @@ void MD_TestFaceState(int health,int damage,int attack,int invulnerable,int dire
 }
 void MD_TestMonsters(int enabled) { monstersEnabled = enabled; }
 static mobj_t *testTarget;
+void MD_TestLightSource(int kind) {
+    mobj_t *p=players[0].mo;
+    double angle=(double)p->angle*(2*M_PI/4294967296.0);
+    mobjtype_t type=kind==0 ? MT_MISC41 : kind==1 ? MT_PLASMA : MT_ROCKET;
+    P_SpawnMobj(p->x+cos(angle)*96*FRACUNIT,p->y+sin(angle)*96*FRACUNIT,
+               kind==0 ? ONFLOORZ : p->z+32*FRACUNIT,type);
+}
 void MD_TestTarget(int type, float distance) {
     mobj_t *p = players[0].mo;
     double angle = (double)p->angle * (2*M_PI/4294967296.0);
@@ -411,6 +418,32 @@ MD_Sector MD_GetSector(int index) {
     return result;
 }
 
+// Rendering-only source classification. IDs 1...3 are decorations, 4...6 projectiles.
+static int LightKind(mobj_t *object, float *height) {
+    *height = (float)object->height/FRACUNIT * 0.5f;
+    switch (object->type) {
+        case MT_PLASMA: case MT_ARACHPLAZ: return 4;
+        case MT_BFG: case MT_BRUISERSHOT: return 5;
+        case MT_ROCKET: case MT_TROOPSHOT: case MT_HEADSHOT:
+        case MT_FATSHOT: case MT_TRACER: return 6;
+        default: break;
+    }
+    switch (object->sprite) {
+        case SPR_TBLU: *height=48; return 1;
+        case SPR_TGRN: *height=48; return 2;
+        case SPR_TRED: *height=48; return 3;
+        case SPR_SMBT: *height=28; return 1;
+        case SPR_SMGT: *height=28; return 2;
+        case SPR_SMRT: *height=28; return 3;
+        case SPR_CAND: *height=12; return 3;
+        case SPR_CBRA: *height=48; return 3;
+        case SPR_FCAN: *height=32; return 3;
+        case SPR_TLMP: *height=64; return 1;
+        case SPR_TLP2: *height=48; return 1;
+        default: return 0;
+    }
+}
+
 int MD_CopyThings(MD_Thing *output, int capacity, float cameraX, float cameraY) {
     if (!loaded) return 0;
     int count = 0;
@@ -433,12 +466,15 @@ int MD_CopyThings(MD_Thing *output, int capacity, float cameraX, float cameraY) 
         int lump = firstspritelump+frame->lump[rotation];
         if (lump < firstspritelump || lump > lastspritelump) continue;
         if (output && count < capacity) {
+            float lightHeight=0;
+            int lightKind=LightKind(object,&lightHeight);
             output[count] = (MD_Thing){
                 (float)object->x/FRACUNIT, (float)object->y/FRACUNIT, (float)object->z/FRACUNIT,
                 (float)object->subsector->sector->lightlevel/255.0f,
                 (float)object->floorz/FRACUNIT,
                 lump, frame->flip[rotation], (object->frame & FF_FULLBRIGHT) != 0,
-                mobjinfo[object->type].doomednum, !!(object->flags & MF_SHADOW)
+                mobjinfo[object->type].doomednum, !!(object->flags & MF_SHADOW),
+                lightKind, (float)object->z/FRACUNIT+lightHeight
             };
         }
         ++count;
@@ -476,6 +512,7 @@ MD_HUD MD_GetHUD(void) {
     hud.allmap=player->powers[pw_allmap]!=0;hud.invisibility=player->powers[pw_invisibility];
     hud.health = player->health; hud.armor = player->armorpoints;
     hud.readyWeapon = player->readyweapon;
+    hud.weaponFlash = player->psprites[ps_flash].state != NULL;
     ammotype_t ammo = weaponinfo[player->readyweapon].ammo;
     hud.readyAmmo = ammo == am_noammo ? -1 : player->ammo[ammo];
     hud.bullets = player->ammo[am_clip]; hud.shells = player->ammo[am_shell];

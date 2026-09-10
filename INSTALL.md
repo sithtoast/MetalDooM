@@ -1,4 +1,4 @@
-# Installing MetalDooM 0.5.0
+# Installing MetalDooM 0.6.0
 
 Requires an Apple Silicon Mac and macOS 14 or later.
 
