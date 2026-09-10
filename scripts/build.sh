@@ -19,6 +19,13 @@ if [[ ! "$CURRENT_BUILD" =~ ^[0-9]{1,9}$ ]]; then
   exit 1
 fi
 NEXT_BUILD="$((10#$CURRENT_BUILD + 1))"
+if [[ -n "${METALDOOM_CI_BUILD_NUMBER:-}" ]]; then
+  if [[ "${GITHUB_ACTIONS:-}" != true || ! "$METALDOOM_CI_BUILD_NUMBER" =~ ^[0-9]{5,9}$ ]]; then
+    echo "CI build number requires GitHub Actions and a 5-9 digit integer." >&2
+    exit 1
+  fi
+  NEXT_BUILD="$METALDOOM_CI_BUILD_NUMBER"
+fi
 TEMP_BUILD="$(mktemp -d "$BUILD_DIR/.compile.XXXXXX")"
 APP_DIR="$TEMP_BUILD/MetalDooM.app"
 mkdir -p "$APP_DIR/Contents/MacOS"
@@ -45,5 +52,7 @@ if ! mv "$APP_DIR" "$BUILD_DIR/MetalDooM.app"; then
   if [[ -d "$TEMP_BUILD/previous.app" ]]; then mv "$TEMP_BUILD/previous.app" "$BUILD_DIR/MetalDooM.app"; fi
   exit 1
 fi
-printf '%s\n' "$NEXT_BUILD" > "$PROJECT_DIR/BUILD_NUMBER"
+if [[ -z "${METALDOOM_CI_BUILD_NUMBER:-}" ]]; then
+  printf '%s\n' "$NEXT_BUILD" > "$PROJECT_DIR/BUILD_NUMBER"
+fi
 echo "Built $BUILD_DIR/MetalDooM.app (build $NEXT_BUILD)"

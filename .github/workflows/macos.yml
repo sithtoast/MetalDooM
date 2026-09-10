@@ -1,0 +1,155 @@
+name: macOS build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Matches the locally tested Xcode generation; this GitHub image is in preview.
+    runs-on: xcode-27
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      build: ${{ steps.metadata.outputs.build }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Validate version and record toolchain
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            [[ "$GITHUB_REF_NAME" == "v$version" ]] || { echo 'Tag must match Info.plist version.' >&2; exit 1; }
+          fi
+          build=$((10000 + GITHUB_RUN_NUMBER))
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "METALDOOM_CI_BUILD_NUMBER=$build" >> "$GITHUB_ENV"
+          xcodebuild -version
+          xcrun swiftc --version
+          uname -m
+      - name: Build
+        run: bash scripts/build.sh
+      - name: Run checks that require no game WADs
+        run: |
+          bash scripts/test-input.sh
+          bash scripts/test-console.sh
+          bash scripts/test-testing-metrics.sh
+      - name: Import Developer ID for version tags only
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          METALDOOM_SIGN_IDENTITY: ${{ secrets.SIGNING_IDENTITY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${BUILD_CERTIFICATE_BASE64:?Add BUILD_CERTIFICATE_BASE64 in repository secrets}"
+          : "${P12_PASSWORD:?Add P12_PASSWORD in repository secrets}"
+          : "${METALDOOM_SIGN_IDENTITY:?Add SIGNING_IDENTITY in repository secrets}"
+          certificate="$RUNNER_TEMP/metaldoom-signing.p12"
+          keychain="$RUNNER_TEMP/metaldoom-signing.keychain-db"
+          keychain_password=$(openssl rand -hex 24)
+          echo "::add-mask::$keychain_password"
+          printf '%s' "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$certificate"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$certificate" -P "$P12_PASSWORD" -t cert -f pkcs12 -k "$keychain" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain"
+          rm -f "$certificate"
+          bash scripts/release.sh prepare
+          bash scripts/release.sh package-unnotarized
+      - name: Assemble downloadable artifacts
+        env:
+          VERSION: ${{ steps.metadata.outputs.version }}
+          BUILD: ${{ steps.metadata.outputs.build }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/artifacts
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            cp "build/releases/MetalDooM-$VERSION-build$BUILD/MetalDooM-$VERSION-build$BUILD-macOS-arm64-unnotarized.zip" build/artifacts/
+          else
+            ditto -c -k --sequesterRsrc --keepParent build/MetalDooM.app "build/artifacts/MetalDooM-$VERSION-build$BUILD-macOS-arm64-adhoc.zip"
+          fi
+          git archive --format=zip --prefix="MetalDooM-$VERSION-source/" -o "build/artifacts/MetalDooM-$VERSION-build$BUILD-source.zip" HEAD
+          git rev-parse HEAD > build/artifacts/SOURCE-COMMIT.txt
+          {
+            echo "# MetalDooM $VERSION (build $BUILD)"
+            echo
+            echo 'Apple Silicon · macOS 14+. Supply your own WADs.'
+            echo
+            if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+              echo 'Developer ID signed, NOT notarized by Apple. If macOS blocks first launch, use System Settings → Privacy & Security → Open Anyway. See INSTALL.md in the ZIP.'
+            else
+              echo 'Development artifact: ad-hoc signed, NOT Developer ID signed or notarized. No public GitHub Release is created for this build.'
+            fi
+            echo
+            echo "Source commit: $(git rev-parse HEAD)"
+            echo 'Includes a matching source ZIP and checksums. See CHANGELOG.md for changes and TESTING.md for bug reports.'
+          } > build/artifacts/RELEASE_NOTES.md
+          (cd build/artifacts && shasum -a 256 ./*.zip > SHA256SUMS.txt)
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          for archive in Path('build/artifacts').glob('*.zip'):
+              with zipfile.ZipFile(archive) as z:
+                  assert z.testzip() is None, archive
+                  assert not any(Path(n).suffix.lower() in ('.wad','.p12','.p8','.key') for n in z.namelist()), archive
+          PY
+      - name: Upload artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: MetalDooM-${{ steps.metadata.outputs.version }}-build${{ steps.metadata.outputs.build }}
+          path: build/artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove signing material
+        if: always() && startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          security delete-keychain "$RUNNER_TEMP/metaldoom-signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/metaldoom-signing.p12"
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: MetalDooM-${{ needs.build.outputs.version }}-build${{ needs.build.outputs.build }}
+          path: artifacts
+      - name: Publish prerelease with matching source and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.build.outputs.version }}
+          BUILD: ${{ needs.build.outputs.build }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" artifacts/*.zip artifacts/SHA256SUMS.txt artifacts/SOURCE-COMMIT.txt \
+            --verify-tag --prerelease --title "MetalDooM $VERSION (build $BUILD)" \
+            --notes-file artifacts/RELEASE_NOTES.md

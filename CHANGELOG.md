@@ -4,6 +4,17 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 74 — GitHub Actions builds and tagged releases
+
+- Add macOS builds and WAD-free checks on main pushes/pull requests, with downloadable
+  development artifacts. Version tags sign with Developer ID and publish a prerelease
+  containing the app, matching source archive and checksums; notarization stays off.
+- Isolate signing secrets to tag builds and remove the temporary runner keychain.
+- Separate CI build numbering from the local counter and validate tags against the
+  app version. Add a beginner guide for certificate export and GitHub secret setup.
+- Validate local build and WAD-free checks. Hosted execution and secret import await
+  the first GitHub run after setup and push.
+
 ## Build 73 — GitHub preview packaging and documentation
 
 - Shorten the README and move controls, development details and historical

@@ -2,3 +2,7 @@ build/
 .DS_Store
 *.wad
 *.WAD
+
+# Signing credentials belong in Keychain/GitHub secrets, never source control.
+*.p12
+*.p8

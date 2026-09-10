@@ -43,7 +43,7 @@ menu provides the Metal HUD, WAD hashes, benchmarks and session-log exports.
 - [Testing and bug reports](TESTING.md)
 - [Build and development notes](DEVELOPMENT.md) · [Architecture](ARCHITECTURE.md)
 - [Validation history](VALIDATION.md) · [Changelog](CHANGELOG.md)
-- [Release packaging](RELEASING.md)
+- [Release packaging](RELEASING.md) · [GitHub Actions setup](GITHUB_SETUP.md)
 
 ## Credits and license
 
