@@ -264,7 +264,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
         view.releaseMouse()
         let alert = NSAlert(); alert.messageText = appTitle
         let date = Bundle.main.object(forInfoDictionaryKey:"MetalDooMBuildDate") as? String ?? "Unknown"
-        alert.informativeText = "Native Apple Silicon / Metal gameplay preview.\nBuilt: \(date)\n\nChocolate Doom combat, monsters, pickups, doors, Metal weapon sprites, and native sound effects. Level exits, classic intermission stats, inventory carryover, and live switch textures. Native save/load and quick saves are available in File. Native music, pause menus, named save slots, display options and audio levels are available. Original finale sequences remain pending.\n\nGPL-2.0-or-later. Includes Chocolate Doom code by id Software, Simon Howard, and contributors."
+        alert.informativeText = "Classic Doom for Apple Silicon, rendered with Metal.\nBuilt: \(date)\n\nGameplay powered by Chocolate Doom.\nCode by id Software, Simon Howard and contributors.\nOPL emulation by Nuked OPL3 (Nuke.YKT and contributors).\n\nGPL-2.0-or-later · Nuked OPL3: LGPL-2.1-or-later\nGame data supplied separately."
         alert.runModal()
     }
     func show(_ error: Error) {

@@ -21,7 +21,7 @@ Choose **Open WAD…**, select the base IWAD and any supported add-ons in load o
 then start a game. Supported campaign targets are Doom/Ultimate Doom, Doom II,
 TNT: Evilution, The Plutonia Experiment and standard SIGIL Episode 5.
 General MAPINFO/UMAPINFO/DeHackEd mods, SIGIL II, Legacy of Rust and Doom 64 are
-not supported. See README.md for controls and compatibility details.
+not supported. See PLAYER_GUIDE.md for controls and DEVELOPMENT.md for compatibility details.
 
 ## Collect a useful bug report
 
@@ -31,7 +31,7 @@ not supported. See README.md for controls and compatibility details.
 2. Reproduce the issue, then choose **Diagnostics → Copy Diagnostic Report**.
 3. Paste the report into a GitHub issue, along with reproduction steps, what you
    expected, what happened, and a screenshot/video if useful. Review before posting.
-   The report includes WAD filenames and their order, not full paths or WAD data.
+   The report includes WAD filenames, SHA-256 hashes and their order, not full paths or WAD data.
 4. For a crash, include the corresponding MetalDooM crash report from macOS Console.
    Review it for personal paths before attaching it. Never attach commercial WADs.
 

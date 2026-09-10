@@ -3,7 +3,7 @@
 set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MODE="${1:-prepare}"
-[[ "$MODE" == prepare || "$MODE" == notarize ]] || { echo "Usage: $0 [prepare|notarize]" >&2; exit 1; }
+[[ "$MODE" == prepare || "$MODE" == notarize || "$MODE" == package-unnotarized ]] || { echo "Usage: $0 [prepare|package-unnotarized|notarize]" >&2; exit 1; }
 PROFILE="${METALDOOM_NOTARY_PROFILE:-MetalDooM-notary}"
 SOURCE_APP="$PROJECT_DIR/build/MetalDooM.app"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$SOURCE_APP/Contents/Info.plist")"
@@ -22,6 +22,25 @@ codesign --verify --deep --strict --verbose=2 "$APP"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$RELEASE_DIR/notary-upload.zip"
 echo "Signed locally: $APP"
 echo "Run $0 notarize to upload this app to Apple for notarization."
+exit 0
+fi
+if [[ "$MODE" == package-unnotarized ]]; then
+codesign --verify --deep --strict --verbose=2 "$APP"
+PACKAGE="MetalDooM-$VERSION-build$BUILD-macOS-arm64-unnotarized"
+PAYLOAD="$RELEASE_DIR/$PACKAGE"
+mkdir "$PAYLOAD"
+ditto "$APP" "$PAYLOAD/MetalDooM.app"
+for DOC in README.md INSTALL.md PLAYER_GUIDE.md TESTING.md DEVELOPMENT.md ARCHITECTURE.md VALIDATION.md RELEASING.md CHANGELOG.md LICENSE; do
+  cp "$PROJECT_DIR/$DOC" "$PAYLOAD/$DOC"
+done
+mkdir -p "$PAYLOAD/Vendor/ChocolateDoom/opl"
+cp "$PROJECT_DIR/Vendor/ChocolateDoom/UPSTREAM.md" "$PAYLOAD/Vendor/ChocolateDoom/UPSTREAM.md"
+cp "$PROJECT_DIR/Vendor/ChocolateDoom/opl/COPYING.LESSER" "$PAYLOAD/Vendor/ChocolateDoom/opl/COPYING.LESSER"
+cp "$PROJECT_DIR/Vendor/ChocolateDoom/opl/COPYING.LESSER" "$PAYLOAD/Nuked-OPL3-LICENSE.txt"
+printf '%s\n' "Developer ID signed; NOT notarized by Apple." > "$PAYLOAD/SIGNING-STATUS.txt"
+ditto -c -k --sequesterRsrc --keepParent "$PAYLOAD" "$RELEASE_DIR/$PACKAGE.zip"
+(cd "$RELEASE_DIR" && shasum -a 256 "$PACKAGE.zip" > "$PACKAGE.zip.sha256")
+echo "Signed, unnotarized package ready: $RELEASE_DIR/$PACKAGE.zip"
 exit 0
 fi
 [[ -f "$RELEASE_DIR/notary-upload.zip" ]] || { echo "Run prepare first." >&2; exit 1; }

@@ -4,6 +4,16 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 73 — GitHub preview packaging and documentation
+
+- Shorten the README and move controls, development details and historical
+  validation into dedicated guides; add installation and release notes.
+- Replace the verbose, outdated About text with a short description and credits
+  for Chocolate Doom, id Software and Nuked OPL3.
+- Add explicit signed-but-unnotarized ZIP packaging with instructions, license
+  notices and SHA-256 checksums. Keep Apple submission separate.
+- Build and verify the signed app, About dialog and extracted release archive.
+
 ## Build 72 — Selected Metal M app icon
 
 - Replace the placeholder with the selected standalone Apple Metal M in Doom gold-to-blue-steel colors.
