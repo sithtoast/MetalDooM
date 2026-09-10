@@ -27,6 +27,21 @@ are never included in the repository.
   maps without defined pars. Hide the overlay during title demos and endings.
 - Validate engine counts, time, saves, transitions, secret notice timing and
   Doom II par coverage; verify the HUD and controls in the running app.
+
+## 0.3.0 · Build 86 — AO controls and transparent grilles
+
+- Add per-session View controls for AO strength (0–100%) and radius (16–96 Doom
+  units), preserving the previous 50%/48-unit defaults and classic launch mode.
+- Let grille bars and other masked world textures cast occlusion while rays
+  pass through transparent pixels. Match texture wrapping, alpha cutoff and
+  animation; avoid geometry rebuilds for control, UV-only and mask-only changes.
+- Record both controls in diagnostics and benchmark comparisons. Validate native
+  menus plus GPU alpha rays, control effects, unchanged HUD/classic restoration,
+  moving doors, map replacement and shutdown on Doom/Doom II and a grille fixture.
+- Fix validate-ao crashes from its window-focus assertion. Drive the door test
+  without keyboard focus and report test/load failures as terminal errors with
+  nonzero exits, instead of assertion crash reports or unattended modal alerts.
+
 ## 0.3.0 · Build 84 — Experimental ray-traced ambient occlusion
 
 - Add View → Ray-Traced Ambient Occlusion (Experimental), off at launch, with

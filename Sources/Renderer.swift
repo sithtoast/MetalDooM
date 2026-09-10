@@ -75,6 +75,12 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var worldFormat: MTLPixelFormat = .bgra8Unorm
     private var opaqueMaterials = Set<MaterialKey>()
     private var aoGeometryDirty = true
+    private var aoAlphaBuffer: MTLBuffer?
+    private var aoAlphaInfo: [ObjectIdentifier:SIMD4<UInt32>] = [:]
+    private(set) var aoSettings=AOSettings()
+    func setAOSettings(strength: Float? = nil, radius: Float? = nil) {
+        aoSettings=AOSettings(strength:strength ?? aoSettings.strength,radius:radius ?? aoSettings.radius)
+    }
     private(set) var ambientOcclusion: AmbientOcclusion?
     var ambientOcclusionEnabled: Bool { ambientOcclusion != nil }
     var ambientOcclusionSupported: Bool { device.supportsRaytracing && device.supportsRaytracingFromRender }
@@ -86,14 +92,25 @@ final class Renderer: NSObject, MTKViewDelegate {
         aoGeometryDirty=true
     }
     private func prepareAmbientOcclusion(command: MTLCommandBuffer) throws {
-        guard let ao=ambientOcclusion, aoGeometryDirty else { return }
-        var positions: [SIMD4<Float>] = []
-        for batch in batches where opaqueMaterials.contains(batch.material) {
-            let vertices=batch.vertices.contents().bindMemory(to:WorldVertex.self,capacity:batch.count)
-            positions.append(contentsOf:(0..<batch.count).map { vertices[$0].position })
+        guard let ao=ambientOcclusion else { return }
+        if aoGeometryDirty {
+            let geometry=batches.map { batch in
+                let source=batch.vertices.contents().bindMemory(to:WorldVertex.self,capacity:batch.count)
+                let vertices=(0..<batch.count).map { AOVertex(position:source[$0].position,uv:SIMD4(source[$0].uvLight.x,source[$0].uvLight.y,0,0)) }
+                return AOGeometry(vertices:vertices,opaque:opaqueMaterials.contains(batch.material))
+            }
+            try ao.prepare(geometry:geometry,device:device,command:command)
+            aoGeometryDirty=false
         }
-        try ao.prepare(positions:positions,device:device,command:command)
-        aoGeometryDirty=false
+        // Texture translation can change every tic without any geometry change.
+        // Publish a fresh immutable mapping only when the selected frames change.
+        let info=try batches.enumerated().map { index,batch -> SIMD4<UInt32> in
+            guard var material=aoAlphaInfo[ObjectIdentifier(animatedTexture(batch))] else {
+                throw PortError("Missing ambient occlusion alpha mask.")
+            }
+            material.w=ao.baseVertices[index];return material
+        }
+        try ao.updateMaterials(info,device:device)
     }
     private var sceneSnapshot: MTLTexture?
     private var sky: MTLTexture?
@@ -304,6 +321,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         var cached: [MaterialKey:MTLTexture] = [:], missing: [String] = []
         var opaque = Set<MaterialKey>()
+        var alphaBytes:[UInt8]=[255], alphaInfo:[ObjectIdentifier:SIMD4<UInt32>]=[:]
         func cacheMaterial(_ material: MaterialKey) throws {
             if cached[material] != nil { return }
             let source = try art.image(material)
@@ -317,6 +335,12 @@ final class Renderer: NSObject, MTKViewDelegate {
             }
             pixels.rgba.withUnsafeBytes { bytes in
                 texture.replace(region:MTLRegionMake2D(0,0,pixels.width,pixels.height),mipmapLevel:0,withBytes:bytes.baseAddress!,bytesPerRow:pixels.width*4)
+            }
+            if opaque.contains(material) { alphaInfo[ObjectIdentifier(texture)]=SIMD4(0,1,1,0) }
+            else {
+                guard alphaBytes.count+pixels.width*pixels.height<=Int(UInt32.max) else { throw PortError("AO alpha masks are too large.") }
+                alphaInfo[ObjectIdentifier(texture)]=SIMD4(UInt32(alphaBytes.count),UInt32(pixels.width),UInt32(pixels.height),0)
+                alphaBytes.append(contentsOf:stride(from:3,to:pixels.rgba.count,by:4).map { pixels.rgba[$0] })
             }
             cached[material] = texture
         }
@@ -351,7 +375,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             try cacheMaterial(key); animationIDs[key]=frame.index
             if key.flat { flats[frame.index]=cached[key] } else { walls[frame.index]=cached[key] }
         }
-        // Conservatively omit animated walls if any animation frame is masked.
+        // Conservatively alpha-test animated walls if any animation frame is masked.
         let maskedWallAnimation=animationIDs.contains { !$0.key.flat && !opaque.contains($0.key) }
         if maskedWallAnimation { for key in animationIDs.keys where !key.flat { opaque.remove(key) } }
         animatedIDs=animationIDs; animatedWalls=walls; animatedFlats=flats
@@ -360,6 +384,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         progress = MD_GetProgress(); intermission = IntermissionSequence(progress); intermissionTime = 0; deathTime = 0; finale = FinaleSequence(); lastGeometryTick = -1
         intermissionArt = loadedIntermission
         textureHeights = heights
+        guard let alphaBuffer=device.makeBuffer(bytes:alphaBytes,length:alphaBytes.count,options:.storageModeShared) else { throw PortError("Cannot allocate AO alpha masks.") }
+        aoAlphaBuffer=alphaBuffer;aoAlphaInfo=alphaInfo
         opaqueMaterials=opaque;aoGeometryDirty=true
         self.map = map; self.wad = wad; textures = cached; batches = loaded; sky = loadedSky; sprites = loadedSprites; pitch = 0
         music?.update(active:false); music=loadedMusic; music?.enabled=musicEnabled; music?.volume=musicVolume
@@ -508,11 +534,16 @@ final class Renderer: NSObject, MTKViewDelegate {
                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:skyVertexCount)
                 encoder.setRenderPipelineState(pipeline)
             }
-            if let ao=ambientOcclusion, let structure=ao.structure {
+            if let ao=ambientOcclusion, let structure=ao.structure, let vertices=ao.vertices, let materials=ao.materials, let alpha=aoAlphaBuffer {
                 var aoEye=SIMD4(eye,1)
                 encoder.setRenderPipelineState(ao.pipeline)
                 encoder.setFragmentBytes(&aoEye,length:MemoryLayout<SIMD4<Float>>.stride,index:3)
                 encoder.setFragmentAccelerationStructure(structure,bufferIndex:4)
+                encoder.setFragmentBuffer(vertices,offset:0,index:5)
+                encoder.setFragmentBuffer(materials,offset:0,index:6)
+                encoder.setFragmentBuffer(alpha,offset:0,index:7)
+                var settings=aoSettings.uniform
+                encoder.setFragmentBytes(&settings,length:MemoryLayout<SIMD4<Float>>.stride,index:8)
             }
             for batch in batches {
                 encoder.setVertexBuffer(batch.vertices,offset:0,index:0); encoder.setFragmentTexture(animatedTexture(batch),index:0)

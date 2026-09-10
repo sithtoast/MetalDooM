@@ -80,6 +80,18 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             secretMenuItem=viewMenu.addItem(withTitle:"Secret Notifications",action:#selector(toggleSecretNotifications),keyEquivalent:"")
             secretMenuItem?.target=self
             viewMenu.addItem(withTitle:"Ray-Traced Ambient Occlusion (Experimental)",action:#selector(toggleAmbientOcclusion),keyEquivalent:"").target=self
+            let strengthItem=NSMenuItem(title:"AO Strength",action:nil,keyEquivalent:"")
+            let strengthMenu=NSMenu(title:"AO Strength");strengthItem.submenu=strengthMenu;viewMenu.addItem(strengthItem)
+            for value in [0,25,50,75,100] {
+                let item=strengthMenu.addItem(withTitle:"\(value)%"+(value==50 ? " (Default)":""),action:#selector(selectAOStrength(_:)),keyEquivalent:"")
+                item.tag=value;item.target=self
+            }
+            let radiusItem=NSMenuItem(title:"AO Radius",action:nil,keyEquivalent:"")
+            let radiusMenu=NSMenu(title:"AO Radius");radiusItem.submenu=radiusMenu;viewMenu.addItem(radiusItem)
+            for (value,title) in [(16,"Compact — 16 units"),(32,"Near — 32 units"),(48,"Default — 48 units"),(96,"Wide — 96 units")] {
+                let item=radiusMenu.addItem(withTitle:title,action:#selector(selectAORadius(_:)),keyEquivalent:"")
+                item.tag=value;item.target=self
+            }
             let audioItem=NSMenuItem(), audioMenu=NSMenu(title:"Audio")
             audioItem.submenu=audioMenu; menu.addItem(audioItem)
             let musicItem=audioMenu.addItem(withTitle:"Music",action:#selector(toggleMusic(_:)),keyEquivalent:"m")

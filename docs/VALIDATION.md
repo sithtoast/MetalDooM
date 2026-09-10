@@ -26,6 +26,35 @@ visibly reports MetalDooM 0.4.0 (build 92). Gameplay source is unchanged from bu
   SECRET FOUND! with S advancing from 0/4 to 1/4 in an ignored local IWAD fixture.
 - Source WADs were unchanged. Generated fixture/game data and app bundles remain
   ignored. This is targeted validation, not a complete campaign playthrough.
+
+## AO controls, alpha testing and validator repair — build 86
+
+- Native build 86: View strength/radius controls were exercised at 100%/96 units,
+  visually checked, then returned to 50%/48 units with AO enabled in E1M1.
+- Final GPU regression passes on original Ultimate Doom E1M1, Doom II MAP01 and
+  a generated E1M1 MIDGRATE portal fixture. Analytic rays hit bars at distance 2,
+  see the backing wall through holes at distance 4, or miss at distance 8. Tests
+  verify alpha values 127/128, negative repeat UVs, changed texture masks and
+  UV-only updates without rebuilding unchanged geometry.
+- Strength/radius change GPU pixels and benchmark identity; zero strength and
+  disabling AO both restore classic pixels. HUD remains identical, paused output
+  stays stable, moving doors rebuild the mesh, and map replacement/shutdown pass.
+- Sampled GPU command means at 1280×800 with Metal API validation/readback were
+  about 3.8 ms on E1M1, 2.6 ms on MAP01 and 3.6 ms on the grille fixture with AO.
+  These are exploratory paused-scene timings, not sustained or uncapped FPS.
+  Build 83's paired benchmark below remains historical; it was not repeated here.
+- The grille fixture also passes all 36 Ultimate Doom geometry/material checks.
+- User report for validate-ao PID 62595 at 16:29:08 matches the harness's Swift
+  focus assertion (SIGTRAP). The door fixture now drives engine tics through a
+  test-only renderer bridge, independent of keyboard focus. Expected test errors
+  print FAIL and exit nonzero; an intentional failing check was verified to
+  exit status 1, not a signal. Native load errors no longer wait on modal alerts,
+  and missing IWAD paths are rejected before compilation.
+
+Sky and billboard sprites remain excluded as occluders. Other GPU families,
+all animated WAD material combinations, GPU fault injection and complete campaign
+playthroughs remain untested.
+
 ## Ambient occlusion experiment — 2026-09-10
 
 Final app: 0.3.0 build 84 on `codex/metal-experiments`. The preceding build 83

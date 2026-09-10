@@ -22,35 +22,36 @@ View and Options → HUD controls and persistent preferences.
 
 ## Where the experiment stands
 
-Read [Metal experiments](docs/METAL_EXPERIMENTS.md). `AmbientOcclusion.swift`
-adds eight short hemisphere rays per world fragment using a Metal acceleration
-structure built from opaque world triangles. Moving geometry gets a fresh
-structure; unchanged positions avoid rebuilds for light-only changes. Sky,
-billboard sprites and masked materials do not cast occlusion. Original sprite,
-weapon and HUD shading remain unchanged.
+Read [Metal experiments](docs/METAL_EXPERIMENTS.md). The user selected AO controls
+and correct grille handling; both are now implemented. View offers strength
+0–100% and radius 16–96 units, defaulting to 50%/48 units. AO starts disabled each
+launch, while choices persist through toggles and map changes within a session.
 
-The View option is disabled when Metal ray tracing in render shaders is absent.
-The M5 Pro used locally reports support. Other GPU families are untested.
-Diagnostics and benchmark settings include AO state. The existing benchmark is
-still a capped CPU-submission benchmark, not a GPU throughput measurement.
+`AmbientOcclusion.swift` uses eight hemisphere rays against world triangles.
+Masked hits interpolate UVs and check the current animated texture's texel alpha;
+holes let rays continue. Position/topology changes rebuild the structure, UV-only
+changes replace attributes, and mask changes replace material mappings. All
+submitted resources remain immutable. Sky and billboard sprites do not occlude.
 
-The focused Metal API-validation regression passed on Ultimate Doom E1M1:
-paused AO pixels remain stable, HUD pixels are unchanged, disabling AO restores
-identical classic pixels, a real door updates the ray mesh, map replacement
-rebuilds it, and shutdown completes. A corrected single-frame 1280×800 paused
-sample measured approximately 4.8 ms AO versus 0.18 ms classic GPU command time;
-API validation/readback pacing limit performance conclusions. The original
-geometry/art regression passed all 36 Ultimate Doom maps. See validation docs
-for final native checks and Doom II coverage. Build 83's paired DEMO1 benchmark
-at 2200×1400 returned 118.8 FPS AO / 118.0 FPS classic under the 120 FPS cap;
-this does not establish uncapped throughput or an AO speedup. Build 84 hardens
-the path where render-encoder creation fails after encoding a ray-mesh build.
-Its final GPU regression passed, and the running build 84 View toggle/presentation
-were verified. The app was left in E1M1 with AO enabled for this session.
+Build 86 native controls/presentation were verified. GPU checks passed on
+Ultimate Doom, Doom II and a generated MIDGRATE fixture, including analytic alpha
+rays, settings effects, classic restoration, HUD stability, moving doors, map
+replacement and shutdown. The app was left in E1M1 with AO on at default settings.
 
-Potential follow-ups are alpha-tested ray intersections, static/moving mesh
-separation, sample-quality tuning and measurements on more maps/GPUs. Keep KEX
-compatibility and the future in-window WAD picker on their own branches.
+The user saw validate-ao crash dialogs from the old focus assertion. The harness
+now drives the original door fixture independently of focus using a bridge added
+only to its copied Renderer source. Checks and top-level/native load errors print
+FAIL and exit nonzero; an intentional failure was verified as exit 1, not SIGTRAP.
+Do not restore the old focus precondition or modal test error path.
+
+M5 Pro capability probes report Metal 4, ray tracing in render shaders and
+MetalFX spatial/temporal/denoised upscaling and frame interpolation support.
+These optional MetalFX paths are not implemented. Other GPUs remain untested.
+The prior build 83 benchmark is historical; see validation docs for timing limits.
+
+The discussed next visible experiment is one shadow-casting light, before
+projectile/torch lighting. It has not been implemented. Keep compatibility and
+in-window picker work on separate branches. No push has been requested.
 
 ## Current behavior and important boundaries
 

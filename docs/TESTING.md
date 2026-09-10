@@ -132,4 +132,6 @@ On the Metal experiments branch, use **View → Ray-Traced Ambient Occlusion
 (Experimental)**. It starts off each launch. Compare the same paused scene, then
 run matching DEMO1 benchmarks with it off/on. The report records AO state. See
 [Metal experiments](METAL_EXPERIMENTS.md) for the native GPU regression, current
-material/sprite exclusions and timing limits.
+sprite exclusions and timing limits. Strength and radius are separate View
+submenus. The validator does not need keyboard focus; failures should report a
+terminal error rather than creating a macOS crash dialog.

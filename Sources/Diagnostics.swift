@@ -14,6 +14,8 @@ extension App {
 
     @objc func selectOPL(_ sender:NSMenuItem) { UserDefaults.standard.set("opl",forKey:"musicBackend");sessionLog.append("Music backend: Classic OPL") }
     @objc func selectAppleMIDI(_ sender:NSMenuItem) { UserDefaults.standard.set("apple",forKey:"musicBackend");sessionLog.append("Music backend: Apple MIDI") }
+    @objc func selectAOStrength(_ sender: NSMenuItem) { renderer.setAOSettings(strength:Float(sender.tag)/100) }
+    @objc func selectAORadius(_ sender: NSMenuItem) { renderer.setAOSettings(radius:Float(sender.tag)) }
     @objc func toggleAmbientOcclusion() {
         do {
             try renderer.setAmbientOcclusion(!renderer.ambientOcclusionEnabled)
@@ -68,7 +70,9 @@ extension App {
         Frame limit: \(view.preferredFramesPerSecond) FPS
         Recent renderer FPS: \(fps) (not a benchmark)
         Music backend: \(MusicPlayer.preferredBackend == "opl" ? "Classic OPL" : "Apple MIDI")
-        Ray-traced AO: \(renderer.ambientOcclusionEnabled ? "On (8 rays, radius 48, strength 0.5, opaque world only)" : "Off")
+        Ray-traced AO: \(renderer.ambientOcclusionEnabled ? "On (8 rays, alpha-tested world)" : "Off")
+        AO strength: \(Int(renderer.aoSettings.strength*100))%
+        AO radius: \(Int(renderer.aoSettings.radius)) Doom units
         AO occluder triangles: \(renderer.ambientOcclusion?.triangleCount ?? 0)
         Ray tracing in render shaders: \(renderer.ambientOcclusionSupported)
         Recent GPU command duration: \(String(format:"%.3f",renderer.recentGPUTime*1000)) ms (not a benchmark)

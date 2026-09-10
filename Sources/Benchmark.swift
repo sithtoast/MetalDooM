@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 extension App {
     var benchmarkSettings: String {
-        "\(view.drawableSize)|\(view.renderScale)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)"
+        "\(view.drawableSize)|\(view.renderScale)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)|\(renderer.aoSettings.strength)|\(renderer.aoSettings.radius)"
     }
     @objc func runBenchmark() {
         guard benchmark == nil else { return }
@@ -78,6 +78,14 @@ extension App {
         if item.action == #selector(selectOPL(_:)) { item.state=MusicPlayer.preferredBackend == "opl" ? .on : .off }
         if item.action == #selector(selectAppleMIDI(_:)) { item.state=MusicPlayer.preferredBackend == "apple" ? .on : .off }
         if benchmark != nil { return item.action == #selector(cancelBenchmark) || item.action == #selector(NSApplication.terminate(_:)) }
+        if item.action == #selector(selectAOStrength(_:)) {
+            item.state=Int(renderer.aoSettings.strength*100)==item.tag ? .on:.off
+            return renderer.ambientOcclusionSupported
+        }
+        if item.action == #selector(selectAORadius(_:)) {
+            item.state=Int(renderer.aoSettings.radius)==item.tag ? .on:.off
+            return renderer.ambientOcclusionSupported
+        }
         if item.action == #selector(toggleAmbientOcclusion) {
             item.state=renderer.ambientOcclusionEnabled ? .on : .off
             return renderer.ambientOcclusionSupported

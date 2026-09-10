@@ -2,14 +2,38 @@
 import MetalKit
 import simd
 
-/// Optional world-only experiment. Each changed mesh gets a fresh acceleration
-/// structure so queued frames never observe resources being modified underneath them.
+struct AOSettings: Equatable {
+    let strength: Float
+    let radius: Float
+    init(strength: Float = 0.5, radius: Float = 48) {
+        self.strength = strength.isFinite ? min(1,max(0,strength)) : 0.5
+        self.radius = radius.isFinite ? min(96,max(16,radius)) : 48
+    }
+    var uniform: SIMD4<Float> { SIMD4(radius,strength,0,0) }
+}
+
+struct AOVertex: Equatable {
+    var position: SIMD4<Float>
+    var uv: SIMD4<Float>
+}
+struct AOGeometry {
+    let vertices: [AOVertex]
+    let opaque: Bool
+}
+
+/// Resources are immutable after submission, including animated alpha mappings.
 final class AmbientOcclusion {
     let pipeline: MTLRenderPipelineState
     private(set) var structure: MTLAccelerationStructure?
-    private var positions: [SIMD4<Float>] = []
+    private(set) var vertices: MTLBuffer?
+    private(set) var materials: MTLBuffer?
+    private var mesh: [AOVertex] = []
+    private var counts: [Int] = []
+    private var opacity: [Bool] = []
+    private var materialInfo: [SIMD4<UInt32>] = []
+    private(set) var baseVertices: [UInt32] = []
     private(set) var buildCount = 0
-    var triangleCount: Int { positions.count / 3 }
+    var triangleCount: Int { mesh.count / 3 }
 
     init(device: MTLDevice, shader: String, format: MTLPixelFormat) throws {
         guard device.supportsRaytracing && device.supportsRaytracingFromRender else {
@@ -24,38 +48,81 @@ final class AmbientOcclusion {
         pipeline = try device.makeRenderPipelineState(descriptor:descriptor)
     }
 
-    func prepare(positions next: [SIMD4<Float>], device: MTLDevice, command: MTLCommandBuffer) throws {
-        // Sector light/UV/texture changes rebuild raster batches too, but do not
-        // require rebuilding the BVH when the opaque triangles are unchanged.
-        guard next != positions else { return }
-        guard !next.isEmpty else { positions=[];structure=nil;return }
-        guard let vertices=device.makeBuffer(bytes:next,length:next.count*MemoryLayout<SIMD4<Float>>.stride,options:.storageModeShared) else {
+    func prepare(geometry batches: [AOGeometry], device: MTLDevice, command: MTLCommandBuffer) throws {
+        let next=batches.flatMap(\.vertices), nextCounts=batches.map { $0.vertices.count }, nextOpacity=batches.map(\.opaque)
+        guard next != mesh || nextCounts != counts || nextOpacity != opacity else { return }
+        guard !next.isEmpty else {
+            mesh=[];counts=[];opacity=[];baseVertices=[];structure=nil;vertices=nil;return
+        }
+        guard let freshVertices=device.makeBuffer(bytes:next,length:next.count*MemoryLayout<AOVertex>.stride,options:.storageModeShared) else {
             throw PortError("Cannot allocate ambient occlusion vertices.")
         }
-        let geometry=MTLAccelerationStructureTriangleGeometryDescriptor()
-        geometry.vertexBuffer=vertices;geometry.vertexStride=MemoryLayout<SIMD4<Float>>.stride
-        geometry.vertexFormat = .float3;geometry.triangleCount=next.count/3;geometry.opaque=true
-        let descriptor=MTLPrimitiveAccelerationStructureDescriptor()
-        descriptor.geometryDescriptors=[geometry]
-        let sizes=device.accelerationStructureSizes(descriptor:descriptor)
-        guard let fresh=device.makeAccelerationStructure(size:sizes.accelerationStructureSize),
-              let scratch=device.makeBuffer(length:sizes.buildScratchBufferSize,options:.storageModePrivate),
-              let encoder=command.makeAccelerationStructureCommandEncoder() else {
-            throw PortError("Cannot allocate ambient occlusion acceleration structure.")
+        let rebuild=structure == nil || nextCounts != counts || nextOpacity != opacity || next.count != mesh.count || zip(next,mesh).contains { $0.position != $1.position }
+        var starts:[UInt32]=[], start=0
+        var descriptors:[MTLAccelerationStructureGeometryDescriptor]=[]
+        for batch in batches {
+            starts.append(UInt32(start))
+            let geometry=MTLAccelerationStructureTriangleGeometryDescriptor()
+            geometry.vertexBuffer=freshVertices;geometry.vertexBufferOffset=start*MemoryLayout<AOVertex>.stride
+            geometry.vertexStride=MemoryLayout<AOVertex>.stride
+            geometry.vertexFormat = .float3;geometry.triangleCount=batch.vertices.count/3;geometry.opaque=batch.opaque
+            descriptors.append(geometry);start += batch.vertices.count
         }
-        fresh.label="AO world triangles"
-        encoder.build(accelerationStructure:fresh,descriptor:descriptor,scratchBuffer:scratch,scratchBufferOffset:0)
-        encoder.endEncoding()
-        structure=fresh;positions=next;buildCount += 1
+        if rebuild {
+            let descriptor=MTLPrimitiveAccelerationStructureDescriptor()
+            descriptor.geometryDescriptors=descriptors
+            let sizes=device.accelerationStructureSizes(descriptor:descriptor)
+            guard let fresh=device.makeAccelerationStructure(size:sizes.accelerationStructureSize),
+                  let scratch=device.makeBuffer(length:sizes.buildScratchBufferSize,options:.storageModePrivate),
+                  let encoder=command.makeAccelerationStructureCommandEncoder() else {
+                throw PortError("Cannot allocate ambient occlusion acceleration structure.")
+            }
+            fresh.label="AO world triangles (alpha-tested)"
+            encoder.build(accelerationStructure:fresh,descriptor:descriptor,scratchBuffer:scratch,scratchBufferOffset:0)
+            encoder.endEncoding();structure=fresh;buildCount += 1
+        }
+        // UV changes replace this buffer but do not rebuild unchanged positions.
+        vertices=freshVertices;mesh=next;counts=nextCounts;opacity=nextOpacity;baseVertices=starts
+    }
+
+    func updateMaterials(_ next: [SIMD4<UInt32>], device: MTLDevice) throws {
+        guard next != materialInfo else { return }
+        guard !next.isEmpty else { materials=nil;materialInfo=[];return }
+        guard let fresh=device.makeBuffer(bytes:next,length:next.count*MemoryLayout<SIMD4<UInt32>>.stride,options:.storageModeShared) else {
+            throw PortError("Cannot allocate ambient occlusion material mappings.")
+        }
+        materials=fresh;materialInfo=next
     }
 
     static let shader = """
 
     #include <metal_raytracing>
     using namespace raytracing;
+    struct AOVertex { float4 position; float4 uv; };
+    float aoHitDistance(ray r, primitive_acceleration_structure world,
+            const device AOVertex *vertices, const device uint4 *materials, const device uchar *alpha) {
+        intersection_params params;
+        params.assume_geometry_type(geometry_type::triangle);
+        intersection_query<triangle_data> hits(r,world,params);
+        while (hits.next()) {
+            // Fully opaque batches commit in hardware. For masked candidates,
+            // interpolate the exact raster UV, repeat in texels, then test alpha.
+            uint4 material=materials[hits.get_candidate_geometry_id()];
+            uint base=material.w+hits.get_candidate_primitive_id()*3;
+            float2 bary=hits.get_candidate_triangle_barycentric_coord();
+            float2 uv=vertices[base].uv.xy*(1-bary.x-bary.y)
+                    +vertices[base+1].uv.xy*bary.x+vertices[base+2].uv.xy*bary.y;
+            float2 size=float2(material.yz);
+            uint2 pixel=uint2(floor(fract(uv/size)*size));
+            if (alpha[material.x+pixel.y*material.y+pixel.x]>=128) hits.commit_triangle_intersection();
+        }
+        return hits.get_committed_intersection_type()==intersection_type::none ? r.max_distance:hits.get_committed_distance();
+    }
     fragment float4 aoFragment(Out in [[stage_in]], bool front [[front_facing]],
             texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]],
-            constant float4 &eye [[buffer(3)]], primitive_acceleration_structure world [[buffer(4)]]) {
+            constant float4 &eye [[buffer(3)]], primitive_acceleration_structure world [[buffer(4)]],
+            const device AOVertex *vertices [[buffer(5)]], const device uint4 *materials [[buffer(6)]],
+            const device uchar *alpha [[buffer(7)]], constant float4 &settings [[buffer(8)]]) {
         if (in.fullbright > 0.5 && !front) discard_fragment();
         constexpr sampler s(coord::normalized, address::repeat, filter::nearest);
         float4 c=tex.sample(s,in.uv/float2(tex.get_width(),tex.get_height()));
@@ -65,12 +132,9 @@ final class AmbientOcclusion {
         float3 n=normalize(cross(dfdx(in.world),dfdy(in.world)));
         if (dot(n,eye.xyz-in.world)<0) n=-n;
         float shade=(power.x>0 || power.y>0) ? 1.0 : in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
-        if (power.x==0 && power.y==0) {
+        if (power.x==0 && power.y==0 && settings.y>0) {
             float3 axis=abs(n.y)<0.9 ? float3(0,1,0):float3(1,0,0);
             float3 tangent=normalize(cross(axis,n)), bitangent=cross(n,tangent);
-            intersector<triangle_data> trace;
-            trace.assume_geometry_type(geometry_type::triangle);
-            trace.force_opacity(forced_opacity::opaque);
             float occlusion=0;
             // Fixed cosine-weighted hemisphere directions: stable while paused
             // or moving, without temporal history, noise or a denoising pass.
@@ -79,11 +143,11 @@ final class AmbientOcclusion {
                 ray query;
                 query.origin=in.world+n*0.15;
                 query.direction=tangent*(r*cos(angle))+bitangent*(r*sin(angle))+n*sqrt(1-r*r);
-                query.min_distance=0.05;query.max_distance=48.0;
-                auto hit=trace.intersect(query,world);
-                if (hit.type!=intersection_type::none) occlusion+=1.0-smoothstep(0.0,48.0,hit.distance);
+                query.min_distance=0.05;query.max_distance=settings.x;
+                float distance=aoHitDistance(query,world,vertices,materials,alpha);
+                occlusion+=1.0-smoothstep(0.0,settings.x,distance);
             }
-            shade*=1.0-0.5*(occlusion/8.0);
+            shade*=1.0-settings.y*(occlusion/8.0);
         }
         return float4(powerColor(c.rgb*shade,power),1);
     }
