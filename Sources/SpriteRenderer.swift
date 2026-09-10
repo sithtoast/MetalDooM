@@ -130,7 +130,12 @@ final class SpriteRenderer {
                 x -= hudPatches[name]?.width ?? 0; draw(name,x,y)
             }
         }
-        draw("STBAR",0,0); draw("STARMS",104,0)
+        // Rerelease IWADs extend STBAR on both sides of the classic 320-wide
+        // layout. Center that artwork without scaling its labels or moving the
+        // foreground widgets. The viewport clips the extra side decoration;
+        // original 320-wide patches retain their existing position and offsets.
+        let backgroundX = min(0, (320 - (hudPatches["STBAR"]?.width ?? 320)) / 2)
+        draw("STBAR",backgroundX,0); draw("STARMS",104,0)
         number(state.readyAmmo,44,3,"STTNUM")
         number(max(0,state.health),90,3,"STTNUM"); draw("STTPRCNT",90,3)
         number(state.armor,221,3,"STTNUM"); draw("STTPRCNT",221,3)

@@ -4,6 +4,16 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 55 — Rerelease HUD alignment
+
+- Center extended rerelease status-bar backgrounds around the classic HUD so
+  ammo, health and armor labels align with their counters in Final Doom and
+  other rerelease IWADs, without stretching the artwork or moving widgets.
+- Preserve original 320-pixel backgrounds and integer HUD scaling; use the
+  extended artwork for side padding and clip it at the viewport edges.
+- Verify installed build 55 with TNT and Plutonia, normal/expanded windows,
+  original Doom II and Ultimate Doom artwork, and clean loaded-WAD exits.
+
 ## Build 54 — Final Doom
 
 - Recognize TNT: Evilution and The Plutonia Experiment from the base IWAD,
