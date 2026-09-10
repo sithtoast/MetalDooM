@@ -47,6 +47,24 @@ Save first if you want to keep your progress. Selecting Play opens the new game
 in a fresh app instance automatically; the previous instance closes after the
 new WAD loads successfully. Cancel leaves your current game available.
 
+## Choosing WADs
+
+**Open WAD…** opens a two-column picker:
+
+- **Main game:** choose a folder to list its main IWADs, select one, or use
+  Choose IWAD. You can also drop a main WAD or folder into the left drop area.
+  The last folder is remembered. Folder browsing scans that folder only.
+- **Extra WADs:** add optional PWADs using Add PWAD or the right drop area.
+  Dropping a folder adds its PWADs in filename order. Move Up, Move Down and
+  Remove let you adjust the stack; later files take priority. Duplicate files
+  are ignored, and main IWADs cannot be added as extras.
+
+For SIGIL, select your Ultimate Doom IWAD on the left and add `sigil.wad` on the
+right. Review compatibility and load order before Play; listing a WAD is not a
+full compatibility check. Reopening the picker during play shows the current
+stack. Choosing a different main game keeps the extras visible for your review.
+The original WAD files are never moved or modified.
+
 ## Window layout
 
 The map picker sits beside the map name in the bottom status bar. Selecting a map

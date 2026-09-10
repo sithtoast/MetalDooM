@@ -249,21 +249,16 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func openWAD() {
         guard !switchingWAD, window.attachedSheet == nil else { return }
         view.releaseMouse()
-        let panel = NSOpenPanel(); panel.allowedContentTypes = [UTType(filenameExtension:"wad") ?? .data]
-        panel.canChooseDirectories = false; panel.allowsMultipleSelection = false
-        panel.beginSheetModal(for:window) { [weak self] response in
-            guard let self, response == .OK, let url=panel.url else { return }
-            let stack=WADStackPanel(base:url,replacingGame:self.wad != nil)
-            self.stackPanel=stack
-            stack.onPlay={ [weak self] extras in
-                guard let self else { return }
-                self.stackPanel=nil
-                if self.wad == nil { self.load(url,addOns:extras) }
-                else { self.switchWAD(url,addOns:extras) }
-            }
-            stack.onCancel={ [weak self] in self?.stackPanel=nil }
-            self.window.beginSheet(stack)
+        let stack=WADStackPanel(base:wad?.sourceURLs.first,addOns:wad.map { Array($0.sourceURLs.dropFirst()) } ?? [],replacingGame:wad != nil)
+        stackPanel=stack
+        stack.onPlay={ [weak self] url,extras in
+            guard let self else { return }
+            self.stackPanel=nil
+            if self.wad == nil { self.load(url,addOns:extras) }
+            else { self.switchWAD(url,addOns:extras) }
         }
+        stack.onCancel={ [weak self] in self?.stackPanel=nil }
+        window.beginSheet(stack)
     }
     // Chocolate Doom owns process-global WAD resources. Hand off only after the
     // replacement instance reports a successful load, preserving this game on failure.

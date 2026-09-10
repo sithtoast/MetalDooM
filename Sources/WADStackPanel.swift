@@ -2,59 +2,212 @@
 import AppKit
 import UniformTypeIdentifiers
 
-// Reviewable load order. Base data remains external; later add-ons take priority.
-final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
-    var onCancel: (()->Void)?
-    var onPlay: (([URL])->Void)?
-    private var addOns: [URL]=[]
-    private let table=NSTableView()
-    init(base: URL, replacingGame: Bool = false) {
-        super.init(contentRect:NSRect(x:0,y:0,width:620,height:380),styleMask:[.titled],backing:.buffered,defer:false)
-        title="WAD Load Order";isReleasedWhenClosed=false
-        let root=contentView!
-        func label(_ text:String,_ y:CGFloat) {
-            let label=NSTextField(labelWithString:text);label.frame=NSRect(x:20,y:y,width:580,height:24);root.addSubview(label)
-        }
-        label("Base game: \(base.lastPathComponent)",340)
-        label("Optional add-ons — later files override earlier files.",310)
-        if replacingGame { label("Play ends the current game. Cancel to go back and save first.",280) }
-        let column=NSTableColumn(identifier:NSUserInterfaceItemIdentifier("file"));column.title="Load order";column.width=570
-        table.addTableColumn(column);table.dataSource=self;table.delegate=self;table.rowHeight=26
-        let scroll=NSScrollView(frame:NSRect(x:20,y:100,width:580,height:170));scroll.documentView=table;scroll.hasVerticalScroller=true
-        root.addSubview(scroll)
-        func button(_ title:String,_ x:CGFloat,_ y:CGFloat,_ width:CGFloat,_ action:Selector) {
-            let b=NSButton(title:title,target:self,action:action);b.bezelStyle = .rounded;b.frame=NSRect(x:x,y:y,width:width,height:32);root.addSubview(b)
-            if title=="Play" { b.keyEquivalent="\r" }
-        }
-        button("Add PWAD…",20,60,130,#selector(addFiles))
-        button("Remove",155,60,100,#selector(removeFile))
-        button("Move Up",260,60,100,#selector(moveEarlier))
-        button("Move Down",365,60,120,#selector(moveLater))
-        button("Cancel",395,15,95,#selector(cancel))
-        button("Play",500,15,100,#selector(play))
+// Read only the signature while browsing; full validation happens when Play loads the stack.
+enum WADPickerFiles {
+    static func kind(_ url: URL) -> String? {
+        guard url.pathExtension.lowercased() == "wad",
+              let file=try? FileHandle(forReadingFrom:url) else { return nil }
+        defer { try? file.close() }
+        guard let data=try? file.read(upToCount:4) else { return nil }
+        let signature=String(decoding:data,as:UTF8.self)
+        return ["IWAD","PWAD"].contains(signature) ? signature : nil
+    }
+    static func contents(of folder:URL, kind signature:String) throws -> [URL] {
+        try FileManager.default.contentsOfDirectory(at:folder,includingPropertiesForKeys:nil,options:[.skipsHiddenFiles])
+            .map { $0.standardizedFileURL.resolvingSymlinksInPath() }
+            .filter { kind($0) == signature }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+    }
+    static func isDirectory(_ url:URL) -> Bool {
+        (try? url.resourceValues(forKeys:[.isDirectoryKey]).isDirectory) == true
+    }
+}
+
+private final class WADDropArea: NSView {
+    var onDrop: (([URL])->Bool)?
+    private var highlighted=false { didSet { needsDisplay=true } }
+    init(frame:NSRect, title:String) {
+        super.init(frame:frame)
+        registerForDraggedTypes([.fileURL])
+        let label=NSTextField(labelWithString:title)
+        label.frame=bounds.insetBy(dx:10,dy:13);label.alignment = .center
+        label.textColor = .secondaryLabelColor;label.font = .systemFont(ofSize:12)
+        label.isSelectable=false;addSubview(label)
+        setAccessibilityLabel(title)
     }
     required init?(coder:NSCoder) { fatalError("init(coder:) unavailable") }
-    func numberOfRows(in tableView:NSTableView)->Int { addOns.count }
+    private func urls(_ sender:NSDraggingInfo) -> [URL] {
+        sender.draggingPasteboard.readObjects(forClasses:[NSURL.self],options:[.urlReadingFileURLsOnly:true]) as? [URL] ?? []
+    }
+    override func draggingEntered(_ sender:NSDraggingInfo)->NSDragOperation {
+        highlighted = !urls(sender).isEmpty
+        return highlighted ? .copy : []
+    }
+    override func draggingExited(_ sender:NSDraggingInfo?) { highlighted=false }
+    override func prepareForDragOperation(_ sender:NSDraggingInfo)->Bool { !urls(sender).isEmpty }
+    override func performDragOperation(_ sender:NSDraggingInfo)->Bool {
+        highlighted=false;return onDrop?(urls(sender)) ?? false
+    }
+    override func draw(_ dirtyRect:NSRect) {
+        let path=NSBezierPath(roundedRect:bounds.insetBy(dx:1,dy:1),xRadius:8,yRadius:8)
+        (highlighted ? NSColor.controlAccentColor.withAlphaComponent(0.15) : NSColor.controlBackgroundColor).setFill();path.fill()
+        (highlighted ? NSColor.controlAccentColor : NSColor.separatorColor).setStroke()
+        path.lineWidth=highlighted ? 2 : 1;path.stroke()
+    }
+}
+
+// One main game on the left; explicit, ordered add-ons on the right.
+final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
+    var onCancel: (()->Void)?
+    var onPlay: ((URL,[URL])->Void)?
+    private var refreshing=false
+    private var base:URL?
+    private var folder:URL?
+    private var mainFiles:[URL]=[]
+    private var addOns:[URL]
+    private let mainTable=NSTableView(), extrasTable=NSTableView()
+    private let folderLabel=NSTextField(labelWithString:"Choose a folder or drop a main WAD below.")
+    private let selectedLabel=NSTextField(labelWithString:"No main WAD selected")
+    private let notice=NSTextField(labelWithString:"")
+    private var playButton:NSButton!
+    private var removeButton:NSButton!, upButton:NSButton!, downButton:NSButton!
+
+    init(base:URL? = nil, addOns:[URL] = [], replacingGame:Bool = false) {
+        self.base=base?.standardizedFileURL.resolvingSymlinksInPath();self.addOns=addOns.map { $0.standardizedFileURL.resolvingSymlinksInPath() }
+        super.init(contentRect:NSRect(x:0,y:0,width:840,height:540),styleMask:[.titled],backing:.buffered,defer:false)
+        title="Choose WADs";isReleasedWhenClosed=false
+        let root=contentView!
+        func label(_ text:String,_ rect:NSRect, bold:Bool=false) {
+            let field=NSTextField(labelWithString:text);field.frame=rect
+            field.font = .systemFont(ofSize:bold ? 15 : 12,weight:bold ? .semibold : .regular)
+            field.textColor=bold ? .labelColor : .secondaryLabelColor;root.addSubview(field)
+        }
+        func button(_ title:String,_ rect:NSRect,_ action:Selector)->NSButton {
+            let b=NSButton(title:title,target:self,action:action);b.bezelStyle = .rounded;b.frame=rect;root.addSubview(b);return b
+        }
+        label("Main game",NSRect(x:20,y:500,width:390,height:24),bold:true)
+        label("Extra WADs",NSRect(x:430,y:500,width:390,height:24),bold:true)
+        label("Choose one IWAD from your folder.",NSRect(x:20,y:475,width:390,height:20))
+        label("Optional PWADs. Later files take priority.",NSRect(x:430,y:475,width:390,height:20))
+        folderLabel.frame=NSRect(x:20,y:446,width:390,height:22);folderLabel.font = .systemFont(ofSize:11)
+        folderLabel.lineBreakMode = .byTruncatingMiddle;root.addSubview(folderLabel)
+        label("Load order",NSRect(x:430,y:446,width:390,height:22))
+        for (table,x,name) in [(mainTable,CGFloat(20),"Main WADs"),(extrasTable,CGFloat(430),"Extra WAD load order")] {
+            let column=NSTableColumn(identifier:NSUserInterfaceItemIdentifier(name));column.width=366
+            table.addTableColumn(column);table.headerView=nil;table.rowHeight=28
+            table.dataSource=self;table.delegate=self;table.allowsEmptySelection=true
+            table.setAccessibilityLabel(name)
+            let scroll=NSScrollView(frame:NSRect(x:x,y:225,width:390,height:215))
+            scroll.documentView=table;scroll.hasVerticalScroller=true;scroll.borderType = .bezelBorder;root.addSubview(scroll)
+        }
+        selectedLabel.frame=NSRect(x:20,y:197,width:390,height:22)
+        selectedLabel.lineBreakMode = .byTruncatingMiddle;selectedLabel.font = .systemFont(ofSize:11);root.addSubview(selectedLabel)
+        _ = button("Choose Folder…",NSRect(x:20,y:155,width:150,height:32),#selector(chooseFolder))
+        _ = button("Choose IWAD…",NSRect(x:175,y:155,width:145,height:32),#selector(chooseBase))
+        _ = button("Add PWAD…",NSRect(x:430,y:185,width:130,height:32),#selector(addFiles))
+        removeButton=button("Remove",NSRect(x:565,y:185,width:85,height:32),#selector(removeFile))
+        upButton=button("Move Up",NSRect(x:650,y:185,width:80,height:32),#selector(moveEarlier))
+        downButton=button("Move Down",NSRect(x:730,y:185,width:90,height:32),#selector(moveLater))
+        let mainDrop=WADDropArea(frame:NSRect(x:20,y:95,width:390,height:50),title:"Drop a main WAD or folder here")
+        let extraDrop=WADDropArea(frame:NSRect(x:430,y:95,width:390,height:70),title:"Drop extra WADs or a folder here")
+        mainDrop.onDrop={ [weak self] urls in self?.receiveMain(urls) ?? false }
+        extraDrop.onDrop={ [weak self] urls in self?.receiveExtras(urls) ?? false }
+        root.addSubview(mainDrop);root.addSubview(extraDrop)
+        notice.frame=NSRect(x:20,y:60,width:800,height:26);notice.font = .systemFont(ofSize:11)
+        notice.lineBreakMode = .byTruncatingTail;root.addSubview(notice)
+        if replacingGame { label("Play ends the current game. Cancel to go back and save first.",NSRect(x:20,y:21,width:590,height:22)) }
+        let cancelButton=button("Cancel",NSRect(x:620,y:15,width:95,height:32),#selector(cancel));cancelButton.keyEquivalent="\u{1b}"
+        playButton=button("Play",NSRect(x:725,y:15,width:95,height:32),#selector(play));playButton.keyEquivalent="\r"
+        let remembered=UserDefaults.standard.string(forKey:"wadPickerFolder").map { URL(fileURLWithPath:$0,isDirectory:true) }
+        if let initial=base?.deletingLastPathComponent() ?? remembered { browse(initial) }
+        refresh()
+    }
+    required init?(coder:NSCoder) { fatalError("init(coder:) unavailable") }
+    private func refresh() {
+        refreshing=true
+        mainTable.reloadData();extrasTable.reloadData()
+        if let base,let i=mainFiles.firstIndex(of:base) { mainTable.selectRowIndexes(IndexSet(integer:i),byExtendingSelection:false) }
+        refreshing=false
+        selectedLabel.stringValue=base.map { "Selected: " + $0.lastPathComponent } ?? "No main WAD selected"
+        selectedLabel.toolTip=base?.path;playButton.isEnabled=base != nil
+        updateButtons()
+    }
+    private func updateButtons() {
+        let i=extrasTable.selectedRow
+        removeButton.isEnabled=addOns.indices.contains(i);upButton.isEnabled=i>0
+        downButton.isEnabled=i>=0 && i+1<addOns.count
+    }
+    private func browse(_ url:URL) {
+        let url=url.standardizedFileURL.resolvingSymlinksInPath()
+        do {
+            let files=try WADPickerFiles.contents(of:url,kind:"IWAD")
+            folder=url;mainFiles=files;folderLabel.stringValue=url.path;folderLabel.toolTip=url.path
+            UserDefaults.standard.set(url.path,forKey:"wadPickerFolder")
+            if let base,!files.contains(base) { self.base=nil }
+            notice.stringValue=files.isEmpty ? "No main IWADs found in this folder. Extra PWADs belong on the right." : "\(files.count) main WAD\(files.count == 1 ? "" : "s") found. Select one to play."
+            refresh()
+        } catch { notice.stringValue="Cannot read folder: \(error.localizedDescription)" }
+    }
+    @discardableResult private func receiveMain(_ urls:[URL])->Bool {
+        guard urls.count == 1,let original=urls.first else { notice.stringValue="Choose one main WAD or one folder.";return false }
+        let url=original.standardizedFileURL.resolvingSymlinksInPath()
+        if WADPickerFiles.isDirectory(url) { browse(url);return true }
+        guard WADPickerFiles.kind(url) == "IWAD" else { notice.stringValue="The main game must be an IWAD. Drop extra PWADs on the right.";return false }
+        browse(url.deletingLastPathComponent());base=url;refresh();return true
+    }
+    @discardableResult private func receiveExtras(_ urls:[URL])->Bool {
+        do {
+            var candidates:[URL]=[]
+            for original in urls {
+                let url=original.standardizedFileURL.resolvingSymlinksInPath()
+                if WADPickerFiles.isDirectory(url) { candidates += try WADPickerFiles.contents(of:url,kind:"PWAD") }
+                else {
+                    guard WADPickerFiles.kind(url) == "PWAD" else { notice.stringValue="Extras must be PWAD files. Main IWADs belong on the left.";return false }
+                    candidates.append(url)
+                }
+            }
+            let previous=addOns.count
+            for url in candidates where !addOns.contains(url) { addOns.append(url) }
+            extrasTable.reloadData();updateButtons()
+            notice.stringValue="Added \(addOns.count-previous) extra WAD(s). Review their order before playing."
+            return true
+        } catch { notice.stringValue="Cannot read extras: \(error.localizedDescription)";return false }
+    }
+    func numberOfRows(in tableView:NSTableView)->Int { tableView === mainTable ? mainFiles.count : addOns.count }
     func tableView(_ tableView:NSTableView,viewFor column:NSTableColumn?,row:Int)->NSView? {
-        NSTextField(labelWithString:"\(row+1). \(addOns[row].lastPathComponent)")
+        let url=(tableView === mainTable ? mainFiles : addOns)[row]
+        let field=NSTextField(labelWithString:(tableView === mainTable ? "" : "\(row+1). ") + url.lastPathComponent)
+        field.lineBreakMode = .byTruncatingMiddle;field.toolTip=url.path;return field
+    }
+    func tableViewSelectionDidChange(_ notification:Notification) {
+        guard !refreshing else { return }
+        if notification.object as? NSTableView === mainTable,mainFiles.indices.contains(mainTable.selectedRow) {
+            base=mainFiles[mainTable.selectedRow]
+            selectedLabel.stringValue="Selected: " + base!.lastPathComponent;selectedLabel.toolTip=base?.path;playButton.isEnabled=true
+        }
+        updateButtons()
+    }
+    @objc private func chooseFolder() {
+        let panel=NSOpenPanel();panel.canChooseFiles=false;panel.canChooseDirectories=true;panel.directoryURL=folder
+        panel.beginSheetModal(for:self) { [weak self] result in if result == .OK,let url=panel.url { self?.browse(url) } }
+    }
+    @objc private func chooseBase() {
+        let panel=NSOpenPanel();panel.allowedContentTypes=[UTType(filenameExtension:"wad") ?? .data];panel.directoryURL=folder
+        panel.beginSheetModal(for:self) { [weak self] result in if result == .OK { self?.receiveMain(panel.urls) } }
     }
     @objc private func addFiles() {
         let panel=NSOpenPanel();panel.allowedContentTypes=[UTType(filenameExtension:"wad") ?? .data]
-        panel.allowsMultipleSelection=true;panel.canChooseDirectories=false
-        panel.beginSheetModal(for:self) { [weak self] result in
-            guard let self,result == .OK else { return }
-            for url in panel.urls where !self.addOns.contains(url) { self.addOns.append(url) }
-            self.table.reloadData()
-        }
+        panel.allowsMultipleSelection=true;panel.canChooseDirectories=false;panel.directoryURL=folder
+        panel.beginSheetModal(for:self) { [weak self] result in if result == .OK { self?.receiveExtras(panel.urls) } }
     }
-    @objc private func removeFile() { let i=table.selectedRow;guard addOns.indices.contains(i) else { return };addOns.remove(at:i);table.reloadData() }
+    @objc private func removeFile() { let i=extrasTable.selectedRow;guard addOns.indices.contains(i) else { return };addOns.remove(at:i);extrasTable.reloadData();updateButtons() }
     private func move(_ delta:Int) {
-        let i=table.selectedRow,j=i+delta
+        let i=extrasTable.selectedRow,j=i+delta
         guard addOns.indices.contains(i),addOns.indices.contains(j) else { return }
-        addOns.swapAt(i,j);table.reloadData();table.selectRowIndexes(IndexSet(integer:j),byExtendingSelection:false)
+        addOns.swapAt(i,j);extrasTable.reloadData();extrasTable.selectRowIndexes(IndexSet(integer:j),byExtendingSelection:false);updateButtons()
     }
     @objc private func moveEarlier() { move(-1) }
     @objc private func moveLater() { move(1) }
     @objc private func cancel() { sheetParent?.endSheet(self);orderOut(nil);onCancel?() }
-    @objc private func play() { sheetParent?.endSheet(self);orderOut(nil);onPlay?(addOns) }
+    @objc private func play() { guard let base else { return };sheetParent?.endSheet(self);orderOut(nil);onPlay?(base,addOns) }
 }

@@ -4,6 +4,18 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.2.1 · Build 79 — Folder and drag-and-drop WAD picker
+
+- Replace the two-step file/load-order flow with a single two-column picker:
+  main IWAD folder list on the left, ordered extra PWADs on the right.
+- Remember the last folder and accept files or folders in separate drop areas.
+  Filter by WAD signature, reject files on the wrong side, and normalize paths
+  to prevent duplicate add-ons. Keep move/remove controls and current-stack review.
+- Validate build 79 with the rerelease folder, Doom + SIGIL launch, persisted
+  folder selection, current-stack review and cancellation. Add a WAD-free native
+  regression covering file-URL drop callbacks, filtering, rejection, duplicates,
+  ordering and Play handoff. Finder mouse-drag interaction was not manually tested.
+
 ## 0.2.1 · Build 77 — Optional bottom status bar
 
 - Remove the top toolbar and place the map picker beside the map name in the
