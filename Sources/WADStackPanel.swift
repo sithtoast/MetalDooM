@@ -86,6 +86,7 @@ final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
     private let mainTable=NSTableView(), extrasTable=NSTableView()
     private let folderLabel=NSTextField(labelWithString:"Choose a folder or drop a main WAD below.")
     private let selectedLabel=NSTextField(labelWithString:"No main WAD selected")
+    private let extrasLabel=NSTextField(labelWithString:"")
     private let notice=NSTextField(labelWithString:"")
     private var playButton:NSButton!
     private var removeButton:NSButton!, upButton:NSButton!, downButton:NSButton!
@@ -120,14 +121,16 @@ final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
         }
         selectedLabel.frame=NSRect(x:20,y:197,width:390,height:22)
         selectedLabel.lineBreakMode = .byTruncatingMiddle;selectedLabel.font = .systemFont(ofSize:11);root.addSubview(selectedLabel)
+        extrasLabel.frame=NSRect(x:430,y:197,width:390,height:22)
+        extrasLabel.font = .systemFont(ofSize:11);root.addSubview(extrasLabel)
         _ = button("Choose Folder…",NSRect(x:20,y:155,width:150,height:32),#selector(chooseFolder))
         _ = button("Choose IWAD…",NSRect(x:175,y:155,width:145,height:32),#selector(chooseBase))
-        _ = button("Add PWAD…",NSRect(x:430,y:185,width:130,height:32),#selector(addFiles))
-        removeButton=button("Remove",NSRect(x:565,y:185,width:85,height:32),#selector(removeFile))
-        upButton=button("Move Up",NSRect(x:650,y:185,width:80,height:32),#selector(moveEarlier))
-        downButton=button("Move Down",NSRect(x:730,y:185,width:90,height:32),#selector(moveLater))
+        _ = button("Add PWAD…",NSRect(x:430,y:155,width:130,height:32),#selector(addFiles))
+        removeButton=button("Remove",NSRect(x:565,y:155,width:85,height:32),#selector(removeFile))
+        upButton=button("Move Up",NSRect(x:650,y:155,width:80,height:32),#selector(moveEarlier))
+        downButton=button("Move Down",NSRect(x:730,y:155,width:90,height:32),#selector(moveLater))
         let mainDrop=WADDropArea(frame:NSRect(x:20,y:95,width:390,height:50),title:"Drop a main WAD or folder here")
-        let extraDrop=WADDropArea(frame:NSRect(x:430,y:95,width:390,height:70),title:"Drop extra WADs or a folder here")
+        let extraDrop=WADDropArea(frame:NSRect(x:430,y:95,width:390,height:50),title:"Drop extra WADs or a folder here")
         mainDrop.onDrop={ [weak self] urls in self?.receiveMain(urls) ?? false }
         extraDrop.onDrop={ [weak self] urls in self?.receiveExtras(urls) ?? false }
         root.addSubview(mainDrop);root.addSubview(extraDrop)
@@ -151,6 +154,7 @@ final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
         updateButtons()
     }
     private func updateButtons() {
+        extrasLabel.stringValue=addOns.isEmpty ? "No extra WADs selected" : "\(addOns.count) extra WAD\(addOns.count == 1 ? "" : "s") selected"
         let i=extrasTable.selectedRow
         removeButton.isEnabled=addOns.indices.contains(i);upButton.isEnabled=i>0
         downButton.isEnabled=i>=0 && i+1<addOns.count

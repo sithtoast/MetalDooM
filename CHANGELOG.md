@@ -4,6 +4,15 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.3.0 · Build 81 — WAD picker feature preview
+
+- Bump the minor version for the new folder/drop WAD picker, game switching and
+  optional bottom status bar introduced since the 0.2.1 patch.
+- Align both picker button rows and drop areas, with matching summary rows for
+  the selected main game and extra-WAD count.
+- Refresh current version references and release notes. Verify the balanced
+  layout and 0.3.0 version in the running build 81 app.
+
 ## 0.2.1 · Build 80 — Game titles in the WAD picker
 
 - Show recognized game names and KEX edition labels above filenames in both

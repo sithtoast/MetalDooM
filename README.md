@@ -3,7 +3,7 @@
 Classic Doom on Apple Silicon, with native Metal rendering and gameplay powered
 by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
-**Version 0.2.1 · early preview · Developer ID signed, not notarized.**
+**Version 0.3.0 · early preview · Developer ID signed, not notarized.**
 
 ## Get started
 
