@@ -4,6 +4,12 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Version 0.2.1 — Build 69 — Patch version update
+
+- Bump the app version to 0.2.1 for the invisible-teleport-destination rendering
+  fix delivered in build 68; update the documented version.
+- Rebuild and verify the installed app displays 0.2.1 with build 69.
+
 ## Build 68 — Invisible teleport destinations
 
 - Stop drawing non-sector objects as world sprites. Invisible teleport
