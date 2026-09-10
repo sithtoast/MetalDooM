@@ -4,6 +4,12 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 71 — Placeholder app icon
+
+- Add a metallic M placeholder icon with warm orange lighting and transparent corners.
+- Generate standard and Retina macOS icon sizes from the source artwork during each build.
+- Verify the signed app bundle, Finder icon preview and launch of build 71.
+
 ## Build 70 — Developer ID release packaging
 
 - Add separate local signing and Apple notarization steps, using a Developer ID
