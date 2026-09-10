@@ -4,6 +4,12 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Build 72 — Selected Metal M app icon
+
+- Replace the placeholder with the selected standalone Apple Metal M in Doom gold-to-blue-steel colors.
+- Remove the draft's checkerboard background while preserving the original opaque artwork and providing transparent rounded corners.
+- Verify all ten bundled icon sizes, app signature, Finder rendering and launch of build 72.
+
 ## Build 71 — Placeholder app icon
 
 - Add a metallic M placeholder icon with warm orange lighting and transparent corners.
