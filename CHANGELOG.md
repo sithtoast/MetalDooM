@@ -4,6 +4,20 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.8.0 · Build 112 — Classic/Enhanced comparison shortcut
+
+- Add Command-Shift-E and View → Toggle Classic / Enhanced. Active effects
+  switch to Classic; the next press selects Enhanced. Show a brief preset-name
+  message after successful keyboard or menu selection.
+- Preserve resolution, frame cap and saved custom setups. Ignore held-key repeat,
+  lock the shortcut during benchmarks, and keep Command shortcuts from activating
+  gameplay keys such as E/Use.
+- Reuse drawable configuration for same-format preset changes. Add paused/visible/
+  occluded state and submitted-frame counts to diagnostics.
+- Validate native build 112, installed-menu shortcut dispatch, repeated preset and
+  HDR/SDR transitions, notice text, input isolation, custom/graphics preservation,
+  benchmark locking, automatic frame delivery and the Ultimate Doom Metal suite.
+
 ## 0.8.0 · Build 108 — Ludicrous effects preset
 
 - Add View → Effects Presets → Ludicrous: all effects, High ray quality, 50% AO

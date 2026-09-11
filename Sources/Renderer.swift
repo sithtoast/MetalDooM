@@ -30,7 +30,7 @@ final class GameView: MTKView {
     func consumeWeapon() -> Int32 { let value = weaponQueued; weaponQueued = -1; return value }
     override var acceptsFirstResponder: Bool { true }
     override func keyDown(with event: NSEvent) {
-        if inputBlocked || event.isARepeat { return }
+        if inputBlocked || event.isARepeat || event.modifierFlags.contains(.command) { return }
         if event.keyCode == 36 { continueQueued = true }
         if event.keyCode == 3 { attackQueued = true } // F: keyboard fire
         let slots: [UInt16:Int32] = [18:0,19:1,20:2,21:3,23:4,22:5,26:6]
@@ -117,9 +117,13 @@ final class Renderer: NSObject, MTKViewDelegate {
         setLightGain(preset.lightGain ?? 1);setBloomStrength(preset.bloomStrength ?? 0.12)
         setHDRSpriteBoost(preset.hdrSpriteBoost == true)
         worldFormat=format;aoGeometryDirty=true;sceneSnapshot=nil
-        view.releaseDrawables();view.colorPixelFormat=format
-        view.colorspace=preset.hdr ? CGColorSpace(name:CGColorSpace.extendedLinearSRGB):nil
-        (view.layer as? CAMetalLayer)?.wantsExtendedDynamicRangeContent=preset.hdr
+        // Classic/Enhanced share the same drawable format: keep their live draw
+        // loop intact. Only HDR/SDR transitions need drawable reconfiguration.
+        if view.colorPixelFormat != format {
+            view.releaseDrawables();view.colorPixelFormat=format
+            view.colorspace=preset.hdr ? CGColorSpace(name:CGColorSpace.extendedLinearSRGB):nil
+            (view.layer as? CAMetalLayer)?.wantsExtendedDynamicRangeContent=preset.hdr
+        }
     }
     private var batches: [GPUBatch] = []
     private var worldShader = ""

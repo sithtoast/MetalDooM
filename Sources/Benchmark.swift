@@ -88,6 +88,9 @@ extension App {
             item.state=EffectsPreset(renderer:renderer)==preset ? .on:.off
             return (!preset.hdr || hdrDisplayAvailable) && (!(preset.ao || preset.testLight || preset.switches.contains(where: { $0.needsRays })) || renderer.ambientOcclusionSupported)
         }
+        if item.action == #selector(toggleClassicEnhanced) {
+            return effectsActive || renderer.ambientOcclusionSupported
+        }
         if item.action == #selector(toggleHDR) {
             item.state=renderer.hdrEnabled ? .on:.off
             return renderer.hdrEnabled || hdrDisplayAvailable

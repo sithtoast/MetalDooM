@@ -36,9 +36,9 @@ extension Renderer {
 }
 """)
 (output/'main.swift').write_text(source+'\n'+(root/'Tests/AOAlphaValidation.swift').read_text()+'\n'+(root/'Tests/WorldSamplingValidation.swift').read_text()+'\n'+(root/'Tests/AmbientOcclusionValidation.swift').read_text().replace('// Exercise map replacement', (root/'Tests/SceneEffectsValidation.swift').read_text()+'\n'+(root/'Tests/AdvancedEffectsValidation.swift').read_text()+'\n'+(root/'Tests/HDRVolumeValidation.swift').read_text()+'\n// Exercise map replacement'))
-if os.environ.get('AO_PROFILE') == '1':
+if os.environ.get('AO_PROFILE') == '1' or os.environ.get('AO_LIVE') == '1':
     setup=(root/'Tests/AmbientOcclusionValidation.swift').read_text().split('func frame()')[0]
-    (output/'main.swift').write_text(source+'\n'+setup+(root/'Tests/EffectsProfile.swift').read_text())
+    (output/'main.swift').write_text(source+'\n'+setup+(root/('Tests/EffectsLiveValidation.swift' if os.environ.get('AO_LIVE') == '1' else 'Tests/EffectsProfile.swift')).read_text())
 PY
 SOURCES=()
 for source in "$PROJECT_DIR"/Sources/*.swift; do

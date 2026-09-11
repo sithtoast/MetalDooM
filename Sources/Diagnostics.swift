@@ -85,6 +85,7 @@ extension App {
         Volumetric density: \(renderer.fogDensity); quarter resolution, \(renderer.highRayQuality ? 32:16) steps, 4 nearest lights
         Fullscreen: \(window.styleMask.contains(.fullScreen))
         Frame limit: \(view.preferredFramesPerSecond) FPS
+        View paused: \(view.isPaused); window visible: \(window.isVisible); unoccluded: \(window.occlusionState.contains(.visible)); submitted frames: \(renderer.renderedFrames)
         Recent renderer FPS: \(fps) (not a benchmark)
         Music backend: \(MusicPlayer.preferredBackend == "opl" ? "Classic OPL" : "Apple MIDI")
         Ray-traced AO: \(renderer.ambientOcclusionEnabled ? "On (alpha-tested world)" : "Off")

@@ -15,6 +15,12 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.8.0
 
+Build 112 adds **⌘⇧E** to toggle Classic/Enhanced in place, with a brief preset
+message. Other active effects switch to Classic first. Resolution, frame cap and
+saved custom setups are preserved; the shortcut is disabled during benchmarks.
+Same-format preset transitions reuse drawable configuration; diagnostics now
+include view visibility, paused state and frame counts.
+
 Build 108 adds **Ludicrous**, an opt-in preset with High ray quality, stronger AO,
 Atmospheric haze, brighter lights, heavier bloom, boosted fullbright world sprites and
 an 8× HDR ceiling. Light strength, bloom strength and sprite boost have independent

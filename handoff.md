@@ -12,7 +12,7 @@ The active experiment is on `codex/metal-experiments`; check Git status/log befo
 continuing. The user selected **ray-traced ambient occlusion**. It is implemented
 as a per-session View menu option, with classic rendering still the default.
 
-Current version: **0.8.0**, successful local app **build 108**. `Info.plist` owns
+Current version: **0.8.0**, successful local app **build 112**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
 This is an experimental branch, not a published release. No push was requested.
 
@@ -27,7 +27,22 @@ the level-stats/secret/save tests and the AO/48-view ceiling GPU suite, and its
 native window was checked with live counters/par time and AO together. The
 separate validation instance was closed afterward.
 
-## Latest refinement — Ludicrous (build 108)
+## Latest refinement — preset shortcut (build 112)
+
+View → Toggle Classic / Enhanced uses ⌘⇧E. Any active effects go to Classic;
+effects-off rendering goes to Enhanced, with a two-second preset notice.
+The benchmark lock, graphics scale/cap, saved custom setup and gameplay inputs
+are preserved. Holding the shortcut does not repeat expensive preset changes.
+Other manually tuned setups need explicit Save Current as Custom before toggling.
+Same-format changes reuse drawable configuration. Automation made the preview
+appear frozen, but build-111 diagnostics confirmed macOS marked it occluded; this
+was expected background frame suppression, not a proven engine stall. Keep that
+optimization. AO_LIVE=1 checks automatic frame delivery across seven transitions.
+This continues the 0.8.0 presets refinement. The user asked for pre-merge ideas;
+named custom slots and optional effects persistence were suggested, not authorized
+or implemented. No merge or push is requested.
+
+## Ludicrous (build 108)
 
 View → Effects Presets → Ludicrous restores the heavier optional choices while
 Enhanced/Atmospheric/Showcase remain restrained. It selects all twelve effects,

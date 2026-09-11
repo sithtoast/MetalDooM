@@ -36,6 +36,9 @@ struct EffectsPreset: Codable, Equatable {
 }
 
 extension App {
+    var effectsActive: Bool {
+        renderer.ambientOcclusionEnabled || renderer.dynamicLightEnabled || renderer.hdrEnabled || !renderer.sceneEffects.isEmpty
+    }
     var effectsPresetName: String {
         let current=EffectsPreset(renderer:renderer)
         if let i=EffectsPreset.builtins.firstIndex(of:current) { return EffectsPreset.names[i] }
@@ -51,6 +54,8 @@ extension App {
             let item=NSMenuItem(title:title,action:nil,keyEquivalent:"")
             let child=NSMenu(title:title);item.submenu=child;menu.addItem(item);return child
         }
+        let toggle=menu.addItem(withTitle:"Toggle Classic / Enhanced",action:#selector(toggleClassicEnhanced),keyEquivalent:"e")
+        toggle.target=self;toggle.keyEquivalentModifierMask=[.command,.shift]
         let graphics=submenu("Graphics Presets")
         for (i,title) in ["Performance — 50%, 120 FPS","Balanced — 75%, 120 FPS","Native — 100%, 120 FPS","Quiet — 75%, 60 FPS"].enumerated() {
             let item=graphics.addItem(withTitle:title,action:#selector(selectGraphicsPreset(_:)),keyEquivalent:"");item.tag=i;item.target=self
@@ -96,8 +101,20 @@ extension App {
     @objc func selectEffectsPreset(_ sender:NSMenuItem) {
         let preset=EffectsPreset.builtins.indices.contains(sender.tag) ? EffectsPreset.builtins[sender.tag]:savedEffectsPreset
         guard let preset else { return }
-        do { try renderer.applyEffectsPreset(preset,view:view);sessionLog.append("Effects preset: \(effectsPresetName)") }
+        applyEffectsPreset(preset)
+    }
+    private func applyEffectsPreset(_ preset:EffectsPreset) {
+        do {
+            try renderer.applyEffectsPreset(preset,view:view)
+            sessionLog.append("Effects preset: \(effectsPresetName)")
+            renderer.notice="Effects: \(effectsPresetName)";renderer.noticeUntil=CACurrentMediaTime()+2
+        }
         catch { show(error) }
+    }
+    @objc func toggleClassicEnhanced() {
+        guard !shuttingDown, benchmark == nil, effectsActive || renderer.ambientOcclusionSupported else { return }
+        if let event=NSApp.currentEvent, event.type == .keyDown, event.isARepeat { return }
+        applyEffectsPreset(EffectsPreset.builtins[effectsActive ? 0:1])
     }
     @objc func saveEffectsPreset() {
         do { UserDefaults.standard.set(try JSONEncoder().encode(EffectsPreset(renderer:renderer)),forKey:"customEffectsPreset.v1") }

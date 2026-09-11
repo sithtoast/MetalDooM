@@ -3,6 +3,34 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.8.0, build 112 — Classic/Enhanced shortcut
+
+- Build 112 succeeds at semantic version 0.8.0. Native shortcut preview uses the
+  generated E1M1 fixture; Command-Shift-E changes original world textures and
+  lighting to Enhanced. Both directions and the corresponding preset notices
+  are visually confirmed in an unobstructed fullscreen build-112 window; return
+  the preview to windowed mode after inspection.
+- `build/preset-shortcut-final/results.txt` runs the Ultimate Doom Metal
+  suite plus installed-main-menu key-equivalent dispatch. Pass HDR-to-Classic,
+  repeated Classic/Enhanced changes, two-second notice state, saved custom data,
+  resolution/frame cap and benchmark locking. Command-modified E cannot queue Use.
+- The synthetic event uses a lowercase `charactersIgnoringModifiers` value to
+  match AppKit's stored key equivalent. Menu lookup uses the submenu's title,
+  since the top-level NSMenuItem title is empty in the programmatic menu model.
+- The background preview appeared frozen during automation. An exported build-111
+  report confirms `View paused: false; window visible: true; unoccluded: false`:
+  the renderer intentionally skipped frames due to macOS occlusion. This did not
+  prove an engine stall. Retain background suppression; discard the speculative
+  timer-reset workaround. Same-format switches now skip drawable reconfiguration.
+- `AO_LIVE=1` exercises automatic frame delivery without explicit view.draw()
+  calls across seven Classic/Enhanced/HDR transitions and preserves manual mode.
+  Evidence: `build/preset-shortcut-live/results.txt`. This checks liveness, not
+  sustained FPS. Diagnostic exports under build retain the occlusion evidence.
+- Retain GPU checks for HDR limits/HUD colors, Ludicrous intensity controls,
+  legacy presets, lighting and AO, cutouts, resize, save/load and shutdown.
+  No new shader algorithms or ray budgets change in this refinement. This is
+  not a sustained combat/performance soak or complete pre-merge compatibility run.
+
 ## 0.8.0, build 108 — Ludicrous and independent intensity controls
 
 - `scripts/build.sh` succeeds at build 108; native title confirms **0.8.0

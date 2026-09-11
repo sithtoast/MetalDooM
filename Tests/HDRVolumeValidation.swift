@@ -163,6 +163,33 @@ for i in stride(from:hudStart,to:hdr.count,by:4) {
     }
 }
 print("HDR live display: current headroom \(headroom)x, potential \(subject.window.screen?.maximumPotentialExtendedDynamicRangeColorComponentValue ?? 1)x; drawable maximum \(maximum)")
+// Native key-equivalent dispatch exercises the actual menu shortcut, not only the action.
+guard let appMenu=NSApp.mainMenu,
+      let shortcutMenu=appMenu.items.compactMap(\.submenu).first(where: { $0.title=="View" }),
+      let shortcutItem=shortcutMenu.items.first(where: { $0.action == #selector(App.toggleClassicEnhanced) }) else {
+    validationFail("Missing native preset shortcut menu")
+}
+validationRequire(shortcutItem.keyEquivalent=="e" && shortcutItem.keyEquivalentModifierMask==[.command,.shift],"Wrong preset shortcut")
+let shortcut=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[.command,.shift],timestamp:0,
+    windowNumber:subject.window.windowNumber,context:nil,characters:"E",charactersIgnoringModifiers:"e",isARepeat:false,keyCode:14)!
+let untouchedCustom=UserDefaults.standard.data(forKey:"customEffectsPreset.v1")
+let shortcutScale=subject.view.renderScale,shortcutFPS=subject.view.preferredFramesPerSecond
+for expected in ["Classic","Enhanced","Classic","Enhanced"] {
+    validationRequire(appMenu.performKeyEquivalent(with:shortcut),"Preset shortcut was not handled")
+    validationRequire(subject.effectsPresetName==expected && renderer.pickupMessage=="Effects: \(expected)","Shortcut or preset notice failed")
+    validationRequire(subject.view.renderScale==shortcutScale && subject.view.preferredFramesPerSecond==shortcutFPS,"Shortcut changed graphics settings")
+    for _ in 0..<3 { _=frame() }
+}
+subject.view.useQueued=false
+subject.view.keyDown(with:shortcut)
+validationRequire(!subject.view.useQueued && !subject.view.keys.contains(14),"Command shortcut leaked into gameplay Use")
+subject.benchmark=BenchmarkRun(context:"preset shortcut",settings:subject.benchmarkSettings)
+validationRequire(!subject.validateMenuItem(shortcutItem),"Preset shortcut enabled during benchmark")
+subject.toggleClassicEnhanced()
+validationRequire(subject.effectsPresetName=="Enhanced","Shortcut action bypassed benchmark lock")
+subject.benchmark=nil
+validationRequire(UserDefaults.standard.data(forKey:"customEffectsPreset.v1")==untouchedCustom,"Shortcut overwrote saved custom preset")
+print("PASS: Classic/Enhanced native key equivalent, repeated switching, notice, graphics/custom preservation, gameplay input isolation and benchmark lock")
 // Exercise the real menu routing: Ludicrous must not steal Saved Custom's tag.
 let effectsMenu=NSMenu(title:"Validation graphics");subject.addGraphicsMenus(to:effectsMenu)
 let presetsMenu=effectsMenu.items.first { $0.title=="Effects Presets" }!.submenu!

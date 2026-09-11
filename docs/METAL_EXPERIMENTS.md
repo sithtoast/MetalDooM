@@ -388,3 +388,26 @@ normalize to the restrained defaults. Snapshots, diagnostics, benchmark identity
 and menu checkmarks include the controls. Apply Saved Custom now uses a separate
 negative menu tag so the fifth built-in cannot intercept it. HDR presentation
 continues using current display headroom; no system brightness is changed.
+
+
+### Quick comparison — build 112
+
+View → Toggle Classic / Enhanced (⌘⇧E) switches from any enabled effects to the
+Classic preset, and from effects-off rendering to Enhanced. This uses the same
+transactional preset application path as the menu and shows a two-second preset
+notice after success. Other presets and manual setups are not implicitly saved;
+Save Current as Custom remains the explicit way to retain them.
+
+The native menu key equivalent works during gameplay, suppresses held-key repeat,
+and is disabled during a benchmark. Command-modified keys cannot leak into game
+movement, firing, weapon selection or E/Use even if a menu item is unavailable.
+The regression harness dispatches through the installed NSApplication main menu,
+checks Classic/Enhanced and HDR-to-Classic transitions, preserves graphics and
+saved custom state, and verifies the benchmark lock.
+
+
+Classic/Enhanced keep the same drawable format and avoid unnecessary drawable
+reconfiguration. HDR/SDR transitions still update the format and colorspace.
+Diagnostics report paused/visible/occluded state and submitted frame counts.
+`AO_LIVE=1 bash scripts/test-ambient-occlusion.sh /path/to/DOOM.WAD` tests automatic
+frame delivery across seven Classic/Enhanced/HDR transitions without forcing draws.

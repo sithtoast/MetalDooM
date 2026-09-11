@@ -32,6 +32,7 @@ with both backends. No instrument banks or game music are bundled.
 | Escape | Pause/open menu; back from submenus; resume from main menu |
 | R | Restart map with fresh starting inventory |
 | Return / Enter | Intermission: skip counting, show destination, then skip the four-second map display |
+| Command-Shift-E | Toggle Classic / Enhanced effects |
 | Command-O | Open or switch IWAD and optional add-ons |
 | Command-S / Command-L | Save Game… / Load Game… |
 | Command-Shift-S / Command-Shift-L | Quick Save / Quick Load for this WAD |
@@ -372,3 +373,12 @@ weapon/HUD artwork and fixed-colormap power-ups at their normal brightness.
 The existing effect switches still work independently. Select Showcase to return
 to restrained settings, or Save Current as Custom to keep your own combination.
 Ludicrous keeps smooth textures, steady sampling and the visibility optimizations.
+
+
+Press **⌘⇧E (Command-Shift-E)**, or choose **View → Toggle Classic / Enhanced**,
+to compare the original rendering with Enhanced in place. Any active effects
+setup (including HDR Showcase or Ludicrous) switches to Classic first; the next
+press selects Enhanced. A brief message names the selected preset. Use Save
+Current as Custom before comparing if you want to restore a manually tuned setup.
+The shortcut leaves resolution, frame cap, saved custom presets and game progress
+unchanged. It is disabled while benchmarking and does not activate the E/Use key.
