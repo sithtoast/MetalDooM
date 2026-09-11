@@ -2,75 +2,225 @@ import AppKit
 import MetalKit
 import simd
 
-final class GameView: MTKView {
-    var onBlockedClick: (() -> Void)?
-    var inputBlocked = false
-    var keys = Set<UInt16>()
-    private var movementQueued = Set<UInt16>()
-    var mouseMotion = SIMD2<Float>.zero
-    var captured = false
-    var running = false
-    var useQueued = false
-    var attackQueued = false, mouseFire = false
-    var weaponQueued: Int32 = -1
-    var continueQueued = false
-    var onEscape: (() -> Void)?
-    var renderScale: CGFloat = 1 { didSet { updateResolution() } }
-    func updateResolution() {
-        autoResizeDrawable=false
-        let scale=(window?.backingScaleFactor ?? 2)*renderScale
-        drawableSize=CGSize(width:max(1,(bounds.width*scale).rounded()),height:max(1,(bounds.height*scale).rounded()))
-    }
-    override func layout() { super.layout(); updateResolution() }
-    override func viewDidChangeBackingProperties() { super.viewDidChangeBackingProperties(); updateResolution() }
-    func consumeAttack() -> Int32 {
-        let fire = attackQueued || mouseFire || keys.contains(3)
-        attackQueued = false; return fire ? 1 : 0
-    }
-    func consumeWeapon() -> Int32 { let value = weaponQueued; weaponQueued = -1; return value }
-    override var acceptsFirstResponder: Bool { true }
-    override func keyDown(with event: NSEvent) {
-        if inputBlocked || event.isARepeat { return }
-        if event.keyCode == 36 { continueQueued = true }
-        if event.keyCode == 3 { attackQueued = true } // F: keyboard fire
-        let slots: [UInt16:Int32] = [18:0,19:1,20:2,21:3,23:4,22:5,26:6]
-        if let slot = slots[event.keyCode] { weaponQueued = slot }
-        if [0,1,2,13,123,124,125,126].contains(Int(event.keyCode)) { movementQueued.insert(event.keyCode) }
-        if event.keyCode == 14 || event.keyCode == 49 { useQueued = true }
-        if event.keyCode == 53 { releaseMouse(); onEscape?() } else { keys.insert(event.keyCode) }
-    }
-    override func keyUp(with event: NSEvent) { keys.remove(event.keyCode) }
-    override func flagsChanged(with event: NSEvent) { running = event.modifierFlags.contains(.shift) }
-    func consumeMovement() -> Set<UInt16> {
-        let result = keys.union(movementQueued); movementQueued.removeAll(); return result
-    }
-    override func mouseDown(with event: NSEvent) {
-        guard !inputBlocked else { onBlockedClick?();return }
-        window?.makeFirstResponder(self)
-        if !captured {
-            captured = true
-            CGAssociateMouseAndMouseCursorPosition(0)
-            NSCursor.hide()
-        } else { mouseFire = true; attackQueued = true }
-    }
-    override func mouseUp(with event: NSEvent) { mouseFire = false }
-    override func mouseMoved(with event: NSEvent) {
-        if captured { mouseMotion += SIMD2(Float(event.deltaX),Float(event.deltaY)) }
-    }
-    override func mouseDragged(with event: NSEvent) { mouseMoved(with:event) }
-    func releaseMouse() {
-        attackQueued = false; mouseFire = false; weaponQueued = -1; continueQueued = false
-        keys.removeAll(); movementQueued.removeAll(); mouseMotion = .zero; running = false; useQueued = false
-        if captured { captured = false; CGAssociateMouseAndMouseCursorPosition(1); NSCursor.unhide() }
-    }
-}
-
 private struct GPUBatch { let vertices: MTLBuffer, texture: MTLTexture; let material: MaterialKey; let count: Int }
 private struct Uniforms { var matrix: simd_float4x4 }
 
 final class Renderer: NSObject, MTKViewDelegate {
-    let device: MTLDevice, queue: MTLCommandQueue, pipeline: MTLRenderPipelineState, skyPipeline: MTLRenderPipelineState, skySurfacePipeline: MTLRenderPipelineState, spritePipeline: MTLRenderPipelineState, tintPipeline: MTLRenderPipelineState, fuzzPipeline: MTLRenderPipelineState, depth: MTLDepthStencilState, fuzzDepth: MTLDepthStencilState
+    let device: MTLDevice, queue: MTLCommandQueue, depth: MTLDepthStencilState, fuzzDepth: MTLDepthStencilState, visibleDepth: MTLDepthStencilState
+    private var programs: WorldPrograms
+    var pipeline: MTLRenderPipelineState { programs.world }
+    var skyPipeline: MTLRenderPipelineState { programs.sky }
+    var skySurfacePipeline: MTLRenderPipelineState { programs.skySurface }
+    var spritePipeline: MTLRenderPipelineState { programs.sprite }
+    var tintPipeline: MTLRenderPipelineState { programs.tint }
+    var fuzzPipeline: MTLRenderPipelineState { programs.fuzz }
+    private(set) var highRayQuality=false
+    func setHighRayQuality(_ enabled:Bool) { highRayQuality=enabled }
+    private var hdrOutput: HDROutput?
+    var hdrEnabled: Bool { hdrOutput != nil }
+    private(set) var lightGain: Float = 1
+    private(set) var bloomStrength: Float = 0.12
+    private(set) var hdrSpriteBoost=false
+    func setLightGain(_ value:Float) { lightGain=value.isFinite ? min(2,max(0,value)):1 }
+    func setBloomStrength(_ value:Float) { bloomStrength=value.isFinite ? min(0.3,max(0,value)):0.12 }
+    func setHDRSpriteBoost(_ enabled:Bool) { hdrSpriteBoost=enabled }
+    private(set) var hdrPeak: Float = 4
+    private(set) var fogDensity: Float = 0.003
+    func setHDRPeak(_ value: Float) { hdrPeak=value.isFinite ? min(8,max(1,value)):4 }
+    func setFogDensity(_ value: Float) { fogDensity=value.isFinite ? min(0.01,max(0,value)):0.003 }
+    private var volume: VolumetricLighting?
+    private var effectDepth: MTLTexture?
+    func setHDR(_ enabled: Bool, view: GameView) throws {
+        guard enabled != hdrEnabled else { return }
+        var preset=EffectsPreset(renderer:self);preset.hdr=enabled
+        try applyEffectsPreset(preset,view:view)
+    }
+
+    func applyEffectsPreset(_ preset: EffectsPreset, view: GameView) throws {
+        let format:MTLPixelFormat=preset.hdr ? .rgba16Float:.bgra8Unorm
+        let switches=preset.switches
+        let nextPrograms=try WorldPrograms(device:device,shader:worldShader,format:format)
+        let nextOutput=preset.hdr ? try HDROutput(device:device):nil
+        let nextAO=(preset.ao || preset.testLight || switches.contains(where: { $0.needsRays }))
+            ? try AmbientOcclusion(device:device,shader:worldShader,format:format):nil
+        let nextBloom=switches.contains(.bloom) ? try Bloom(device:device,format:format):nil
+        let nextParticles=switches.contains(.particles) ? try ParticleRenderer(device:device,format:format):nil
+        let nextVolume=switches.contains(.volumetrics) ? try VolumetricLighting(device:device,shader:worldShader,format:format):nil
+        programs=nextPrograms;hdrOutput=nextOutput;ambientOcclusion=nextAO;bloom=nextBloom;particles=nextParticles;volume=nextVolume
+        ambientOcclusionEnabled=preset.ao;dynamicLightEnabled=preset.testLight;dynamicLightShadows=preset.testShadows
+        highRayQuality=preset.highRayQuality == true
+        sceneEffects=switches;setAOSettings(strength:preset.strength,radius:preset.radius)
+        setFogDensity(preset.density);setHDRPeak(preset.peak)
+        setLightGain(preset.lightGain ?? 1);setBloomStrength(preset.bloomStrength ?? 0.12)
+        setHDRSpriteBoost(preset.hdrSpriteBoost == true)
+        worldFormat=format;aoGeometryDirty=true;sceneSnapshot=nil
+        // Classic/Medium share the same drawable format: keep their live draw
+        // loop intact. Only HDR/SDR transitions need drawable reconfiguration.
+        if view.colorPixelFormat != format {
+            view.releaseDrawables();view.colorPixelFormat=format
+            view.colorspace=preset.hdr ? CGColorSpace(name:CGColorSpace.extendedLinearSRGB):nil
+            (view.layer as? CAMetalLayer)?.wantsExtendedDynamicRangeContent=preset.hdr
+        }
+    }
     private var batches: [GPUBatch] = []
+    private var worldShader = ""
+    private var worldFormat: MTLPixelFormat = .bgra8Unorm
+    private var opaqueMaterials = Set<MaterialKey>()
+    private var aoGeometryDirty = true
+    private var aoAlphaBuffer: MTLBuffer?
+    private var aoAlphaInfo: [ObjectIdentifier:SIMD4<UInt32>] = [:]
+    private(set) var aoSettings=AOSettings()
+    func setAOSettings(strength: Float? = nil, radius: Float? = nil) {
+        aoSettings=AOSettings(strength:strength ?? aoSettings.strength,radius:radius ?? aoSettings.radius)
+    }
+    // The optional ray pipeline/mesh is shared by AO and all world lights.
+    private(set) var ambientOcclusion: AmbientOcclusion?
+    private(set) var ambientOcclusionEnabled = false
+    private(set) var dynamicLightEnabled = false
+    private(set) var dynamicLightShadows = true
+    var ambientOcclusionSupported: Bool { device.supportsRaytracing && device.supportsRaytracingFromRender }
+    var onGPUFrame: ((Double) -> Void)?
+    private(set) var recentGPUTime: Double = 0
+    func setAmbientOcclusion(_ enabled: Bool) throws {
+        try configureRayEffects(ao:enabled,light:dynamicLightEnabled)
+    }
+    func setDynamicLight(_ enabled: Bool) throws {
+        try configureRayEffects(ao:ambientOcclusionEnabled,light:enabled)
+    }
+    func setDynamicLightShadows(_ enabled: Bool) { dynamicLightShadows=enabled }
+    private(set) var sceneEffects=Set<SceneEffect>()
+    private var bloom: Bloom?
+    private var particles: ParticleRenderer?
+    private var surfaceColors:[MaterialKey:SIMD4<Float>]=[:]
+    private var surfaceLights:[DynamicLightUniforms]=[]
+    private var surfaceLightsDirty=true
+    private func rebuildSurfaceLights() {
+        guard surfaceLightsDirty, let map else { return }
+        var collector=SurfaceLightCollector()
+        for batch in batches {
+            guard let color=surfaceColors[batch.material], color.w>0 else { continue }
+            let vertices=batch.vertices.contents().bindMemory(to:WorldVertex.self,capacity:batch.count)
+            for i in stride(from:0,to:batch.count,by:3) {
+                let triangle=[vertices[i],vertices[i+1],vertices[i+2]]
+                let a=SIMD3(triangle[0].position.x,triangle[0].position.y,triangle[0].position.z)
+                let b=SIMD3(triangle[1].position.x,triangle[1].position.y,triangle[1].position.z)
+                let c=SIMD3(triangle[2].position.x,triangle[2].position.y,triangle[2].position.z)
+                let cross=simd_cross(b-a,c-a)
+                guard simd_length_squared(cross)>0.0001 else { continue }
+                var normal=simd_normalize(cross)
+                if batch.material.flat {
+                    let center=(a+b+c)/3
+                    let sector=map.sectors[map.sector(at:SIMD2(center.x,-center.z))]
+                    normal=SIMD3(0,abs(center.y-sector.floor)<abs(center.y-sector.ceiling) ? 1:-1,0)
+                }
+                collector.add(triangle,material:batch.material,color:color,normal:normal)
+            }
+        }
+        surfaceLights=collector.lights();surfaceLightsDirty=false
+    }
+    private var lightThings:[MD_Thing]=[]
+    var sceneEffectsKey: String { SceneEffect.allCases.map { sceneEffects.contains($0) ? "1":"0" }.joined() }
+    func setSceneEffect(_ effect: SceneEffect, enabled: Bool) throws {
+        var next=sceneEffects
+        if enabled { next.insert(effect) } else { next.remove(effect) }
+        if next.contains(where: { $0.needsRays }) && ambientOcclusion == nil {
+            ambientOcclusion=try AmbientOcclusion(device:device,shader:worldShader,format:worldFormat)
+            aoGeometryDirty=true
+        }
+        if effect == .bloom {
+            bloom=enabled ? try Bloom(device:device,format:worldFormat):nil
+        }
+        if effect == .volumetrics { volume=enabled ? try VolumetricLighting(device:device,shader:worldShader,format:worldFormat):nil }
+        if effect == .particles { particles=enabled ? try ParticleRenderer(device:device,format:worldFormat):nil }
+        sceneEffects=next
+        if !ambientOcclusionEnabled && !dynamicLightEnabled && !next.contains(where: { $0.needsRays }) { ambientOcclusion=nil }
+    }
+    private func sceneLights() -> [DynamicLightUniforms] {
+        var lights:[DynamicLightUniforms]=[]
+        if dynamicLightEnabled { lights.append(movingLightUniforms()) }
+        if sceneEffects.contains(where: { $0.needsRays }) {
+            if sceneEffects.contains(.torches) || sceneEffects.contains(.projectiles) {
+                lightThings=Array(repeating:MD_Thing(),count:Int(MD_CopyThings(nil,0,position.x,position.y)))
+                _=MD_CopyThings(&lightThings,Int32(lightThings.count),position.x,position.y)
+            } else { lightThings=[] }
+            lights += DynamicLightUniforms.gameplay(things:lightThings,hud:hud,
+                eye:SIMD3(position.x,eyeZ,-position.y),effects:sceneEffects)
+        }
+        if sceneEffects.contains(.surfaceLighting) {
+            rebuildSurfaceLights()
+            let eye=SIMD3(position.x,eyeZ,-position.y)
+            var candidates:[(Int,DynamicLightUniforms,Float)]=[]
+            for (index,light) in surfaceLights.enumerated() {
+                let point=SIMD3<Float>(light.positionRadius.x,light.positionRadius.y,light.positionRadius.z)
+                let distance=simd_length_squared(point-eye)
+                if distance<1_048_576 { candidates.append((index,light,distance)) }
+            }
+            candidates.sort { $0.2==$1.2 ? $0.0<$1.0:$0.2<$1.2 }
+            let nearest=candidates.prefix(4).map { $0.1 }
+            lights=Array(lights.prefix(DynamicLightUniforms.limit-nearest.count))+nearest
+        }
+        lights=Array(lights.prefix(DynamicLightUniforms.limit))
+        if sceneEffects.contains(.softShadows) {
+            for i in lights.indices { lights[i].options.y=lights[i].facing == .zero ? 6:12 }
+        }
+        for i in lights.indices {
+            lights[i].options.z=highRayQuality ? 8:4
+            lights[i].colorIntensity.w *= lightGain
+        }
+        // Keep decoration emitters inside their actual sector, including low ceilings.
+        if let map {
+            for i in lights.indices {
+                let s=map.sectors[map.sector(at:SIMD2(lights[i].positionRadius.x,-lights[i].positionRadius.z))]
+                if s.ceiling-s.floor>2 { lights[i].positionRadius.y=min(s.ceiling-1,max(s.floor+1,lights[i].positionRadius.y)) }
+                else { lights[i].colorIntensity.w=0 }
+            }
+        }
+        return lights
+    }
+    private func configureRayEffects(ao: Bool, light: Bool) throws {
+        if (ao || light || sceneEffects.contains(where: { $0.needsRays })) && ambientOcclusion == nil {
+            ambientOcclusion=try AmbientOcclusion(device:device,shader:worldShader,format:worldFormat)
+            aoGeometryDirty=true
+        }
+        ambientOcclusionEnabled=ao;dynamicLightEnabled=light
+        if !ao && !light && !sceneEffects.contains(where: { $0.needsRays }) { ambientOcclusion=nil }
+    }
+    private func disableRayEffects() {
+        ambientOcclusion=nil;ambientOcclusionEnabled=false;dynamicLightEnabled=false;volume=nil
+        sceneEffects=sceneEffects.filter { !$0.needsRays }
+    }
+    private func movingLightUniforms() -> DynamicLightUniforms {
+        guard dynamicLightEnabled else { return DynamicLightUniforms() }
+        var light=DynamicLightUniforms.moving(eye:SIMD3(position.x,eyeZ,-position.y),yaw:yaw,
+                                             tics:hud.levelTics,shadows:dynamicLightShadows)
+        if let map {
+            let sector=map.sectors[map.sector(at:SIMD2(light.positionRadius.x,-light.positionRadius.z))]
+            guard sector.ceiling-sector.floor>16 else { return DynamicLightUniforms() }
+            light.positionRadius.y=min(sector.ceiling-8,max(sector.floor+8,light.positionRadius.y))
+        }
+        return light
+    }
+    private func prepareAmbientOcclusion(command: MTLCommandBuffer) throws {
+        guard let ao=ambientOcclusion else { return }
+        if aoGeometryDirty {
+            let geometry=batches.map { batch in
+                let source=batch.vertices.contents().bindMemory(to:WorldVertex.self,capacity:batch.count)
+                let vertices=(0..<batch.count).map { AOVertex(position:source[$0].position,uv:SIMD4(source[$0].uvLight.x,source[$0].uvLight.y,0,0)) }
+                return AOGeometry(vertices:vertices,opaque:opaqueMaterials.contains(batch.material))
+            }
+            try ao.prepare(geometry:geometry,device:device,command:command)
+            aoGeometryDirty=false
+        }
+        // Texture translation can change every tic without any geometry change.
+        // Publish a fresh immutable mapping only when the selected frames change.
+        let info=try batches.enumerated().map { index,batch -> SIMD4<UInt32> in
+            guard var material=aoAlphaInfo[ObjectIdentifier(animatedTexture(batch))] else {
+                throw PortError("Missing ambient occlusion alpha mask.")
+            }
+            material.w=ao.baseVertices[index];return material
+        }
+        try ao.updateMaterials(info,device:device)
+    }
     private var sceneSnapshot: MTLTexture?
     private var sky: MTLTexture?
     private var skyGeometry: MTLBuffer?
@@ -159,6 +309,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         let shader = """
         #include <metal_stdlib>
         using namespace metal;
+        \(WorldSampling.shader)
         struct Vertex { float4 position; float4 uvLight; };
         struct Out { float4 position [[position]]; float2 uv; float light; float distance; float fullbright; float3 world; };
         vertex Out worldVertex(uint id [[vertex_id]], const device Vertex *v [[buffer(0)]],
@@ -170,19 +321,33 @@ final class Renderer: NSObject, MTKViewDelegate {
             if (power.x > 0) return float3(floor((1.0-dot(rgb,float3(0.299,0.587,0.114)))*31.0)/31.0);
             return rgb;
         }
-        fragment float4 worldFragment(Out in [[stage_in]], bool front [[front_facing]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]]) {
+        float3 emissiveColor(float3 color, float3 lit, float4 emission, float4 power) {
+            if (emission.y<=0 || power.x>0 || power.y>0) return lit;
+            float mask=smoothstep(emission.x,min(1.0,emission.x+0.25),max(color.r,max(color.g,color.b)));
+            if (emission.z>0) {
+                float saturation=max(color.r,max(color.g,color.b))-min(color.r,min(color.g,color.b));
+                mask*=smoothstep(0.15,0.4,saturation);
+            }
+            return mix(lit,max(lit,color*emission.y),mask);
+        }
+        fragment void visibilityFragment(Out in [[stage_in]],bool front [[front_facing]],texture2d<float> tex [[texture(0)]]) {
+            if (in.fullbright>0.5 && !front) discard_fragment();
+            constexpr sampler s(coord::normalized,address::repeat,filter::nearest);
+            if (tex.sample(s,in.uv/float2(tex.get_width(),tex.get_height())).a<0.5) discard_fragment();
+        }
+        fragment float4 worldFragment(Out in [[stage_in]], bool front [[front_facing]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]], constant float4 &emission [[buffer(11)]]) {
             if (in.fullbright > 0.5 && !front) discard_fragment();
             constexpr sampler s(coord::normalized, address::repeat, filter::nearest);
-            float4 c = tex.sample(s, in.uv / float2(tex.get_width(),tex.get_height()));
+            float4 c = sampleWorld(tex,in.uv,power);
             if (c.a < 0.5) discard_fragment();
             float shade = (power.x>0 || power.y>0) ? 1.0 : in.light * clamp(1.0 - in.distance / 3200.0, 0.3, 1.0);
-            return float4(powerColor(c.rgb * shade,power), 1.0);
+            return float4(powerColor(emissiveColor(c.rgb,c.rgb*shade,emission,power),power), 1.0);
         }
         fragment float4 spriteFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]]) {
             constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::nearest);
             float4 c = tex.sample(s,in.uv / float2(tex.get_width(),tex.get_height()));
             if (c.a < 0.5) discard_fragment();
-            float shade = (in.fullbright > 0.5 || power.x>0 || power.y>0) ? 1.0 : in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
+            float shade = (power.x>0 || power.y>0) ? 1.0 : in.fullbright>0.5 ? max(1.0,in.fullbright) : in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
             return float4(powerColor(c.rgb*shade,power),1.0);
         }
         fragment float4 fuzzFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]],
@@ -223,32 +388,16 @@ final class Renderer: NSObject, MTKViewDelegate {
             return float4(powerColor(skyColor(float3(cos(camera.x)*f+sin(camera.x)*x,h,-sin(camera.x)*f+cos(camera.x)*x),tex).rgb,power),1);
         }
         """
-        let library = try device.makeLibrary(source:shader,options:nil)
-        let descriptor = MTLRenderPipelineDescriptor()
-        descriptor.vertexFunction = library.makeFunction(name:"worldVertex")
-        descriptor.fragmentFunction = library.makeFunction(name:"worldFragment")
-        descriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
-        descriptor.depthAttachmentPixelFormat = .depth32Float
-        pipeline = try device.makeRenderPipelineState(descriptor:descriptor)
-        descriptor.fragmentFunction = library.makeFunction(name:"skySurfaceFragment")
-        skySurfacePipeline = try device.makeRenderPipelineState(descriptor:descriptor)
-        descriptor.fragmentFunction = library.makeFunction(name:"spriteFragment")
-        spritePipeline = try device.makeRenderPipelineState(descriptor:descriptor)
-        descriptor.fragmentFunction = library.makeFunction(name:"fuzzFragment")
-        fuzzPipeline = try device.makeRenderPipelineState(descriptor:descriptor)
-        descriptor.vertexFunction = library.makeFunction(name:"skyVertex")
-        descriptor.fragmentFunction = library.makeFunction(name:"skyFragment")
-        skyPipeline = try device.makeRenderPipelineState(descriptor:descriptor)
-        descriptor.fragmentFunction = library.makeFunction(name:"tintFragment")
-        descriptor.colorAttachments[0].isBlendingEnabled = true
-        descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-        descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        tintPipeline = try device.makeRenderPipelineState(descriptor:descriptor)
+        worldShader=shader;worldFormat=view.colorPixelFormat
+        programs=try WorldPrograms(device:device,shader:shader,format:view.colorPixelFormat)
         let state = MTLDepthStencilDescriptor(); state.depthCompareFunction = .less; state.isDepthWriteEnabled = true
         guard let depth = device.makeDepthStencilState(descriptor:state) else { throw PortError("Cannot create Metal depth state.") }
         self.depth = depth
         state.isDepthWriteEnabled=false;state.depthCompareFunction = .lessEqual
         guard let fuzzDepth=device.makeDepthStencilState(descriptor:state) else { throw PortError("Cannot create fuzz depth state.") };self.fuzzDepth=fuzzDepth
+        state.depthCompareFunction = .equal
+        guard let visibleDepth=device.makeDepthStencilState(descriptor:state) else { throw PortError("Cannot create visible-surface depth state.") }
+        self.visibleDepth=visibleDepth
         super.init()
     }
     func load(wad: WAD, map name: String, continuing: Bool = false, restorePath: String? = nil, demo: String? = nil) throws -> (triangles:Int,missing:[String]) {
@@ -278,18 +427,29 @@ final class Renderer: NSObject, MTKViewDelegate {
             }
         }
         var cached: [MaterialKey:MTLTexture] = [:], missing: [String] = []
+        var emissionColors:[MaterialKey:SIMD4<Float>]=[:]
+        var opaque = Set<MaterialKey>()
+        var alphaBytes:[UInt8]=[255], alphaInfo:[ObjectIdentifier:SIMD4<UInt32>]=[:]
         func cacheMaterial(_ material: MaterialKey) throws {
             if cached[material] != nil { return }
             let source = try art.image(material)
             if source == nil { missing.append(material.name) }
             let pixels = source ?? Art.fallback
-            let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba8Unorm,width:pixels.width,height:pixels.height,mipmapped:false)
+            emissionColors[material]=source == nil ? .zero:SurfaceLightCollector.color(material:material,pixels:pixels)
+            if stride(from:3,to:pixels.rgba.count,by:4).allSatisfy({ pixels.rgba[$0] >= 128 }) { opaque.insert(material) }
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba8Unorm,width:pixels.width,height:pixels.height,mipmapped:true)
             descriptor.usage = .shaderRead; descriptor.storageMode = .shared
             guard let texture = device.makeTexture(descriptor:descriptor) else {
                 throw PortError("Cannot allocate Metal map resources.")
             }
             pixels.rgba.withUnsafeBytes { bytes in
                 texture.replace(region:MTLRegionMake2D(0,0,pixels.width,pixels.height),mipmapLevel:0,withBytes:bytes.baseAddress!,bytesPerRow:pixels.width*4)
+            }
+            if opaque.contains(material) { alphaInfo[ObjectIdentifier(texture)]=SIMD4(0,1,1,0) }
+            else {
+                guard alphaBytes.count+pixels.width*pixels.height<=Int(UInt32.max) else { throw PortError("AO alpha masks are too large.") }
+                alphaInfo[ObjectIdentifier(texture)]=SIMD4(UInt32(alphaBytes.count),UInt32(pixels.width),UInt32(pixels.height),0)
+                alphaBytes.append(contentsOf:stride(from:3,to:pixels.rgba.count,by:4).map { pixels.rgba[$0] })
             }
             cached[material] = texture
         }
@@ -324,12 +484,25 @@ final class Renderer: NSObject, MTKViewDelegate {
             try cacheMaterial(key); animationIDs[key]=frame.index
             if key.flat { flats[frame.index]=cached[key] } else { walls[frame.index]=cached[key] }
         }
+        guard let mipCommand=queue.makeCommandBuffer(), let mipEncoder=mipCommand.makeBlitCommandEncoder() else {
+            throw PortError("Cannot prepare world texture mipmaps.")
+        }
+        for texture in cached.values { mipEncoder.generateMipmaps(for:texture) }
+        mipEncoder.endEncoding();mipCommand.commit();mipCommand.waitUntilCompleted()
+        guard mipCommand.status == .completed else { throw PortError("World texture mipmap generation failed.") }
+        // Conservatively alpha-test animated walls if any animation frame is masked.
+        let maskedWallAnimation=animationIDs.contains { !$0.key.flat && !opaque.contains($0.key) }
+        if maskedWallAnimation { for key in animationIDs.keys where !key.flat { opaque.remove(key) } }
         animatedIDs=animationIDs; animatedWalls=walls; animatedFlats=flats
         demoPlayback = demo != nil
         skill=MD_GetSkill()
         progress = MD_GetProgress(); intermission = IntermissionSequence(progress); intermissionTime = 0; deathTime = 0; finale = FinaleSequence(); lastGeometryTick = -1
         intermissionArt = loadedIntermission
         textureHeights = heights
+        guard let alphaBuffer=device.makeBuffer(bytes:alphaBytes,length:alphaBytes.count,options:.storageModeShared) else { throw PortError("Cannot allocate AO alpha masks.") }
+        aoAlphaBuffer=alphaBuffer;aoAlphaInfo=alphaInfo
+        opaqueMaterials=opaque;aoGeometryDirty=true
+        surfaceColors=emissionColors;surfaceLights=[];surfaceLightsDirty=true
         self.map = map; self.wad = wad; textures = cached; batches = loaded; sky = loadedSky; sprites = loadedSprites; pitch = 0
         music?.update(active:false); music=loadedMusic; music?.enabled=musicEnabled; music?.volume=musicVolume
         sound = loadedSound; sound?.volume=effectsVolume; sound?.drain()
@@ -382,7 +555,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private func syncGeometry() throws {
         guard var map, lastGeometryTick != currentPlayer.tick else { return }
         lastGeometryTick = currentPlayer.tick
-        var changed = false
+        var changed = false, surfacesChanged = false
         func name<T>(_ tuple: T) -> String {
             var value = tuple
             return withUnsafePointer(to:&value) { $0.withMemoryRebound(to:CChar.self,capacity:9) { String(cString:$0).uppercased() } }
@@ -392,11 +565,13 @@ final class Renderer: NSObject, MTKViewDelegate {
             let upper = name(state.upper), lower = name(state.lower), middle = name(state.middle)
             if old.x != state.x || old.y != state.y || old.upper != upper || old.lower != lower || old.middle != middle {
                 map.sides[index] = Side(sector:old.sector,x:state.x,y:state.y,upper:upper,lower:lower,middle:middle); changed = true
+                surfacesChanged = surfacesChanged || old.upper != upper || old.lower != lower || old.middle != middle
             }
         }
         for index in map.sectors.indices {
             let state = MD_GetSector(Int32(index)), old = map.sectors[index]
             if state.floor != old.floor || state.ceiling != old.ceiling || state.light != old.light {
+                surfacesChanged = surfacesChanged || state.floor != old.floor || state.ceiling != old.ceiling
                 map.sectors[index] = Sector(floor:state.floor,ceiling:state.ceiling,light:state.light,floorTexture:old.floorTexture,ceilingTexture:old.ceilingTexture)
                 changed = true
             }
@@ -404,6 +579,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         if changed {
             let geometry = try Geometry(map:map,textureHeights:textureHeights)
             batches = try makeBatches(geometry,textures:textures)
+            aoGeometryDirty=true;surfaceLightsDirty = surfaceLightsDirty || surfacesChanged
             try uploadSkyGeometry(geometry)
             self.map = map
         }
@@ -411,6 +587,10 @@ final class Renderer: NSObject, MTKViewDelegate {
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
     func draw(in mtkView: MTKView) {
         guard let view = mtkView as? GameView else { return }
+        // Occluded/minimized windows must not compete with the active game for GPU time.
+        if !view.isPaused && (view.window?.isMiniaturized == true || view.window?.occlusionState.contains(.visible) == false) {
+            lastTime=CACurrentMediaTime();pauseAudio();return
+        }
         let time = CACurrentMediaTime(), delta = min(time-lastTime,0.25); lastTime = time
         do { try update(view:view,delta:delta) }
         catch { engineReady = false; view.releaseMouse(); DispatchQueue.main.async { [weak self] in self?.onError?(error) } }
@@ -421,13 +601,52 @@ final class Renderer: NSObject, MTKViewDelegate {
         let semaphore = inFlight
         command.addCompletedHandler { [weak self] buffer in
             if let error = buffer.error {
-                DispatchQueue.main.async { [weak self] in self?.onWarning?("Metal command error: \(error)") }
+                DispatchQueue.main.async { [weak self] in
+                    self?.disableRayEffects()
+                    self?.bloom=nil;self?.sceneEffects.remove(.bloom)
+                    self?.particles=nil;self?.sceneEffects.remove(.particles)
+                    self?.onWarning?("Metal command error (ray-traced effects, bloom and particles disabled): \(error)")
+                }
+            }
+            let gpuTime=max(0,buffer.gpuEndTime-buffer.gpuStartTime)
+            DispatchQueue.main.async { [weak self] in
+                self?.recentGPUTime=gpuTime
+                self?.onGPUFrame?(gpuTime)
             }
             semaphore.signal()
         }
+        do { try prepareAmbientOcclusion(command:command) }
+        catch {
+            disableRayEffects()
+            DispatchQueue.main.async { [weak self] in self?.onWarning?("Ray-traced effects disabled: \(error)") }
+        }
+        // HDR retains the original palette shading in an extended floating-point scene.
+        // Presentation converts its transfer function to linear EDR after the HUD.
+        var sceneTarget=drawable.texture
+        do {
+            if let hdrOutput {
+                sceneTarget=try hdrOutput.scene(width:drawable.texture.width,height:drawable.texture.height)
+                pass.colorAttachments[0].texture=sceneTarget
+            }
+            if volume != nil {
+                if effectDepth?.width != sceneTarget.width || effectDepth?.height != sceneTarget.height {
+                    let d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.depth32Float,width:sceneTarget.width,height:sceneTarget.height,mipmapped:false)
+                    d.storageMode = .private;d.usage = [.renderTarget,.shaderRead]
+                    guard let texture=device.makeTexture(descriptor:d) else { throw PortError("Cannot allocate volumetric depth.") }
+                    effectDepth=texture
+                }
+                pass.depthAttachment.texture=effectDepth
+            }
+        } catch {
+            command.commit()
+            DispatchQueue.main.async { [weak self] in self?.onWarning?("Cannot allocate effects frame: \(error)") }
+            return
+        }
         pass.depthAttachment.storeAction = .store
-        guard var encoder = command.makeRenderCommandEncoder(descriptor:pass) else { inFlight.signal(); return }
-        var power=SIMD4<Float>(hud.fixedColorMap==32 ? 1:0,hud.fixedColorMap==1 ? 1:0,Float(hud.tick),0)
+        // A BVH build may already be encoded. Submit it even if the render
+        // encoder fails, so the next frame never consumes an unbuilt structure.
+        guard var encoder = command.makeRenderCommandEncoder(descriptor:pass) else { command.commit(); return }
+        var power=SIMD4<Float>(hud.fixedColorMap==32 ? 1:0,hud.fixedColorMap==1 ? 1:0,Float(hud.tick),sceneEffects.contains(.textureFiltering) ? 1:0)
         var noPower=SIMD4<Float>.zero
         encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
         encoder.setRenderPipelineState(pipeline); encoder.setDepthStencilState(depth); encoder.setCullMode(.none); encoder.setFrontFacing(.counterClockwise)
@@ -461,13 +680,43 @@ final class Renderer: NSObject, MTKViewDelegate {
                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:skyVertexCount)
                 encoder.setRenderPipelineState(pipeline)
             }
+            if let ao=ambientOcclusion, let structure=ao.structure, let vertices=ao.vertices, let materials=ao.materials, let alpha=aoAlphaBuffer {
+                // Resolve exact world visibility cheaply before running any per-pixel rays.
+                // Alpha coverage matches the shading pass; this pass never writes color.
+                encoder.setRenderPipelineState(programs.visibility);encoder.setDepthStencilState(depth)
+                for batch in batches {
+                    encoder.setVertexBuffer(batch.vertices,offset:0,index:0);encoder.setFragmentTexture(animatedTexture(batch),index:0)
+                    encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:batch.count)
+                }
+                encoder.setDepthStencilState(visibleDepth)
+                var aoEye=SIMD4(eye,1)
+                encoder.setRenderPipelineState(ao.pipeline)
+                encoder.setFragmentBytes(&aoEye,length:MemoryLayout<SIMD4<Float>>.stride,index:3)
+                encoder.setFragmentAccelerationStructure(structure,bufferIndex:4)
+                encoder.setFragmentBuffer(vertices,offset:0,index:5)
+                encoder.setFragmentBuffer(materials,offset:0,index:6)
+                encoder.setFragmentBuffer(alpha,offset:0,index:7)
+                var settings=aoSettings.uniform
+                settings.z=highRayQuality ? 16:8
+                if !ambientOcclusionEnabled { settings.y=0 }
+                encoder.setFragmentBytes(&settings,length:MemoryLayout<SIMD4<Float>>.stride,index:8)
+                var lights=sceneLights()
+                var count=UInt32(lights.count)
+                if lights.isEmpty { lights=[DynamicLightUniforms()] }
+                lights.withUnsafeBytes { encoder.setFragmentBytes($0.baseAddress!,length:$0.count,index:9) }
+                encoder.setFragmentBytes(&count,length:MemoryLayout<UInt32>.stride,index:10)
+            }
             for batch in batches {
+                var emission=sceneEffects.contains(.emissive) ? emissionSettings(batch.material):.zero
+                encoder.setFragmentBytes(&emission,length:MemoryLayout<SIMD4<Float>>.stride,index:11)
                 encoder.setVertexBuffer(batch.vertices,offset:0,index:0); encoder.setFragmentTexture(animatedTexture(batch),index:0)
                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:batch.count)
             }
+            encoder.setDepthStencilState(depth)
             if let sprites, engineReady {
-                encoder.setRenderPipelineState(spritePipeline)
-                do { try sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw) }
+                encoder.setRenderPipelineState(sceneEffects.contains(.spriteLighting) && ambientOcclusion?.structure != nil
+                    ? ambientOcclusion!.spritePipeline:spritePipeline)
+                do { try sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw,fullbrightGain:hdrEnabled && hdrSpriteBoost ? 1.5:1) }
                 catch { engineReady = false; DispatchQueue.main.async { [weak self] in self?.onError?(error) } }
                 if sprites.hasFuzz || hud.invisibility>128 || (hud.invisibility&8) != 0 {
                     if sceneSnapshot?.width != Int(width) || sceneSnapshot?.height != Int(height) {
@@ -477,7 +726,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                     if let snapshot=sceneSnapshot {
                         encoder.endEncoding()
                         if let blit=command.makeBlitCommandEncoder() {
-                            blit.copy(from:drawable.texture,sourceSlice:0,sourceLevel:0,sourceOrigin:MTLOrigin(x:0,y:0,z:0),sourceSize:MTLSize(width:Int(width),height:Int(height),depth:1),to:snapshot,destinationSlice:0,destinationLevel:0,destinationOrigin:MTLOrigin(x:0,y:0,z:0));blit.endEncoding()
+                            blit.copy(from:sceneTarget,sourceSlice:0,sourceLevel:0,sourceOrigin:MTLOrigin(x:0,y:0,z:0),sourceSize:MTLSize(width:Int(width),height:Int(height),depth:1),to:snapshot,destinationSlice:0,destinationLevel:0,destinationOrigin:MTLOrigin(x:0,y:0,z:0));blit.endEncoding()
                         }
                         pass.colorAttachments[0].loadAction = .load;pass.depthAttachment.loadAction = .load
                         guard let resumed=command.makeRenderCommandEncoder(descriptor:pass) else { command.commit();return }
@@ -487,8 +736,54 @@ final class Renderer: NSObject, MTKViewDelegate {
                         encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
                         encoder.setFragmentTexture(snapshot,index:1);encoder.setRenderPipelineState(fuzzPipeline);encoder.setDepthStencilState(fuzzDepth)
                         try? sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw,fuzz:true)
-                        sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,fuzz:true)
                     }
+                }
+                if let particles, power.x==0 && power.y==0 {
+                    do { try particles.draw(encoder:encoder,camera:position,eye:eye,yaw:yaw,pitch:pitch,tics:hud.levelTics,matrix:uniform.matrix) }
+                    catch {
+                        self.particles=nil;sceneEffects.remove(.particles)
+                        DispatchQueue.main.async { [weak self] in self?.onWarning?("Particles disabled: \(error)") }
+                    }
+                }
+                if let volume, let ao=ambientOcclusion, let alpha=aoAlphaBuffer,
+                   let depthTexture=effectDepth, power.x==0 && power.y==0 {
+                    encoder.endEncoding()
+                    var ready=false
+                    do {
+                        try volume.prepare(command:command,depth:depthTexture,worldHeight:Int(worldHeight),
+                            inverse:uniform.matrix.inverse,eye:eye,lights:sceneLights(),ao:ao,alpha:alpha,density:fogDensity,steps:highRayQuality ? 32:16)
+                        ready=true
+                    } catch {
+                        self.volume=nil;sceneEffects.remove(.volumetrics)
+                        DispatchQueue.main.async { [weak self] in self?.onWarning?("Volumetric lighting disabled: \(error)") }
+                    }
+                    pass.colorAttachments[0].loadAction = .load;pass.depthAttachment.loadAction = .load
+                    guard let resumed=command.makeRenderCommandEncoder(descriptor:pass) else { command.commit();return }
+                    encoder=resumed;encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:worldHeight,znear:0,zfar:1))
+                    if ready { volume.draw(encoder:encoder) }
+                    encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
+                }
+                // Complete world effects before either weapon pass and the HUD.
+                if let bloom, power.x==0 && power.y==0 {
+                    encoder.endEncoding()
+                    var ready=false
+                    do { try bloom.prepare(command:command,source:sceneTarget,worldHeight:Int(worldHeight));ready=true }
+                    catch {
+                        self.bloom=nil;sceneEffects.remove(.bloom)
+                        DispatchQueue.main.async { [weak self] in self?.onWarning?("Bloom disabled: \(error)") }
+                    }
+                    pass.colorAttachments[0].loadAction = .load;pass.depthAttachment.loadAction = .load
+                    guard let resumed=command.makeRenderCommandEncoder(descriptor:pass) else { command.commit();return }
+                    encoder=resumed;encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:worldHeight,znear:0,zfar:1))
+                    encoder.setCullMode(.none);encoder.setFrontFacing(.counterClockwise)
+                    if ready { bloom.draw(encoder:encoder,width:width,height:worldHeight,strength:bloomStrength) }
+                    encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
+                }
+                // Weapons and HUD stay at standard white in HDR.
+                power.w=0;encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
+                if (hud.invisibility>128 || (hud.invisibility&8) != 0), let snapshot=sceneSnapshot {
+                    encoder.setFragmentTexture(snapshot,index:1);encoder.setRenderPipelineState(fuzzPipeline)
+                    sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,fuzz:true)
                 }
                 encoder.setRenderPipelineState(spritePipeline)
                 sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight)
@@ -505,7 +800,12 @@ final class Renderer: NSObject, MTKViewDelegate {
                 sprites.drawHUD(encoder:encoder,state:hud,width:width,height:height)
             }
         }
-        encoder.endEncoding(); command.present(drawable); command.commit(); renderedFrames += 1
+        encoder.endEncoding()
+        if let hdrOutput {
+            hdrOutput.present(command:command,source:sceneTarget,target:drawable.texture,
+                headroom:Float(view.window?.screen?.maximumExtendedDynamicRangeColorComponentValue ?? 1),peak:hdrPeak)
+        }
+        command.present(drawable); command.commit(); renderedFrames += 1
         onSubmittedFrame?(CACurrentMediaTime())
         frames += 1
         if time-reportTime >= 0.5 { onFrame?(Double(frames)/(time-reportTime)); frames = 0; reportTime = time }

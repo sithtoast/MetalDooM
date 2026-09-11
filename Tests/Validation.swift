@@ -17,6 +17,24 @@ import simd
             }
         }
         print("PASS: floor/ceiling polygons respect room edges despite expanded map bounds")
+        let splitRoom = try DoomMap(wad:fixture,name:"MAP02")
+        let splitGeometry = try Geometry(map:splitRoom)
+        for height: Float in [0,128] {
+            var area: Float = 0
+            for batch in splitGeometry.batches where batch.material.flat {
+                for i in stride(from:0,to:batch.vertices.count,by:3) {
+                    let vertices = batch.vertices[i..<i+3].map { $0.position }
+                    guard vertices.allSatisfy({ $0.y == height }) else { continue }
+                    let p = vertices.map { SIMD2($0.x,-$0.z) }
+                    area += abs(cross(p[1]-p[0],p[2]-p[0]))/2
+                    guard p.allSatisfy({ $0.x >= 0 && $0.x <= 128 && $0.y >= 0 && $0.y <= 128+$0.x/128 }) else {
+                        throw PortError("Split flat escaped original wall boundaries.")
+                    }
+                }
+            }
+            guard abs(area-16448) < 0.01 else { throw PortError("Rounded BSP segs left a gap in floor/ceiling: area \(area), expected 16448.") }
+        }
+        print("PASS: rounded BSP split vertices preserve complete floor/ceiling coverage")
         let original = try Data(contentsOf:fixtureURL)
         let invalidURL = fixtureURL.deletingLastPathComponent().appendingPathComponent("invalid.wad")
         defer { try? FileManager.default.removeItem(at:invalidURL) }

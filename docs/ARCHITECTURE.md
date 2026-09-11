@@ -12,6 +12,8 @@ Swift owns native input/windowing and direct Metal rendering.
 | Sources/WAD.swift | Bounded binary reads, classic map records, BSP lookup |
 | Sources/Geometry.swift | Palette/patch decoding and world triangle generation |
 | Sources/Renderer.swift | Fixed tics, interpolation, sector synchronization, Metal resources |
+| Sources/AmbientOcclusion.swift | Shared ray mesh/pipeline, masked intersections, AO and direct-light shadow shading |
+| Sources/DynamicLight.swift | Deterministic camera-relative light orbit and GPU uniforms |
 | Sources/SpriteRenderer.swift | Sprite texture cache, billboard quads, original HUD patch composition |
 | Sources/IntermissionRenderer.swift | Original intermission patches, stats and destination screen |
 | Sources/SaveStore.swift | Versioned save container, WAD hash, integrity, atomic persistence |
@@ -51,7 +53,13 @@ requests preserve the active engine.
 
 WAD `(x,y)` becomes Metal `(x,height,-y)`. Vertices contain position and texel UV/light
 float4s. Wall art is composited at load time; floors/ceilings are clipped through the
-classic BSP and each leaf's directed seg boundaries. All side materials are cached, including those hidden by closed sectors.
+classic BSP and each leaf's original directed linedefs. Seg endpoints can be rounded
+off those lines by node builders, so they must not define clipping planes. Clipping
+uses Double precision, then inserts shared edge vertices into adjacent flats and
+horizontal wall edges before converting to GPU floats. Subdivided boundaries use
+center fans to preserve collinear vertices and avoid raster T-junction cracks.
+Wall UV/light attributes interpolate along the original triangle. All side materials
+are cached, including those hidden by closed sectors.
 Engine floor/ceiling height, light, sidedef texture or offset changes rebuild geometry
 using current values, once per changed tic. The native bridge caches texture names
 from the WAD using the engine's texture indices, without exposing internal texture
@@ -331,3 +339,21 @@ MAP30 enters upstream F_StartCast/F_CastTicker/F_CastResponder. The bridge copie
 cast name, sprite patch, flip and death state; Metal presents BOSSBACK, text and
 sprite quads without calling software drawers. Fire taps are retained until a cast
 tic. Swift selects D_READ_M/D_EVIL; native finale music hooks are presentation stubs.
+
+## Experimental ray-traced lighting
+
+`AmbientOcclusion.swift` owns the optional shader and primitive acceleration
+structure shared by independently enabled AO and the moving test light. View
+selects AO strength/radius and light/shadow toggles for the session; classic
+rendering is the launch default. World positions build the structure before
+rendering on the same command buffer. Masked hits use interpolated texel UVs and
+the current animated alpha mask; opaque batches commit directly. Replacement
+buffers/structures keep queued frames immutable. Position equality avoids builds
+for sector-light/UV-only changes. AO traces eight short hemisphere rays. Direct
+light adds a normal-weighted, radially attenuated color contribution and, when
+shadows are enabled, a finite alpha-tested visibility ray toward the light.
+`DynamicLight.swift` derives the orbit from level tics and camera orientation;
+moving it changes uniforms rather than the acceleration structure. Sky, sprite,
+weapon and HUD shading remain independent. Both effects bypass fixed-colormap
+power-ups; ray failure clears both enable flags and restores classic rendering. See
+[Metal experiments](METAL_EXPERIMENTS.md) for controls and measurement boundaries.

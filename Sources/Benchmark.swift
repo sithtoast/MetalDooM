@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 extension App {
     var benchmarkSettings: String {
-        "\(view.drawableSize)|\(view.renderScale)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)"
+        "\(view.drawableSize)|\(view.renderScale)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)|\(renderer.aoSettings.strength)|\(renderer.aoSettings.radius)|\(renderer.dynamicLightEnabled)|\(renderer.dynamicLightShadows)|\(renderer.sceneEffectsKey)|\(renderer.hdrEnabled)|\(renderer.hdrPeak)|\(renderer.fogDensity)|\(renderer.highRayQuality)|\(renderer.lightGain)|\(renderer.bloomStrength)|\(renderer.hdrSpriteBoost)"
     }
     @objc func runBenchmark() {
         guard benchmark == nil else { return }
@@ -78,6 +78,67 @@ extension App {
         if item.action == #selector(selectOPL(_:)) { item.state=MusicPlayer.preferredBackend == "opl" ? .on : .off }
         if item.action == #selector(selectAppleMIDI(_:)) { item.state=MusicPlayer.preferredBackend == "apple" ? .on : .off }
         if benchmark != nil { return item.action == #selector(cancelBenchmark) || item.action == #selector(NSApplication.terminate(_:)) }
+        if item.action == #selector(selectGraphicsPreset(_:)), Self.graphicsPresets.indices.contains(item.tag) {
+            let (scale,fps)=Self.graphicsPresets[item.tag]
+            item.state=view.renderScale==scale && view.preferredFramesPerSecond==fps ? .on:.off
+        }
+        if item.action == #selector(selectEffectsPreset(_:)) {
+            let preset=EffectsPreset.builtins.indices.contains(item.tag) ? EffectsPreset.builtins[item.tag]:savedEffectsPreset
+            guard let preset else { return false }
+            item.state=EffectsPreset(renderer:renderer)==preset ? .on:.off
+            return effectsPresetUnavailableReason(preset) == nil
+        }
+        if item.action == #selector(toggleClassicMedium) {
+            return effectsActive || renderer.ambientOcclusionSupported
+        }
+        if item.action == #selector(toggleHDR) {
+            item.state=renderer.hdrEnabled ? .on:.off
+            return renderer.hdrEnabled || hdrDisplayAvailable
+        }
+        if item.action == #selector(selectRayQuality(_:)) {
+            item.state=renderer.highRayQuality == (item.tag==1) ? .on:.off
+            return renderer.ambientOcclusionSupported
+        }
+        if item.action == #selector(toggleHDRSpriteBoost) {
+            item.state=renderer.hdrSpriteBoost ? .on:.off;return renderer.hdrEnabled
+        }
+        if item.action == #selector(selectLightGain(_:)) {
+            item.state=abs(renderer.lightGain-Float(item.tag)/100)<0.00001 ? .on:.off;return true
+        }
+        if item.action == #selector(selectBloomStrength(_:)) {
+            item.state=abs(renderer.bloomStrength-Float(item.tag)/100)<0.00001 ? .on:.off;return true
+        }
+        if item.action == #selector(selectHDRPeak(_:)) {
+            item.state=renderer.hdrPeak==Float(item.tag) ? .on:.off;return true
+        }
+        if item.action == #selector(selectFogDensity(_:)) {
+            item.state=abs(renderer.fogDensity-Float(item.tag)/1000)<0.00001 ? .on:.off
+            return renderer.ambientOcclusionSupported
+        }
+        if item.action == #selector(selectAOStrength(_:)) {
+            item.state=Int(renderer.aoSettings.strength*100)==item.tag ? .on:.off
+            return renderer.ambientOcclusionSupported
+        }
+        if item.action == #selector(selectAORadius(_:)) {
+            item.state=Int(renderer.aoSettings.radius)==item.tag ? .on:.off
+            return renderer.ambientOcclusionSupported
+        }
+        if item.action == #selector(toggleSceneEffect(_:)), let effect=SceneEffect(rawValue:item.tag) {
+            item.state=renderer.sceneEffects.contains(effect) ? .on:.off
+            return !effect.needsRays || renderer.ambientOcclusionSupported
+        }
+        if item.action == #selector(toggleAmbientOcclusion) {
+            item.state=renderer.ambientOcclusionEnabled ? .on : .off
+            return renderer.ambientOcclusionSupported
+        }
+        if item.action == #selector(toggleDynamicLight) {
+            item.state=renderer.dynamicLightEnabled ? .on:.off
+            return renderer.ambientOcclusionSupported
+        }
+        if item.action == #selector(toggleDynamicLightShadows) {
+            item.state=renderer.dynamicLightShadows ? .on:.off
+            return renderer.ambientOcclusionSupported && renderer.dynamicLightEnabled
+        }
         if item.action == #selector(cancelBenchmark) { return false }
         if item.action == #selector(exportBenchmarkResult) { return lastBenchmarkReport != nil }
         return true

@@ -53,6 +53,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var loggedSettings = ""
     var summary = "Open a Doom WAD to explore a map"
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSWindow.allowsAutomaticWindowTabbing=false
         do {
             let menu = NSMenu(), appMenu = NSMenu()
             let appItem = NSMenuItem(); appItem.submenu = appMenu; menu.addItem(appItem)
@@ -71,6 +72,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             quickLoad.target = self; quickLoad.keyEquivalentModifierMask = [.command,.shift]
             let viewItem=NSMenuItem(), viewMenu=NSMenu(title:"View")
             viewItem.submenu=viewMenu; menu.addItem(viewItem)
+            addGraphicsMenus(to:viewMenu)
             statusBarMenuItem=viewMenu.addItem(withTitle:"Show Status Bar",action:#selector(toggleStatusBar),keyEquivalent:"")
             statusBarMenuItem?.target=self
             levelStatsMenuItem=viewMenu.addItem(withTitle:"Show Level Stats",action:#selector(toggleLevelStats),keyEquivalent:"")
@@ -79,6 +81,27 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             parTimeMenuItem?.target=self
             secretMenuItem=viewMenu.addItem(withTitle:"Secret Notifications",action:#selector(toggleSecretNotifications),keyEquivalent:"")
             secretMenuItem?.target=self
+            viewMenu.addItem(withTitle:"Ray-Traced Ambient Occlusion (Experimental)",action:#selector(toggleAmbientOcclusion),keyEquivalent:"").target=self
+            let strengthItem=NSMenuItem(title:"AO Strength",action:nil,keyEquivalent:"")
+            let strengthMenu=NSMenu(title:"AO Strength");strengthItem.submenu=strengthMenu;viewMenu.addItem(strengthItem)
+            for value in [0,25,50,75,100] {
+                let item=strengthMenu.addItem(withTitle:"\(value)%"+(value==50 ? " (Default)":""),action:#selector(selectAOStrength(_:)),keyEquivalent:"")
+                item.tag=value;item.target=self
+            }
+            let radiusItem=NSMenuItem(title:"AO Radius",action:nil,keyEquivalent:"")
+            let radiusMenu=NSMenu(title:"AO Radius");radiusItem.submenu=radiusMenu;viewMenu.addItem(radiusItem)
+            for (value,title) in [(16,"Compact — 16 units"),(32,"Near — 32 units"),(48,"Default — 48 units"),(96,"Wide — 96 units")] {
+                let item=radiusMenu.addItem(withTitle:title,action:#selector(selectAORadius(_:)),keyEquivalent:"")
+                item.tag=value;item.target=self
+            }
+            viewMenu.addItem(withTitle:"Moving Test Light (Experimental)",action:#selector(toggleDynamicLight),keyEquivalent:"").target=self
+            viewMenu.addItem(withTitle:"Test Light Shadows",action:#selector(toggleDynamicLightShadows),keyEquivalent:"").target=self
+            let effectsItem=NSMenuItem(title:"More Metal Effects",action:nil,keyEquivalent:"")
+            let effectsMenu=NSMenu(title:"More Metal Effects");effectsItem.submenu=effectsMenu;viewMenu.addItem(effectsItem)
+            for effect in SceneEffect.allCases {
+                let item=effectsMenu.addItem(withTitle:effect.title,action:#selector(toggleSceneEffect(_:)),keyEquivalent:"")
+                item.tag=effect.rawValue;item.target=self
+            }
             let audioItem=NSMenuItem(), audioMenu=NSMenu(title:"Audio")
             audioItem.submenu=audioMenu; menu.addItem(audioItem)
             let musicItem=audioMenu.addItem(withTitle:"Music",action:#selector(toggleMusic(_:)),keyEquivalent:"m")
@@ -100,6 +123,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSApp.mainMenu = menu
             window = NSWindow(contentRect:NSRect(x:0,y:0,width:1100,height:760),styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)
             window.title = "\(appTitle) — Gameplay Preview"; window.minSize = NSSize(width:720,height:640)
+            window.tabbingMode = .disallowed
             window.isReleasedWhenClosed = false
             window.delegate = self; window.acceptsMouseMovedEvents = true
             let root = NSView(); window.contentView = root

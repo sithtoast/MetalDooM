@@ -125,3 +125,25 @@ service. No game data is required: temporary signature fixtures exercise folder
 filtering and the actual drop-destination callbacks using file-URL pasteboard
 items, plus wrong-type rejection, duplicates, reordering and the Play callback.
 This is separate from manually dragging files from Finder into the running app.
+
+### Experimental ambient occlusion
+
+On the Metal experiments branch, use **View → Ray-Traced Ambient Occlusion
+(Experimental)**. It starts off each launch. Compare the same paused scene, then
+run matching DEMO1 benchmarks with it off/on. The report records AO state. See
+[Metal experiments](METAL_EXPERIMENTS.md) for the native GPU regression, current
+sprite exclusions and timing limits. Strength and radius are separate View
+submenus. The validator does not need keyboard focus; failures should report a
+terminal error rather than creating a macOS crash dialog.
+
+**View → More Metal Effects** contains independent torch/projectile/muzzle lighting,
+gameplay shadows, emissive surfaces and bloom. Compare each at a paused viewpoint,
+then combine them with AO. Check weapon/HUD clarity, real firing, colored torches,
+resize, invisibility and fixed-colormap power-ups. The GPU regression covers these
+paths on Ultimate Doom and Doom II; see the current validation entry for results.
+
+The 0.7.0 additions are Sprite Lighting, Emissive Surface Lighting, Soft Shadows,
+and Embers & Projectile Trails. Test sprite reception with an existing light,
+surface illumination with self-emission off, shadow softness with shadows on,
+and particles with all light sources switched off. Watch large liquids, monsters
+near colored torches, moving rockets, pause/resume and map/save transitions.

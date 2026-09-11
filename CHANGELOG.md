@@ -4,6 +4,192 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.8.0 · Build 115 — Repair pre-merge checks
+
+- Fix the no-WAD input check's stale renderer dependencies by moving the unchanged
+  production GameView into its own source file and testing it independently.
+  The check no longer compiles the renderer or C engine. Remove the same unused
+  renderer dependencies from the native audio test.
+- Pass all three GitHub no-WAD checks (input, console, testing metrics), native
+  pistol/menu audio validation, and the full build. Gameplay behavior is unchanged;
+  this is build/test maintenance within the unreleased 0.8.0 refinement.
+
+## 0.8.0 · Build 114 — In-game effects presets
+
+- Add Esc → Options → Effects with descriptions for highlighted choices, an
+  independent current-preset/Custom indicator, Enter/click application and Back.
+  Expose descriptions as accessibility help; keep unavailable choices readable
+  and explain HDR display, ray capability or benchmark restrictions.
+- Rename Enhanced, Atmospheric and HDR Showcase to Medium, High and Medium HDR.
+  Preserve every preset's settings and saved custom data. Medium HDR retains
+  High's effects with restrained HDR highlights. Label ⌘⇧E Classic / Medium.
+- Preserve resolution/frame cap and paused gameplay while switching effects.
+  Keep the current-status label synchronized with manual View-menu adjustments.
+- Validate native 0.8.0 build 114 layout and keyboard/mouse behavior, classic-menu
+  tests, and the Ultimate Doom Metal suite including paused HDR/SDR transitions,
+  description/accessibility checks, Custom refresh and benchmark locking.
+
+## 0.8.0 · Build 112 — Classic/Enhanced comparison shortcut
+
+- Add Command-Shift-E and View → Toggle Classic / Enhanced. Active effects
+  switch to Classic; the next press selects Enhanced. Show a brief preset-name
+  message after successful keyboard or menu selection.
+- Preserve resolution, frame cap and saved custom setups. Ignore held-key repeat,
+  lock the shortcut during benchmarks, and keep Command shortcuts from activating
+  gameplay keys such as E/Use.
+- Reuse drawable configuration for same-format preset changes. Add paused/visible/
+  occluded state and submitted-frame counts to diagnostics.
+- Validate native build 112, installed-menu shortcut dispatch, repeated preset and
+  HDR/SDR transitions, notice text, input isolation, custom/graphics preservation,
+  benchmark locking, automatic frame delivery and the Ultimate Doom Metal suite.
+
+## 0.8.0 · Build 108 — Ludicrous effects preset
+
+- Add View → Effects Presets → Ludicrous: all effects, High ray quality, 50% AO
+  at 48 units, Atmospheric haze, 200% added light, 30% bloom, 1.5× HDR fullbright
+  world sprites and an HDR ceiling of 8× standard white. Keep the recent
+  visibility optimizations, smooth textures, steady haze and correct HDR mapping.
+- Add independent Added Light Strength, Bloom Strength and HDR Fullbright Sprite
+  Boost controls. Preserve restrained Enhanced/Showcase settings and normal HUD,
+  weapon and power-up colors. Retain every choice in saved custom presets;
+  older custom saves remain compatible.
+- Validate native build 108 on macOS 27, plus Ultimate Doom and Doom II GPU
+  regressions for preset routing, intensity changes, HDR bounds, HUD isolation,
+  resize, save/load and clean shutdown. Ludicrous intentionally costs more GPU
+  time; no new controlled FPS comparison or cause for the reported macOS
+  mediaanalysisd CPU spike is established.
+
+## 0.8.0 · Build 106 — Lower frame intervals for lighting presets
+
+- Resolve world visibility in a cheap alpha-tested depth pass before expensive
+  ray shading. Reject hidden fragments early, and let finite shadow rays stop at
+  the first valid blocker while AO retains nearest-hit distances.
+- Add View → Ray Quality: Balanced (8 AO / 4 soft-shadow / 16 haze samples) and
+  High (16 / 8 / 32). Presets select Balanced; High retains the prior sample
+  quality. Preserve smooth textures, restrained HDR, steady haze and all switches.
+- Stop rendering fully occluded/minimized windows so they do not compete for GPU
+  time. Preserve game state and resume rendering when the window becomes visible.
+- At 2200×1520 in an isolated fixed-scene GPU comparison, Enhanced improves from
+  18.84 to 6.16 ms median and Showcase from 28.77 to 9.20 ms. In the user's restored
+  viewpoint, the native HUD improves from roughly 50.5 ms / 20 FPS to 11.3 ms /
+  88 FPS. These are focused measurements, not universal frame-rate guarantees.
+- Pass Ultimate Doom/Doom II lighting, cutout, HUD, quality/custom-preset, resize,
+  save/load, shutdown and ceiling regressions. Inspect native build 106 with the
+  user's separate saved snapshot restored; previous quick saves are untouched.
+
+## 0.8.0 · Build 104 — Calmer Enhanced and Showcase presets
+
+- Reduce the grainy, over-contrasted appearance of the first HDR/effects presets.
+  Add optional Smooth World Textures with mipmaps and anisotropic filtering for
+  walls/floors/ceilings; retain exact nearest-sampled cutouts, sprites and HUD.
+- Blend added illumination in linear color space with restrained energy. Reduce
+  bloom from 30% to 12% and reserve it for brighter highlights. HDR peak is now a
+  brightness ceiling, without an extra contrast multiplier at standard white;
+  remove the blanket 1.5× HDR boost on fullbright world sprites.
+- Use 16 AO rays and eight soft-shadow samples. Enhanced selects 25%/16-unit AO,
+  soft shadows and world filtering. Atmospheric/Showcase select 25%/32-unit AO and
+  Light Haze. Volumetrics use 32 fixed midpoints instead of 12 pixel-random samples.
+- Preserve Classic, independent toggles, saved custom choices and normal HUD
+  colors. Reselect built-in presets to apply their revised settings.
+- Validate native Ultimate Doom/Doom II GPU regressions, filtered checker/alpha
+  probes, HDR highlight contrast, preset restoration and final build 104 visuals.
+  Smoother sampling costs additional GPU time; crowded-combat performance and
+  the user's exact reported viewpoint remain unverified.
+
+## 0.8.0 · Build 102 — HDR, volumetric lighting and presets
+
+- Add optional HDR/EDR output with a floating-point scene, extended highlights,
+  live display-headroom mapping and 2×/4×/8× peak controls. Preserve standard-white
+  HUD/weapon art and exact Classic restoration when HDR/effects are disabled.
+- Add independent volumetric lighting and four density choices. Existing lights
+  scatter through haze bounded by raster depth; world geometry blocks shadowed
+  sources. Use twelve samples at quarter resolution and four nearest lights.
+- Add separate graphics presets (resolution/frame cap) and effects presets:
+  Classic, Enhanced, Atmospheric and HDR Showcase. Keep individual switches and
+  save/apply one custom effects setup. Effects launch Classic; graphics settings
+  and explicitly saved custom setups persist.
+- Remove the unused macOS Show Tab Bar / Show All Tabs commands by disabling
+  automatic window tabbing. Include new effects in diagnostics and benchmark locks.
+- Validate Ultimate Doom and Doom II GPU suites, opaque-partition scattering,
+  linear EDR output and headroom limits, HUD colors, toggles, custom/graphics
+  presets, resize, save/load, map replacement, shutdown and the 48 ceiling captures.
+  Inspect version 0.8.0 build 102 with HDR Showcase in a separate native preview.
+- Haze is a bounded additive approximation; fullbright world sprites can gain HDR
+  highlights. Other displays/GPUs, physical peak luminance and sustained crowded
+  combat remain unmeasured. System brightness is unchanged.
+
+## 0.7.0 · Build 100 — Connected lighting and particles
+
+- Add separate Sprite Lighting, Emissive Surface Lighting, Soft Shadows and
+  Embers & Projectile Trails switches under View → More Metal Effects. All
+  start off and remain independent of existing AO, light and bloom controls.
+- Let monsters and pickups receive colored lights and world occlusion while
+  preserving fullbright frames, invisibility, weapons and the HUD. Sprites
+  remain billboards and do not cast shadows.
+- Light neighboring geometry from one-sided lamp, computer and liquid surface
+  patches. Subdivide large surfaces for local coverage, update moving geometry,
+  and reserve up to four patches within the shared 16-light budget.
+- Soften enabled shadows with four fixed samples. Draw up to 128 torch embers
+  and projectile sparks from authoritative game time and velocity; pause cleanly
+  and restore without extra save data. Embers rise from torch flames.
+- Pass native Ultimate Doom/Doom II GPU comparisons, analytic penumbra/emission
+  tests, real monster reception and rocket trails, independent toggles, budgets,
+  power-ups, resize, save/load, map transitions and shutdown. Preserve the 48
+  ceiling captures, level-stat tests and diagnostics; inspect native build 100.
+- Surface illumination uses bounded point approximations, soft shadows can show
+  sampling steps, and trails approximate recent motion without particle collision
+  or lingering impact smoke. Other GPUs and sustained crowded combat remain untested.
+
+## 0.6.0 · Build 96 — Independent scene effects
+
+- Add View → More Metal Effects with separate torch/lamp lighting, projectile
+  lighting, muzzle-flash lighting, gameplay light shadows, emissive surfaces and
+  bloom switches. All start off; existing AO/test-light controls stay independent.
+- Follow real actors and weapon flash timing. Colored lights illuminate world
+  surfaces with a shared 16-light budget; optional hard shadows respect walls,
+  moving doors and grille alpha. Flicker pauses with game time.
+- Make bright lamp/liquid/fire texels and colored computer-panel pixels glow.
+  Add restrained world-only LDR bloom before drawing the weapon, damage tint and
+  HUD. Preserve power-up colormaps, invisibility, stats and secret notifications.
+- Keep session choices through map/save loads, include every switch in diagnostics
+  and benchmark identity, and lock them during benchmarks. Turning effects off
+  restores classic pixels; resizing safely replaces bloom textures.
+- Pass Ultimate Doom and Doom II native GPU checks, real pistol flash/expiry,
+  individual/combined toggles, HUD isolation, resize, power-ups, save/load, map
+  changes and shutdown. Pass the existing 48 ceiling captures and level-stat
+  tests; inspect 0.6.0 build 96's native controls and combined effects on M5 Pro.
+- Lights/shadows affect world geometry; billboard sprites do not receive or cast
+  them. Material emission is selective by name/color, not indirect illumination.
+  Bloom is LDR. Other GPUs and sustained crowded-scene performance remain untested.
+
+## 0.5.0 · Build 94 — Moving light and ray-traced shadows
+
+- Add an optional amber light orbiting just ahead of the player, with a separate
+  Test Light Shadows comparison toggle. Its eight-second motion follows game
+  time and pauses with gameplay. Both lighting effects remain off at launch.
+- Cast hard shadows from world geometry and masked grille bars using finite rays
+  toward the light. Share AO's ray mesh while keeping effects independently
+  switchable; light motion and shadow toggles do not rebuild geometry.
+- Preserve sector lighting, fixed-colormap power-ups, sprites, weapon/HUD and
+  stats/secret notifications. Remember choices within a session across map/save
+  loads; include them in diagnostics and benchmark identity.
+- Validate analytic blocker/mask/falloff cases, native Doom/Doom II GPU rendering,
+  motion/pause, exact classic restoration, visible original-room shadows, moving
+  doors, save/load, map replacement and shutdown; verify native build 94 controls.
+- This is one test light. Sprite lighting/shadows, torch/projectile lights,
+  emissive surfaces and bloom are not included. GPU samples use validation and
+  readback; sustained gameplay performance and other GPUs remain untested.
+
+## 0.4.0 · Build 93 — Integrate main into Metal experiments
+
+- Rebase the AO, masked-grille and ceiling-seam work onto main commit `771625e`,
+  retaining compact time/kills/items/secrets counters, optional par time, secret
+  notifications and all existing HUD/AO controls.
+- Keep the current 0.4.0 feature release and continue above main's build 92.
+  No additional lighting effect is introduced by this integration.
+- Validate level stats/secret timing and saves, the AO/48-view ceiling GPU
+  regression, and the combined HUD/View menu in native build 93.
+
 ## 0.4.0 · Build 92 — Level stats feature release
 
 - Bump the minor version for the new compact level stats, whole-second clock,
@@ -27,6 +213,49 @@ are never included in the repository.
   maps without defined pars. Hide the overlay during title demos and endings.
 - Validate engine counts, time, saves, transitions, secret notice timing and
   Doom II par coverage; verify the HUD and controls in the running app.
+
+## 0.3.0 · Build 87 — Close ceiling seams
+
+- Fix the bright slit in E1M1's zigzag-room ceiling, visible with classic rendering
+  as well as maximum AO. Clip flats to original linedefs instead of rounded BSP
+  seg endpoints, keep precise intersections and match shared flat/wall edge vertices.
+- Add a rounded-segment geometry fixture and 24 ceiling viewpoints rendered with
+  AO disabled and at 100% strength/96-unit radius. Preserve texture alignment,
+  sector lighting, moving-door updates and existing AO controls.
+- Validate all 68 Ultimate Doom/Doom II geometry/art maps, focused GPU suites
+  and the native build 87 ceiling view. Shared edges add triangles; a sustained
+  gameplay performance comparison has not been run.
+
+## 0.3.0 · Build 86 — AO controls and transparent grilles
+
+- Add per-session View controls for AO strength (0–100%) and radius (16–96 Doom
+  units), preserving the previous 50%/48-unit defaults and classic launch mode.
+- Let grille bars and other masked world textures cast occlusion while rays
+  pass through transparent pixels. Match texture wrapping, alpha cutoff and
+  animation; avoid geometry rebuilds for control, UV-only and mask-only changes.
+- Record both controls in diagnostics and benchmark comparisons. Validate native
+  menus plus GPU alpha rays, control effects, unchanged HUD/classic restoration,
+  moving doors, map replacement and shutdown on Doom/Doom II and a grille fixture.
+- Fix validate-ao crashes from its window-focus assertion. Drive the door test
+  without keyboard focus and report test/load failures as terminal errors with
+  nonzero exits, instead of assertion crash reports or unattended modal alerts.
+
+## 0.3.0 · Build 84 — Experimental ray-traced ambient occlusion
+
+- Add View → Ray-Traced Ambient Occlusion (Experimental), off at launch, with
+  Metal capability checks and classic-rendering fallback on failure.
+- Add subtle nearby shading to world surfaces using eight rays per fragment;
+  update ray geometry for moving sectors and map/save loads. Preserve classic
+  sector lighting, power-up fullbright effects, sprite/weapon shading and HUD.
+- Omit sky, billboard sprites and transparent materials as occluders in this
+  first version; masked materials do not become solid ray blockers.
+- Include AO state in diagnostics and benchmark comparisons. Document the
+  experiment, its visual limits and GPU measurement workflow.
+- Validate actual GPU pixels, exact restoration when disabled, unchanged HUD,
+  paused stability in Doom/Doom II, a moving Ultimate Doom door, map replacement
+  and shutdown;
+  retain all 36 Ultimate Doom geometry/art regression passes. Paired build 83
+  DEMO1 runs stay near the 120 FPS cap; final build 84 hardens encoder failure.
 
 ## 0.3.0 — Next-chat handoff (app build 81 unchanged)
 

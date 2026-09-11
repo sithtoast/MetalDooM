@@ -1,44 +1,239 @@
-# MetalDooM handoff — 2026-09-10
+# MetalDooM handoff — 2026-09-11
 
 ## Where to resume
 
-The active repository is `/Users/wmh/Dev/MetalDooM`, on `main`.
+The active repository is `/Users/wmh/Dev/MetalDooM`, on `codex/metal-experiments`.
 The saved project for this conversation points to
 `/Users/wmh/Documents/ChatGPT/MetalDooM`, a separate outer repository used for
 staging. Do not commit that outer repository or copy its staging tree over newer
 source. Open the active Dev repository in the next chat and inspect its status.
 
-At handoff preparation, the active tree was clean and the latest implementation
-commit was `279ed70` (publishing helper). This document is committed afterward.
-Only local `main` existed; none of the proposed experimental branches has been
-created. Check `git log`, `git status`, and remote state before starting work.
+The active experiment is on `codex/metal-experiments`; check Git status/log before
+continuing. The user selected **ray-traced ambient occlusion**. It is implemented
+as a per-session View menu option, with classic rendering still the default.
 
-Current version: **0.4.0**, successful local app **build 92**. `Info.plist` owns
+Current version: **0.8.0**, successful local app **build 115**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
-Main now includes a small level-stats HUD (kills/items/secrets and whole-second
-clock), optional campaign par time, and independent secret notifications. Controls
-are in View and Options → HUD; preferences persist. The user requested a smaller
-HUD and found hundredths distracting, so retain the compact, whole-second display.
-See CHANGELOG.md and docs/VALIDATION.md for this change's evidence.
+This is an experimental branch, not a published release. No push was requested.
 
-## Previously discussed branch directions
+Main also supplies the compact level-stats HUD (kills/items/secrets and a whole-second
+clock), optional campaign par time and independent secret notifications. Keep its
+View and Options → HUD controls and persistent preferences.
 
-The user previously discussed starting one of the separate branch directions below.
-They have not selected which one yet. Establish that choice before implementation;
-do not combine all three or introduce a broad advanced-mode toggle first.
-Branch names below are proposals, not existing branches or requested exact names.
+The experiment branch was rebased onto main commit `771625e`. Its three original
+experiment commits were replayed; `codex/metal-experiments-before-771625e` preserves
+the old tip `1730d4c` locally. Main and remotes were not modified. Build 93 passes
+the level-stats/secret/save tests and the AO/48-view ceiling GPU suite, and its
+native window was checked with live counters/par time and AO together. The
+separate validation instance was closed afterward.
 
-| Direction | Suggested branch | Bounded first step |
-| --- | --- | --- |
-| Broader KEX add-on compatibility | `codex/kex-compatibility` | Inventory one chosen add-on's requirements and implement one supported compatibility milestone with regression coverage. |
-| Optional Metal rendering enhancements | `codex/metal-experiments` | Choose one optional effect or performance feature, keep classic presentation as the default, and compare identical scenes with the benchmark. |
-| Picker inside the main window | `codex/window-picker` | Move the picker presentation into the window while retaining its selection, load-order, cancellation and game-switch behavior. |
+## Latest maintenance — pre-merge checks (build 115)
 
-The user specifically floated an in-window picker as later UI polish, and an
-advanced/experimental direction for other WADs supplied with the KEX rerelease
-and optional Metal features. Keep compatibility changes separate from rendering
-experiments so failures can be attributed. External testing of 0.3.0 can continue
-while a focused experiment proceeds on its own branch.
+The user pushed the branch and reported GitHub's no-WAD input check failing with
+missing renderer/effects types. `test-input.sh` had a stale explicit source list.
+GameView now lives unchanged in `Sources/GameView.swift`; the input check compiles
+that view alone. `test-audio.sh` likewise compiles only its WAD/audio dependencies.
+Input, console, testing-metrics and Ultimate Doom audio checks pass locally, as
+does the full 0.8.0 build 115. GitHub must rerun against the new local fix commit;
+no hosted CI success or new push has been claimed. No gameplay/version change.
+Native build 115 loads E1M1 and opens its pause menu with Escape; the isolated
+validation preview was then closed.
+
+## In-game effects presets (build 114)
+
+Esc → Options → Effects now offers Classic, Medium, High, Medium HDR and Ludicrous
+with highlight descriptions, current preset/Custom status, Enter/click application
+and Escape back. Unavailable choices remain readable; the shared apply guard
+preserves benchmark/display/ray capability restrictions. The native shortcut is
+now labelled Classic / Medium (same ⌘⇧E). Graphics settings/custom data are preserved.
+Enhanced → Medium, Atmospheric → High and HDR Showcase → Medium HDR are label-only
+changes: Medium HDR still includes High's effects with restrained 4× HDR output.
+This remains a refinement of 0.8.0. Heretic/Hexen support was discussed, not added.
+The final Ultimate Doom Metal suite and classic-menu tests pass. Native CUA checks
+confirm build 114, readable descriptions, Enter/click application, live Custom
+status, shortcut and Back. Preview remains paused on Options in Classic.
+See `docs/VALIDATION.md` and `build/presets-114-validation/results.txt`.
+
+## Latest refinement — preset shortcut (build 112)
+
+View → Toggle Classic / Enhanced uses ⌘⇧E. Any active effects go to Classic;
+effects-off rendering goes to Enhanced, with a two-second preset notice.
+The benchmark lock, graphics scale/cap, saved custom setup and gameplay inputs
+are preserved. Holding the shortcut does not repeat expensive preset changes.
+Other manually tuned setups need explicit Save Current as Custom before toggling.
+Same-format changes reuse drawable configuration. Automation made the preview
+appear frozen, but build-111 diagnostics confirmed macOS marked it occluded; this
+was expected background frame suppression, not a proven engine stall. Keep that
+optimization. AO_LIVE=1 checks automatic frame delivery across seven transitions.
+This continues the 0.8.0 presets refinement. The user asked for pre-merge ideas;
+named custom slots and optional effects persistence were suggested, not authorized
+or implemented. No merge or push is requested.
+
+## Ludicrous (build 108)
+
+View → Effects Presets → Ludicrous restores the heavier optional choices while
+Enhanced/Atmospheric/Showcase remain restrained. It selects all twelve effects,
+High (16/8/32), AO 50%/48, Atmospheric haze, 2× added light, 30% bloom, 1.5× HDR
+fullbright world sprites and an 8× HDR ceiling. Independent View intensity controls
+and custom snapshots include every new choice; legacy custom files still decode.
+The HDR shoulder, filtering, fixed sampling and visibility optimizations remain.
+This continues the 0.8.0 HDR/presets refinement; see validation notes for evidence.
+
+The user reported high mediaanalysisd CPU after upgrading to macOS 27. Read-only
+inspection found Apple's system daemon idle at 0% CPU at that moment. No direct
+mediaanalysis invocation was made during development, but native captures and
+build/render validation did occur. The earlier spike's trigger and contribution
+to game performance are unverified; do not attribute all measured speedup to code
+or disable system daemons. The existing build-106 game was kept intact during
+build-108 validation.
+
+## Where the experiment stands
+
+Read [Metal experiments](docs/METAL_EXPERIMENTS.md). The user selected AO controls
+and correct grille handling; both are now implemented. View offers strength
+0–100% and radius 16–96 units, defaulting to 50%/48 units. AO starts disabled each
+launch, while choices persist through toggles and map changes within a session.
+
+`AmbientOcclusion.swift` uses sixteen hemisphere rays against world triangles.
+Masked hits interpolate UVs and check the current animated texture's texel alpha;
+holes let rays continue. Position/topology changes rebuild the structure, UV-only
+changes replace attributes, and mask changes replace material mappings. All
+submitted resources remain immutable. Sky and billboard sprites do not occlude.
+
+Build 86 native controls/presentation were verified. GPU checks passed on
+Ultimate Doom, Doom II and a generated MIDGRATE fixture, including analytic alpha
+rays, settings effects, classic restoration, HUD stability, moving doors, map
+replacement and shutdown.
+
+Build 87 fixes the user's bright ceiling slit in E1M1's zigzag room. It was also
+present with AO off: flats were clipped to rounded seg endpoints. Geometry now
+uses original directed linedefs, Double intersections and shared flat/wall edge
+vertices. All 68 Ultimate Doom/Doom II geometry/art checks pass. The opt-in
+`AO_CEILING=1` GPU regression covers 24 viewpoints in classic and stronger AO;
+local images and a loadable `ceiling.mdsave` go in `AO_OUTPUT`. The user's existing
+build 86 game was preserved while the fix was tested separately.
+
+The user saw validate-ao crash dialogs from the old focus assertion. The harness
+now drives the original door fixture independently of focus using a bridge added
+only to its copied Renderer source. Checks and top-level/native load errors print
+FAIL and exit nonzero; an intentional failure was verified as exit 1, not SIGTRAP.
+Do not restore the old focus precondition or modal test error path.
+
+M5 Pro capability probes report Metal 4, ray tracing in render shaders and
+MetalFX spatial/temporal/denoised upscaling and frame interpolation support.
+These optional MetalFX paths are not implemented. Other GPUs remain untested.
+The prior build 83 benchmark is historical; see validation docs for timing limits.
+
+The first moving shadow-casting light is implemented.
+View → Moving Test Light (Experimental) enables an amber camera-relative light;
+Test Light Shadows compares masked world shadows with unshadowed lighting. It is
+independent of AO, shares its pipeline/mesh, starts off, and uses the level clock
+for an eight-second orbit. Doors/grilles participate; sky and billboard sprites
+still do not cast shadows. Sprite reception is now optional (0.7.0); weapon, HUD and power-up
+fullbright rendering retain their original paths. See docs/METAL_EXPERIMENTS.md for details and boundaries.
+
+Build 94's GPU validation covers analytical falloff/blockers, finite shadow rays,
+animated masks, independent effects, paused/moving light, original-room shadows,
+shared-resource lifecycle, doors, save/load, map replacement and shutdown. Native
+View controls and the moving light were checked in a separate original-geometry
+pillar-room fixture. The subsequent 0.6.0 work adds View → More Metal Effects:
+independent torch/lamp, projectile, muzzle-flash, gameplay-shadow, emissive-surface
+and bloom switches, all off by default. Scene lights have a shared 16-source cap;
+world surfaces receive/cast light, billboard sprites do not. Emission uses known
+material families and selective color thresholds; bloom is a world-only LDR pass
+before the weapon/HUD. Those were the 0.6.0 boundaries; the additions below supersede them.
+Build 96 passes Ultimate Doom/Doom II GPU toggles, real flash/expiry, fixed-colormap
+powerups, invisibility, resize, save/load, map replacement/shutdown, the 48 ceiling
+captures, level stats and diagnostics. A separate build 96 preview remains open at
+`build/effects-preview/MetalDooM.app`, using `build/effects-preview.wad`; the generated
+fixture adds three torches to original pillar-room geometry. Native controls and
+combined torch/shadow/emission/bloom/AO were inspected. See docs/VALIDATION.md for
+performance limits and evidence. No push was requested.
+
+The approved next sequence is complete in 0.7.0 build 100: Sprite Lighting,
+Emissive Surface Lighting, Soft Shadows and Embers & Projectile Trails, all
+independently toggleable and off at launch. Sprites receive the shared lights but
+do not cast shadows. Surface lights use one-sided, subdivided 128-unit patches,
+with up to four reserved within the total 16-light budget. They always use world
+occlusion and are independent of self-emission. Soft shadows use four fixed
+samples; particles use a 128-particle cap, current velocity and level time, with
+no simulation/save history. Fullbright/fuzz/weapon/HUD paths remain separate.
+
+Final GPU results are in `build/advanced-effects-build100` (Ultimate Doom),
+`build/advanced-effects-final` (full ceiling regression, build 99) and
+`build/advanced-effects-doom2-final` (Doom II, build 99). Build 100 only refines
+ember origins relative to flame tips. Native build 100 is open in
+`build/advanced-final/MetalDooM.app` using `build/advanced-preview.wad`; the latter
+adds torches, a medikit and barrel to original E1M1 geometry. New controls,
+sprite reception/soft shadows and final ember placement were inspected. See
+`docs/VALIDATION.md` for exact coverage and performance limits. Nothing pushed.
+
+## Latest feature milestone — 0.8.0 build 102
+
+HDR/EDR display output, volumetric lighting and graphics/effects presets are now
+implemented. See docs/METAL_EXPERIMENTS.md for budgets and color management.
+HDR uses an RGBA16Float scene and linear-sRGB EDR drawable with live headroom
+mapping, standard-white HUD/weapon, and 2×/4×/8× peak choices. Volumetrics use twelve
+samples at quarter resolution, four nearest sources, world shadow rays, raster
+depth and depth-aware upsampling. It is additive lit haze with no temporal history.
+
+View has separate graphics presets (scale/cap) and effects presets (Classic,
+Enhanced, Atmospheric, HDR Showcase), plus Save Current as Custom / Apply Saved
+Custom. Effects still start Classic; custom storage is opt-in, graphics settings
+persist. Changes to individual switches remove the built-in preset checkmark.
+Automatic AppKit window tabbing is disabled globally and on the game window.
+
+Final GPU evidence lives in `build/hdr-volume-final` and
+`build/hdr-volume-doom2`. Native HDR preview: `build/hdr-final/MetalDooM.app`, using
+`build/advanced-preview.wad`; generated fixtures remain private and ignored.
+Screenshots cannot prove physical HDR luminance. Test float readback measured
+headroom and enforces it; no system brightness changes or pushes were requested.
+
+## Latest refinement — grain and unnatural brightness, build 104
+
+The user reported Enhanced and Showcase looked grainy/unnatural. Enhanced is SDR,
+so HDR was not the sole contributor. Both presets now enable optional Smooth
+World Textures (trilinear mipmaps, 4× anisotropy, nearest binary alpha, crisp
+sprites/sky/weapon/HUD). Direct lights add restrained linear-space energy;
+bloom is reduced to 12%, and HDR removes the near-white contrast multiplier and
+blanket fullbright-sprite boost. AO uses 16 rays at gentler preset strengths,
+soft shadows use eight samples, fog uses 32 fixed midpoints and Light Haze in
+Atmospheric/Showcase. Custom saves keep previous settings; reselect a built-in.
+
+GPU evidence: `build/preset-polish` (Ultimate Doom), `build/preset-polish-doom2`
+(including minification/alpha and HDR contrast probes), `build/preset-polish-final`
+(final Ultimate Doom/ceiling run). Native build 104 Enhanced and HDR Showcase were
+compared with build 102 in the same torch fixture. The old comparison preview was
+closed; `build/polish-preview/MetalDooM.app` is left open with the revised Showcase.
+The user's exact viewpoint was not supplied. The smoother sampling costs more GPU
+time; avoid claiming a sustained FPS improvement. Still on release version 0.8.0.
+
+## Latest performance fix — build 106
+
+The user's build 104 window showed ~50.45 ms / 19.82 FPS at 2200×1520. Preserve
+that game: a separate snapshot was saved through File → Save Game to
+`build/frame-interval-build104.mdsave` (advanced-preview.wad stack). It was loaded
+into build 106, with Showcase/Balanced and the Metal HUD enabled. That restored
+view showed ~11.31 ms / 88.40 FPS. Only the new app remains running, at
+`build/performance-preview/MetalDooM.app`; the old process was resumed after each
+profiling suspension, then closed only after its snapshot was verified saved.
+Quick saves were not touched.
+
+Changes: world alpha/depth visibility pass before equal-depth early-tested ray
+shading; first-valid-blocker shadow queries; Balanced/High sample budgets
+(8/4/16 versus 16/8/32 for AO/soft shadows/haze); skip GPU work for fully occluded
+or minimized windows. Presets other than Ludicrous use Balanced. Shader tests, legacy custom decoding,
+quality restoration/mesh reuse and minimized-window suppression pass. Manual GPU
+harness drawing still bypasses visibility gating, preserving focus independence.
+
+Isolated profiles at 2200×1520: archived build-104 source `a442f0e`,
+`build/perf-isolated-build104` (Enhanced 18.844, Showcase 28.766 ms median);
+new `build/perf-isolated-balanced` (6.156 / 9.198 ms; High Showcase 16.603 ms).
+The old game process was suspended with an EXIT/INT/TERM resume trap during these
+comparisons. Earlier uncontended-looking results were actually polluted by its
+background rendering and should not be quoted. Final GPU regressions:
+`build/performance-final` (Ultimate + ceiling), `build/performance-doom2`.
+No pushes requested; release stays 0.8.0 as a refinement of the experiment.
 
 ## Current behavior and important boundaries
 
@@ -160,8 +355,6 @@ without a new request. No credentials belong in source or this document.
 Read [AGENTS.md](AGENTS.md): validate each implementation, update the changelog
 with the actual successful app build, and make a local commit before replying.
 No push unless requested; do not infer permission from release bookkeeping.
-Bump the semantic version for delivered user-visible changes: minor for new
-features, patch for fixes. Build numbers alone do not satisfy this requirement.
-Keep intermediate builds/refinements within the same feature release on its
-chosen version; documentation-only changes need no bump. `Info.plist` is the source
-of truth. Synchronize current release docs and retain historical changelog entries. Keep WADs, app bundles, signing material and generated artifacts out of Git.
+Do not bump the semantic version for every build. Fixes can be patches; a coherent
+new feature milestone can justify a minor version. Leave prior changelog entries
+intact. Keep WADs, app bundles, signing material and generated artifacts out of Git.

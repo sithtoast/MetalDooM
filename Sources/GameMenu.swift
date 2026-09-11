@@ -157,11 +157,43 @@ final class GameMenu: NSView {
     }
     private func options() {
         canvas("Options",art:[("M_OPTTTL",108,15)],items:[
-            .init(title:"Sound Volume",patch:"",x:60,y:64,action:{ [weak self] in self?.audioOptions() },textScale:2),
-            .init(title:"Display",patch:"",x:60,y:96,action:{ [weak self] in self?.displayOptions() },textScale:2),
-            .init(title:"HUD",patch:"",x:60,y:128,action:{ [weak self] in self?.hudOptions() },textScale:2),
+            .init(title:"Sound Volume",patch:"",x:60,y:52,action:{ [weak self] in self?.audioOptions() },textScale:2),
+            .init(title:"Display",patch:"",x:60,y:78,action:{ [weak self] in self?.displayOptions() },textScale:2),
+            .init(title:"Effects",patch:"",x:60,y:104,action:{ [weak self] in self?.effectsOptions() },textScale:2),
+            .init(title:"HUD",patch:"",x:60,y:130,action:{ [weak self] in self?.hudOptions() },textScale:2),
             .init(title:"Back",patch:"",x:60,y:156,action:{ [weak self] in self?.main() },textScale:2)
         ],labels:[("ENTER SELECT   ESC BACK",48,180)],back:{ [weak self] in self?.main() })
+    }
+    private func effectsOptions() {
+        let current=EffectsPreset(renderer:app.renderer)
+        var rows=EffectsPreset.names.enumerated().map { index,name in
+            ClassicMenuCanvas.Item(title:name,patch:"",x:48,y:44+CGFloat(index)*16,action:{ [weak self] in
+                self?.app.applyEffectsPreset(EffectsPreset.builtins[index])
+            },value:{ [weak self] in
+                guard let self else { return "" }
+                if self.app.effectsPresetUnavailableReason(EffectsPreset.builtins[index]) != nil { return "UNAVAILABLE" }
+                return EffectsPreset(renderer:self.app.renderer)==EffectsPreset.builtins[index] ? "ACTIVE":""
+            },help:EffectsPreset.descriptions[index].joined(separator:" "))
+        }
+        // Unavailable presets remain focusable so their requirements can be read.
+        // The shared application action guards both native and in-game selections.
+        rows.append(.init(title:"Back",patch:"",x:48,y:128,action:{ [weak self] in self?.options() }))
+        canvas("Effects",art:[],items:rows,selected:EffectsPreset.builtins.firstIndex(of:current) ?? 0,back:{ [weak self] in self?.options() })
+        classic?.onSelectionChanged={ [weak self] _ in self?.refreshEffects() }
+        classic?.onRefresh={ [weak self] in self?.refreshEffects() }
+        refreshEffects()
+    }
+    func refreshEffects() {
+        guard page=="Effects", let classic else { return }
+        var lines=["Choose a preset, then press Enter.", "Resolution and frame cap stay set.", "Changes last for this session."]
+        if EffectsPreset.builtins.indices.contains(classic.selected) {
+            lines=EffectsPreset.descriptions[classic.selected]
+            if let reason=app.effectsPresetUnavailableReason(EffectsPreset.builtins[classic.selected]) { lines[2]=reason }
+        }
+        classic.labels=[("EFFECTS",112,8),("CURRENT: \(app.effectsPresetName)",48,24)]
+            + lines.enumerated().map { ($0.element,CGFloat(32),CGFloat(150+$0.offset*12)) }
+        classic.footer="ENTER APPLY   ESC BACK   CMD-SHIFT-E CLASSIC / MEDIUM"
+        classic.needsDisplay=true
     }
     private func hudOptions() {
         canvas("HUD",art:[("M_OPTTTL",108,15)],items:[

@@ -14,9 +14,28 @@ extension App {
 
     @objc func selectOPL(_ sender:NSMenuItem) { UserDefaults.standard.set("opl",forKey:"musicBackend");sessionLog.append("Music backend: Classic OPL") }
     @objc func selectAppleMIDI(_ sender:NSMenuItem) { UserDefaults.standard.set("apple",forKey:"musicBackend");sessionLog.append("Music backend: Apple MIDI") }
+    @objc func selectAOStrength(_ sender: NSMenuItem) { renderer.setAOSettings(strength:Float(sender.tag)/100) }
+    @objc func selectAORadius(_ sender: NSMenuItem) { renderer.setAOSettings(radius:Float(sender.tag)) }
+    @objc func toggleAmbientOcclusion() {
+        do {
+            try renderer.setAmbientOcclusion(!renderer.ambientOcclusionEnabled)
+            sessionLog.append("Ray-traced ambient occlusion: \(renderer.ambientOcclusionEnabled ? "On" : "Off")")
+        } catch { show(error) }
+    }
     @objc func toggleMetalHUD() {
         metalHUDEnabled.toggle()
         configureMetalHUD()
+    }
+
+    @objc func toggleDynamicLight() {
+        do {
+            try renderer.setDynamicLight(!renderer.dynamicLightEnabled)
+            sessionLog.append("Moving test light: \(renderer.dynamicLightEnabled ? "On":"Off")")
+        } catch { show(error) }
+    }
+    @objc func toggleDynamicLightShadows() {
+        renderer.setDynamicLightShadows(!renderer.dynamicLightShadows)
+        sessionLog.append("Test light shadows: \(renderer.dynamicLightShadows ? "On":"Off")")
     }
 
     @objc func copyDiagnosticReport() {
@@ -58,10 +77,29 @@ extension App {
         Render scale: \(Int(view.renderScale * 100))%
         Display backing scale: \(window.backingScaleFactor)
         Display maximum refresh: \(window.screen?.maximumFramesPerSecond ?? 0) Hz
+        Effects preset: \(effectsPresetName)
+        HDR output: \(renderer.hdrEnabled ? "On (RGBA16Float, linear sRGB EDR)":"Off")
+        HDR peak request: \(renderer.hdrPeak)x standard white
+        Display EDR headroom: current \(window.screen?.maximumExtendedDynamicRangeColorComponentValue ?? 1)x, potential \(window.screen?.maximumPotentialExtendedDynamicRangeColorComponentValue ?? 1)x
+        Added light strength: \(renderer.lightGain)x; bloom strength: \(renderer.bloomStrength); HDR fullbright sprite boost: \(renderer.hdrSpriteBoost)
+        Volumetric density: \(renderer.fogDensity); quarter resolution, \(renderer.highRayQuality ? 32:16) steps, 4 nearest lights
         Fullscreen: \(window.styleMask.contains(.fullScreen))
         Frame limit: \(view.preferredFramesPerSecond) FPS
+        View paused: \(view.isPaused); window visible: \(window.isVisible); unoccluded: \(window.occlusionState.contains(.visible)); submitted frames: \(renderer.renderedFrames)
         Recent renderer FPS: \(fps) (not a benchmark)
         Music backend: \(MusicPlayer.preferredBackend == "opl" ? "Classic OPL" : "Apple MIDI")
+        Ray-traced AO: \(renderer.ambientOcclusionEnabled ? "On (alpha-tested world)" : "Off")
+        AO strength: \(Int(renderer.aoSettings.strength*100))%
+        AO radius: \(Int(renderer.aoSettings.radius)) Doom units
+        Moving test light: \(renderer.dynamicLightEnabled ? "On (amber, radius 256, intensity 2, 8-second orbit)":"Off")
+        Additional effects: \(SceneEffect.allCases.map { "\($0.title)=\(renderer.sceneEffects.contains($0) ? "On":"Off")" }.joined(separator:", "))
+        World light budget: 16 total, up to 4 emissive patches; sprite reception optional; world-only shadow casters
+        Ray quality: \(renderer.highRayQuality ? "High (16 AO, 8 shadows, 32 haze)":"Balanced (8 AO, 4 shadows, 16 haze)")
+        Soft shadows: \(renderer.highRayQuality ? 8:4) fixed samples when selected; particles: maximum 128
+        Test light shadows: \(renderer.dynamicLightShadows ? "On (alpha-tested world)":"Off")
+        Shared ray occluder triangles: \(renderer.ambientOcclusion?.triangleCount ?? 0)
+        Ray tracing in render shaders: \(renderer.ambientOcclusionSupported)
+        Recent GPU command duration: \(String(format:"%.3f",renderer.recentGPUTime*1000)) ms (not a benchmark)
         Metal HUD: \(metalHUDEnabled ? "On" : "Off")
         Campaign: \(wad?.gameName ?? "No WAD loaded")
         Base WAD edition: \(wad == nil ? "No WAD loaded" : (wad!.isKEXEdition ? "KEX Edition" : "Not identified as KEX"))
@@ -74,5 +112,15 @@ extension App {
 
         Add reproduction steps, expected/actual behavior and a screenshot if useful.
         """
+    }
+}
+
+extension App {
+    @objc func toggleSceneEffect(_ sender:NSMenuItem) {
+        guard let effect=SceneEffect(rawValue:sender.tag) else { return }
+        do {
+            try renderer.setSceneEffect(effect,enabled:!renderer.sceneEffects.contains(effect))
+            sessionLog.append("\(effect.title): \(renderer.sceneEffects.contains(effect) ? "On":"Off")")
+        } catch { show(error) }
     }
 }
