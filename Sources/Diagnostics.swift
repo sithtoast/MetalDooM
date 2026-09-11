@@ -81,6 +81,7 @@ extension App {
         HDR output: \(renderer.hdrEnabled ? "On (RGBA16Float, linear sRGB EDR)":"Off")
         HDR peak request: \(renderer.hdrPeak)x standard white
         Display EDR headroom: current \(window.screen?.maximumExtendedDynamicRangeColorComponentValue ?? 1)x, potential \(window.screen?.maximumPotentialExtendedDynamicRangeColorComponentValue ?? 1)x
+        Added light strength: \(renderer.lightGain)x; bloom strength: \(renderer.bloomStrength); HDR fullbright sprite boost: \(renderer.hdrSpriteBoost)
         Volumetric density: \(renderer.fogDensity); quarter resolution, \(renderer.highRayQuality ? 32:16) steps, 4 nearest lights
         Fullscreen: \(window.styleMask.contains(.fullScreen))
         Frame limit: \(view.preferredFramesPerSecond) FPS

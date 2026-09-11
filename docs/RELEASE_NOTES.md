@@ -15,8 +15,14 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.8.0
 
+Build 108 adds **Ludicrous**, an opt-in preset with High ray quality, stronger AO,
+Atmospheric haze, brighter lights, heavier bloom, boosted fullbright world sprites and
+an 8× HDR ceiling. Light strength, bloom strength and sprite boost have independent
+controls. Existing presets stay restrained; all modes retain the recent visibility
+optimizations and correct HDR tone mapping.
+
 Build 106 adds visibility-first ray shading, early-exit shadow rays and separate
-Balanced/High ray quality. Presets use Balanced to reduce frame intervals;
+Balanced/High ray quality. Presets other than Ludicrous use Balanced to reduce frame intervals;
 minimized/covered windows stop submitting GPU work.
 
 Build 104 refines Enhanced and Showcase: optional smooth world textures reduce
@@ -33,7 +39,7 @@ reselect a built-in preset to adopt its new settings.
   sources scatter light through the room, with world shadows and depth-aware
   edges. No sources means no haze glow; weapons and HUD are drawn afterward.
 - Add separate graphics and effects presets. Choose Classic, Enhanced,
-  Atmospheric or HDR Showcase, keep individual controls, and save/apply a
+  Atmospheric, HDR Showcase or Ludicrous, keep individual controls, and save/apply a
   custom effects setup. Classic effects still start each launch.
 - Remove macOS automatic window tab commands, which had no game function.
 

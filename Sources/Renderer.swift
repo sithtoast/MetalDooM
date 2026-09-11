@@ -81,6 +81,12 @@ final class Renderer: NSObject, MTKViewDelegate {
     func setHighRayQuality(_ enabled:Bool) { highRayQuality=enabled }
     private var hdrOutput: HDROutput?
     var hdrEnabled: Bool { hdrOutput != nil }
+    private(set) var lightGain: Float = 1
+    private(set) var bloomStrength: Float = 0.12
+    private(set) var hdrSpriteBoost=false
+    func setLightGain(_ value:Float) { lightGain=value.isFinite ? min(2,max(0,value)):1 }
+    func setBloomStrength(_ value:Float) { bloomStrength=value.isFinite ? min(0.3,max(0,value)):0.12 }
+    func setHDRSpriteBoost(_ enabled:Bool) { hdrSpriteBoost=enabled }
     private(set) var hdrPeak: Float = 4
     private(set) var fogDensity: Float = 0.003
     func setHDRPeak(_ value: Float) { hdrPeak=value.isFinite ? min(8,max(1,value)):4 }
@@ -108,6 +114,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         highRayQuality=preset.highRayQuality == true
         sceneEffects=switches;setAOSettings(strength:preset.strength,radius:preset.radius)
         setFogDensity(preset.density);setHDRPeak(preset.peak)
+        setLightGain(preset.lightGain ?? 1);setBloomStrength(preset.bloomStrength ?? 0.12)
+        setHDRSpriteBoost(preset.hdrSpriteBoost == true)
         worldFormat=format;aoGeometryDirty=true;sceneSnapshot=nil
         view.releaseDrawables();view.colorPixelFormat=format
         view.colorspace=preset.hdr ? CGColorSpace(name:CGColorSpace.extendedLinearSRGB):nil
@@ -214,7 +222,10 @@ final class Renderer: NSObject, MTKViewDelegate {
         if sceneEffects.contains(.softShadows) {
             for i in lights.indices { lights[i].options.y=lights[i].facing == .zero ? 6:12 }
         }
-        for i in lights.indices { lights[i].options.z=highRayQuality ? 8:4 }
+        for i in lights.indices {
+            lights[i].options.z=highRayQuality ? 8:4
+            lights[i].colorIntensity.w *= lightGain
+        }
         // Keep decoration emitters inside their actual sector, including low ceilings.
         if let map {
             for i in lights.indices {
@@ -395,7 +406,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::nearest);
             float4 c = tex.sample(s,in.uv / float2(tex.get_width(),tex.get_height()));
             if (c.a < 0.5) discard_fragment();
-            float shade = (in.fullbright > 0.5 || power.x>0 || power.y>0) ? 1.0 : in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
+            float shade = (power.x>0 || power.y>0) ? 1.0 : in.fullbright>0.5 ? max(1.0,in.fullbright) : in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
             return float4(powerColor(c.rgb*shade,power),1.0);
         }
         fragment float4 fuzzFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]],
@@ -764,7 +775,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             if let sprites, engineReady {
                 encoder.setRenderPipelineState(sceneEffects.contains(.spriteLighting) && ambientOcclusion?.structure != nil
                     ? ambientOcclusion!.spritePipeline:spritePipeline)
-                do { try sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw) }
+                do { try sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw,fullbrightGain:hdrEnabled && hdrSpriteBoost ? 1.5:1) }
                 catch { engineReady = false; DispatchQueue.main.async { [weak self] in self?.onError?(error) } }
                 if sprites.hasFuzz || hud.invisibility>128 || (hud.invisibility&8) != 0 {
                     if sceneSnapshot?.width != Int(width) || sceneSnapshot?.height != Int(height) {
@@ -824,7 +835,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                     guard let resumed=command.makeRenderCommandEncoder(descriptor:pass) else { command.commit();return }
                     encoder=resumed;encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:worldHeight,znear:0,zfar:1))
                     encoder.setCullMode(.none);encoder.setFrontFacing(.counterClockwise)
-                    if ready { bloom.draw(encoder:encoder,width:width,height:worldHeight) }
+                    if ready { bloom.draw(encoder:encoder,width:width,height:worldHeight,strength:bloomStrength) }
                     encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
                 }
                 // Weapons and HUD stay at standard white in HDR.

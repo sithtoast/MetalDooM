@@ -168,7 +168,7 @@ final class AmbientOcclusion {
         float4 c=tex.sample(s,in.uv/float2(tex.get_width(),tex.get_height()));
         if (c.a<0.5) discard_fragment();
         bool fullbright=in.fullbright>0.5 || power.x>0 || power.y>0;
-        float shade=fullbright ? 1.0:in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
+        float shade=(power.x>0 || power.y>0) ? 1.0 : in.fullbright>0.5 ? max(1.0,in.fullbright) : in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
         float3 illumination=float3(shade);
         if (!fullbright) for (uint i=0;i<min(lightCount,16u);i++) {
             float3 delta=lights[i].positionRadius.xyz-in.world;

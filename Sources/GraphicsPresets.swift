@@ -5,18 +5,26 @@ struct EffectsPreset: Codable, Equatable {
     var effects: Set<Int> = []
     // Optional for backward-compatible decoding of saved build-104 custom presets.
     var highRayQuality: Bool? = nil
+    var lightGain: Float? = nil, bloomStrength: Float? = nil
+    var hdrSpriteBoost: Bool? = nil
     var ao=false, testLight=false, testShadows=true, hdr=false
     var strength: Float=0.5, radius: Float=48, density: Float=0.003, peak: Float=4
     var switches: Set<SceneEffect> { Set(effects.compactMap(SceneEffect.init(rawValue:))) }
-    static let names=["Classic", "Enhanced", "Atmospheric", "HDR Showcase"]
+    static let names=["Classic", "Enhanced", "Atmospheric", "HDR Showcase", "Ludicrous"]
     static let builtins: [Self] = {
         let enhanced: Set<SceneEffect>=[.torches,.projectiles,.muzzleFlash,.shadows,.emissive,.bloom,.spriteLighting,.softShadows,.textureFiltering]
+        var ludicrous=Self(effects:Set(SceneEffect.allCases.map(\.rawValue)),ao:true,hdr:true,strength:0.5,radius:48,density:0.003)
+        ludicrous.highRayQuality=true;ludicrous.peak=8
+        ludicrous.lightGain=2;ludicrous.bloomStrength=0.3;ludicrous.hdrSpriteBoost=true
         return [Self(),Self(effects:Set(enhanced.map(\.rawValue)),ao:true,strength:0.25,radius:16),
                 Self(effects:Set(SceneEffect.allCases.map(\.rawValue)),ao:true,strength:0.25,radius:32,density:0.001),
-                Self(effects:Set(SceneEffect.allCases.map(\.rawValue)),ao:true,hdr:true,strength:0.25,radius:32,density:0.001)]
+                Self(effects:Set(SceneEffect.allCases.map(\.rawValue)),ao:true,hdr:true,strength:0.25,radius:32,density:0.001),ludicrous]
     }()
     init(renderer:Renderer) {
         highRayQuality=renderer.highRayQuality ? true:nil
+        lightGain=renderer.lightGain == 1 ? nil:renderer.lightGain
+        bloomStrength=renderer.bloomStrength == 0.12 ? nil:renderer.bloomStrength
+        hdrSpriteBoost=renderer.hdrSpriteBoost ? true:nil
         effects=Set(renderer.sceneEffects.map(\.rawValue));ao=renderer.ambientOcclusionEnabled
         testLight=renderer.dynamicLightEnabled;testShadows=renderer.dynamicLightShadows;hdr=renderer.hdrEnabled
         strength=renderer.aoSettings.strength;radius=renderer.aoSettings.radius
@@ -57,8 +65,17 @@ extension App {
         }
         effects.addItem(.separator())
         effects.addItem(withTitle:"Save Current as Custom",action:#selector(saveEffectsPreset),keyEquivalent:"").target=self
-        let custom=effects.addItem(withTitle:"Apply Saved Custom",action:#selector(selectEffectsPreset(_:)),keyEquivalent:"");custom.tag=4;custom.target=self
+        let custom=effects.addItem(withTitle:"Apply Saved Custom",action:#selector(selectEffectsPreset(_:)),keyEquivalent:"");custom.tag = -1;custom.target=self
         menu.addItem(withTitle:"HDR Display Output",action:#selector(toggleHDR),keyEquivalent:"").target=self
+        menu.addItem(withTitle:"HDR Fullbright Sprite Boost",action:#selector(toggleHDRSpriteBoost),keyEquivalent:"").target=self
+        let lights=submenu("Added Light Strength")
+        for n in [50,100,200] {
+            let item=lights.addItem(withTitle:"\(n)%",action:#selector(selectLightGain(_:)),keyEquivalent:"");item.tag=n;item.target=self
+        }
+        let bloom=submenu("Bloom Strength")
+        for n in [6,12,30] {
+            let item=bloom.addItem(withTitle:"\(n)%",action:#selector(selectBloomStrength(_:)),keyEquivalent:"");item.tag=n;item.target=self
+        }
         let peak=submenu("HDR Highlight Peak")
         for n in [2,4,8] {
             let item=peak.addItem(withTitle:"Up to \(n)× Standard White",action:#selector(selectHDRPeak(_:)),keyEquivalent:"");item.tag=n;item.target=self
@@ -89,6 +106,9 @@ extension App {
     @objc func toggleHDR() {
         do { try renderer.setHDR(!renderer.hdrEnabled,view:view) } catch { show(error) }
     }
+    @objc func toggleHDRSpriteBoost() { renderer.setHDRSpriteBoost(!renderer.hdrSpriteBoost) }
+    @objc func selectLightGain(_ sender:NSMenuItem) { renderer.setLightGain(Float(sender.tag)/100) }
+    @objc func selectBloomStrength(_ sender:NSMenuItem) { renderer.setBloomStrength(Float(sender.tag)/100) }
     @objc func selectRayQuality(_ sender:NSMenuItem) { renderer.setHighRayQuality(sender.tag==1) }
     @objc func selectHDRPeak(_ sender:NSMenuItem) { renderer.setHDRPeak(Float(sender.tag)) }
     @objc func selectFogDensity(_ sender:NSMenuItem) { renderer.setFogDensity(Float(sender.tag)/1000) }

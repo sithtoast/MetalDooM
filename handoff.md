@@ -12,7 +12,7 @@ The active experiment is on `codex/metal-experiments`; check Git status/log befo
 continuing. The user selected **ray-traced ambient occlusion**. It is implemented
 as a per-session View menu option, with classic rendering still the default.
 
-Current version: **0.8.0**, successful local app **build 106**. `Info.plist` owns
+Current version: **0.8.0**, successful local app **build 108**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
 This is an experimental branch, not a published release. No push was requested.
 
@@ -26,6 +26,24 @@ the old tip `1730d4c` locally. Main and remotes were not modified. Build 93 pass
 the level-stats/secret/save tests and the AO/48-view ceiling GPU suite, and its
 native window was checked with live counters/par time and AO together. The
 separate validation instance was closed afterward.
+
+## Latest refinement — Ludicrous (build 108)
+
+View → Effects Presets → Ludicrous restores the heavier optional choices while
+Enhanced/Atmospheric/Showcase remain restrained. It selects all twelve effects,
+High (16/8/32), AO 50%/48, Atmospheric haze, 2× added light, 30% bloom, 1.5× HDR
+fullbright world sprites and an 8× HDR ceiling. Independent View intensity controls
+and custom snapshots include every new choice; legacy custom files still decode.
+The HDR shoulder, filtering, fixed sampling and visibility optimizations remain.
+This continues the 0.8.0 HDR/presets refinement; see validation notes for evidence.
+
+The user reported high mediaanalysisd CPU after upgrading to macOS 27. Read-only
+inspection found Apple's system daemon idle at 0% CPU at that moment. No direct
+mediaanalysis invocation was made during development, but native captures and
+build/render validation did occur. The earlier spike's trigger and contribution
+to game performance are unverified; do not attribute all measured speedup to code
+or disable system daemons. The existing build-106 game was kept intact during
+build-108 validation.
 
 ## Where the experiment stands
 
@@ -49,7 +67,7 @@ Build 87 fixes the user's bright ceiling slit in E1M1's zigzag room. It was also
 present with AO off: flats were clipped to rounded seg endpoints. Geometry now
 uses original directed linedefs, Double intersections and shared flat/wall edge
 vertices. All 68 Ultimate Doom/Doom II geometry/art checks pass. The opt-in
-`AO_CEILING=1` GPU regression covers 24 viewpoints in classic and maximum AO;
+`AO_CEILING=1` GPU regression covers 24 viewpoints in classic and stronger AO;
 local images and a loadable `ceiling.mdsave` go in `AO_OUTPUT`. The user's existing
 build 86 game was preserved while the fix was tested separately.
 
@@ -162,7 +180,7 @@ Quick saves were not touched.
 Changes: world alpha/depth visibility pass before equal-depth early-tested ray
 shading; first-valid-blocker shadow queries; Balanced/High sample budgets
 (8/4/16 versus 16/8/32 for AO/soft shadows/haze); skip GPU work for fully occluded
-or minimized windows. Presets use Balanced. Shader tests, legacy custom decoding,
+or minimized windows. Presets other than Ludicrous use Balanced. Shader tests, legacy custom decoding,
 quality restoration/mesh reuse and minimized-window suppression pass. Manual GPU
 harness drawing still bypasses visibility gating, preserving focus independence.
 

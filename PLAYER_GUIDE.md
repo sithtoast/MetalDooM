@@ -351,9 +351,24 @@ Reselect the preset after updating; previously saved custom choices are preserve
 Turn off **Smooth World Textures** if you prefer the original blocky world texels.
 
 
-For lower frame intervals, use **View → Ray Quality → Balanced** (the preset
-and launch default). **High** doubles AO, soft-shadow and haze sampling for
+For lower frame intervals, use **View → Ray Quality → Balanced** (the launch default and the choice in
+all presets except Ludicrous). **High** doubles AO, soft-shadow and haze sampling for
 additional refinement at a higher GPU cost. Both retain smooth world textures
 and steady haze. This setting is included when saving a custom effects preset;
 older custom presets load with Balanced quality. Minimized or fully covered
 windows stop rendering until visible again.
+
+
+**View → Effects Presets → Ludicrous** restores an intentionally exaggerated
+setup: all twelve effects, High ray quality (16 AO / 8 soft-shadow / 32 haze
+samples), 50% AO at 48 units, Atmospheric haze, 200% added-light strength, 30% bloom,
+1.5× fullbright world-sprite boost and an HDR ceiling of 8× standard white.
+Expect a higher GPU cost than Showcase; it keeps your resolution and frame cap.
+The actual highlight brightness still follows the display's live HDR headroom.
+
+**Added Light Strength**, **Bloom Strength** and **HDR Fullbright Sprite Boost**
+are separate View controls. The sprite boost only operates in HDR and leaves
+weapon/HUD artwork and fixed-colormap power-ups at their normal brightness.
+The existing effect switches still work independently. Select Showcase to return
+to restrained settings, or Save Current as Custom to keep your own combination.
+Ludicrous keeps smooth textures, steady sampling and the visibility optimizations.

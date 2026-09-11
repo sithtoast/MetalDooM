@@ -3,6 +3,34 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.8.0, build 108 — Ludicrous and independent intensity controls
+
+- `scripts/build.sh` succeeds at build 108; native title confirms **0.8.0
+  (build 108)** on macOS 27.0 (26A428). Bundle signature and Info.plist checks pass.
+- Native View menu exposes Ludicrous and independent light/bloom/HDR sprite
+  controls. Inspect the final preset in the generated E1M1 lighting fixture.
+  Stronger light and atmospheric haze remain visible, with room geometry readable
+  and ordinary HUD/weapon artwork. An initial maximum-fog draft was visually
+  excessive; the final preset uses the prior 0.003 Atmospheric density.
+- Ultimate Doom (`build/ludicrous-final/results.txt`) and Doom II MAP01
+  (`build/ludicrous-doom2/results.txt`) pass the native Metal API validation suite.
+  New checks cover actual Ludicrous and Saved Custom menu routing, preset values,
+  independent light/bloom/sprite pixel changes, gain sanitization, exact HUD
+  preservation, Showcase reset, legacy decoding and custom intensity restoration.
+- Existing checks retain alpha-tested shadow rays, deterministic AO/soft shadows,
+  texture minification, one-sided emission, volumetric blockers, fixed-colormap
+  handling, HDR transfer/headroom bounds, resize, save/load, map replacement and
+  clean resource shutdown. New stable-image comparisons hold the HDR ceiling at
+  1× because macOS changes live headroom between frames; fixed synthetic tests
+  separately verify the 1×/2×/4×/8× transfer limits. Live Ludicrous stays finite and
+  within its 8× configured cap. Screenshots cannot verify physical HDR luminance.
+- Existing build-106 user game remains intact; build 108 is a separate preview.
+  No new isolated performance comparison was run. The user's reported earlier
+  mediaanalysisd spike was not reproduced: read-only process inspection found
+  Apple's MediaAnalysis daemon at 0% CPU. Its earlier trigger and performance
+  contribution remain unknown. Background load may affect prior native timing
+  comparisons; do not interpret them as an OS-load-controlled attribution.
+
 ## 0.8.0, build 106 — Frame interval and ray-work reduction
 
 - Native build 104 at the user's actual viewpoint showed 2200×1520, 19.82 FPS and

@@ -56,11 +56,11 @@ final class Bloom {
         try compute(blur,a,b,SIMD2(1,0))
         try compute(blur,b,a,SIMD2(0,1))
     }
-    func draw(encoder:MTLRenderCommandEncoder,width:Double,height:Double) {
+    func draw(encoder:MTLRenderCommandEncoder,width:Double,height:Double,strength:Float=0.12) {
         guard let a else { return }
         encoder.setRenderPipelineState(composite);encoder.setDepthStencilState(depth)
         encoder.setFragmentTexture(a,index:0)
-        var size=SIMD2(Float(width),Float(height));encoder.setFragmentBytes(&size,length:8,index:0)
+        var size=SIMD4(Float(width),Float(height),strength,0);encoder.setFragmentBytes(&size,length:16,index:0)
         encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:3)
     }
     static let shader="""
@@ -93,9 +93,9 @@ final class Bloom {
     vertex float4 bloomVertex(uint id [[vertex_id]]) {
         float2 p=float2((id<<1)&2,id&2);return float4(p*2-1,0,1);
     }
-    fragment float4 bloomFragment(float4 position [[position]],texture2d<float> glow [[texture(0)]],constant float2 &size [[buffer(0)]]) {
+    fragment float4 bloomFragment(float4 position [[position]],texture2d<float> glow [[texture(0)]],constant float4 &size [[buffer(0)]]) {
         constexpr sampler s(coord::normalized,address::clamp_to_edge,filter::linear);
-        return float4(glow.sample(s,position.xy/size).rgb*0.12,0);
+        return float4(glow.sample(s,position.xy/size.xy).rgb*size.z,0);
     }
     """
 }

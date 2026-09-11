@@ -49,7 +49,7 @@ final class SpriteRenderer {
         return GPUPatch(texture:texture,width:Float(image.width),height:Float(image.height),left:Float(patch.left),top:Float(patch.top))
     }
     var hasFuzz: Bool { things.contains { $0.shadow != 0 } }
-    func drawWorld(encoder: MTLRenderCommandEncoder, camera: SIMD2<Float>, yaw: Float, fuzz: Bool=false) throws {
+    func drawWorld(encoder: MTLRenderCommandEncoder, camera: SIMD2<Float>, yaw: Float, fuzz: Bool=false, fullbrightGain: Float=1) throws {
         let count = Int(MD_CopyThings(nil,0,camera.x,camera.y))
         if things.count != count { things = [MD_Thing](repeating:MD_Thing(),count:count) }
         if count > 0 { _ = things.withUnsafeMutableBufferPointer { MD_CopyThings($0.baseAddress,Int32(count),camera.x,camera.y) } }
@@ -65,7 +65,7 @@ final class SpriteRenderer {
             let a = left+SIMD3(0,bottom,0), b = a+right*patch.width
             let c = b+SIMD3(0,patch.height,0), d = a+SIMD3(0,patch.height,0)
             let u0: Float = thing.flip != 0 ? patch.width : 0, u1: Float = thing.flip != 0 ? 0 : patch.width
-            let light = max(0.12,thing.light), fullbright = Float(thing.fullbright)
+            let light = max(0.12,thing.light), fullbright = Float(thing.fullbright)*fullbrightGain
             func vertex(_ position: SIMD3<Float>, _ u: Float, _ v: Float) -> WorldVertex {
                 WorldVertex(position:SIMD4(position,1),uvLight:SIMD4(u,v,light,fullbright))
             }

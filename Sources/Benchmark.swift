@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 extension App {
     var benchmarkSettings: String {
-        "\(view.drawableSize)|\(view.renderScale)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)|\(renderer.aoSettings.strength)|\(renderer.aoSettings.radius)|\(renderer.dynamicLightEnabled)|\(renderer.dynamicLightShadows)|\(renderer.sceneEffectsKey)|\(renderer.hdrEnabled)|\(renderer.hdrPeak)|\(renderer.fogDensity)|\(renderer.highRayQuality)"
+        "\(view.drawableSize)|\(view.renderScale)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)|\(renderer.aoSettings.strength)|\(renderer.aoSettings.radius)|\(renderer.dynamicLightEnabled)|\(renderer.dynamicLightShadows)|\(renderer.sceneEffectsKey)|\(renderer.hdrEnabled)|\(renderer.hdrPeak)|\(renderer.fogDensity)|\(renderer.highRayQuality)|\(renderer.lightGain)|\(renderer.bloomStrength)|\(renderer.hdrSpriteBoost)"
     }
     @objc func runBenchmark() {
         guard benchmark == nil else { return }
@@ -95,6 +95,15 @@ extension App {
         if item.action == #selector(selectRayQuality(_:)) {
             item.state=renderer.highRayQuality == (item.tag==1) ? .on:.off
             return renderer.ambientOcclusionSupported
+        }
+        if item.action == #selector(toggleHDRSpriteBoost) {
+            item.state=renderer.hdrSpriteBoost ? .on:.off;return renderer.hdrEnabled
+        }
+        if item.action == #selector(selectLightGain(_:)) {
+            item.state=abs(renderer.lightGain-Float(item.tag)/100)<0.00001 ? .on:.off;return true
+        }
+        if item.action == #selector(selectBloomStrength(_:)) {
+            item.state=abs(renderer.bloomStrength-Float(item.tag)/100)<0.00001 ? .on:.off;return true
         }
         if item.action == #selector(selectHDRPeak(_:)) {
             item.state=renderer.hdrPeak==Float(item.tag) ? .on:.off;return true

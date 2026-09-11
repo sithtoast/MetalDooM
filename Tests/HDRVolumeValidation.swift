@@ -139,7 +139,7 @@ print("PASS: linear EDR transfer, unclipped highlights, monotonic shoulder and 1
 
 let legacyData=Data("{\"effects\":[],\"ao\":false,\"testLight\":false,\"testShadows\":true,\"hdr\":false,\"strength\":0.5,\"radius\":48,\"density\":0.003,\"peak\":4}".utf8)
 let legacyPreset=try JSONDecoder().decode(EffectsPreset.self,from:legacyData)
-validationRequire(legacyPreset.highRayQuality==nil,"Legacy custom presets failed to decode")
+validationRequire(legacyPreset.highRayQuality==nil && legacyPreset.lightGain==nil && legacyPreset.bloomStrength==nil && legacyPreset.hdrSpriteBoost==nil,"Legacy custom presets failed to decode")
 let savedCustom=UserDefaults.standard.data(forKey:"customEffectsPreset.v1")
 defer {
     if let savedCustom { UserDefaults.standard.set(savedCustom,forKey:"customEffectsPreset.v1") }
@@ -163,6 +163,49 @@ for i in stride(from:hudStart,to:hdr.count,by:4) {
     }
 }
 print("HDR live display: current headroom \(headroom)x, potential \(subject.window.screen?.maximumPotentialExtendedDynamicRangeColorComponentValue ?? 1)x; drawable maximum \(maximum)")
+// Exercise the real menu routing: Ludicrous must not steal Saved Custom's tag.
+let effectsMenu=NSMenu(title:"Validation graphics");subject.addGraphicsMenus(to:effectsMenu)
+let presetsMenu=effectsMenu.items.first { $0.title=="Effects Presets" }!.submenu!
+let ludicrousItem=presetsMenu.items.first { $0.title=="Ludicrous" }!
+let customItem=presetsMenu.items.first { $0.title=="Apply Saved Custom" }!
+validationRequire(ludicrousItem.tag != customItem.tag,"Ludicrous collides with Saved Custom")
+subject.selectEffectsPreset(ludicrousItem)
+validationRequire(subject.effectsPresetName=="Ludicrous" && renderer.highRayQuality,"Ludicrous preset not applied")
+validationRequire(renderer.aoSettings.strength==0.5 && renderer.aoSettings.radius==48 && renderer.fogDensity==0.003 && renderer.hdrPeak==8,"Ludicrous budgets not restored")
+validationRequire(renderer.lightGain==2 && renderer.bloomStrength==0.3 && renderer.hdrSpriteBoost,"Ludicrous intensities not applied")
+for _ in 0..<3 { _=hdrFrame() }
+let ludicrous=hdrFrame()
+validationRequire(ludicrous.allSatisfy { $0.isFinite && $0>=0 && $0<=8.01 },"Ludicrous exceeds display headroom")
+validationRequire(ludicrous[hudStart...]==hdr[hudStart...],"Ludicrous changed HUD")
+// Live display headroom can change between frames; hold the output ceiling
+// at standard white for deterministic pixel comparisons below.
+renderer.setHDRPeak(1)
+for _ in 0..<3 { _=hdrFrame() }
+let steadyLudicrous=hdrFrame()
+validationRequire(hdrFrame()==steadyLudicrous,"Paused Ludicrous is unstable")
+// Isolate each restored control in a deterministic lit scene.
+try renderer.setDynamicLight(true)
+renderer.setLightGain(1)
+let mild=hdrFrame(),baseLights=renderer.validationSelectedLights
+renderer.setLightGain(2)
+let strong=hdrFrame(),strongLights=renderer.validationSelectedLights
+validationRequire(mild != strong && mild[hudStart...]==strong[hudStart...],"Added light strength has no world-only effect")
+validationRequire(zip(baseLights,strongLights).allSatisfy { $1.colorIntensity.w == $0.colorIntensity.w*2 },"Light gain did not scale all sources")
+renderer.setBloomStrength(0)
+let noBloom=hdrFrame()
+renderer.setBloomStrength(0.3)
+validationRequire(hdrFrame() != noBloom,"Restored bloom strength is ineffective")
+MD_TestLightSource(1);try renderer.validationSynchronizeEngine()
+renderer.setHDRSpriteBoost(false)
+let noBoost=hdrFrame()
+renderer.setHDRSpriteBoost(true)
+let boost=hdrFrame()
+validationRequire(boost != noBoost && boost[hudStart...]==noBoost[hudStart...],"HDR sprite boost has no world-only effect")
+renderer.setLightGain(.nan);renderer.setBloomStrength(.infinity)
+validationRequire(renderer.lightGain==1 && renderer.bloomStrength==0.12,"Invalid strengths escaped sanitization")
+try renderer.applyEffectsPreset(EffectsPreset.builtins[3],view:subject.view)
+validationRequire(subject.effectsPresetName=="HDR Showcase" && !renderer.hdrSpriteBoost && renderer.lightGain==1 && renderer.bloomStrength==0.12,"Showcase did not reset Ludicrous intensities")
+renderer.setLightGain(2);renderer.setBloomStrength(0.3);renderer.setHDRSpriteBoost(true)
 renderer.setHDRPeak(8);renderer.setFogDensity(0.006)
 validationRequire(subject.effectsPresetName=="Custom","Manual adjustments leave stale preset checkmark")
 renderer.setHighRayQuality(true)
@@ -170,7 +213,7 @@ subject.saveEffectsPreset()
 let custom=EffectsPreset(renderer:renderer)
 validationRequire(subject.savedEffectsPreset==custom,"Custom preset persistence failed")
 try renderer.applyEffectsPreset(EffectsPreset(),view:subject.view)
-try renderer.applyEffectsPreset(subject.savedEffectsPreset!,view:subject.view)
+subject.selectEffectsPreset(customItem)
 validationRequire(EffectsPreset(renderer:renderer)==custom,"Custom preset restore failed")
 for _ in 0..<3 { _=hdrFrame() }
 let old=subject.view.drawableSize
@@ -221,6 +264,7 @@ validationRequire(renderer.renderedFrames==hiddenFrames,"Minimized window still 
 subject.view.isPaused=true;subject.window.deminiaturize(nil);subject.window.makeKeyAndOrderFront(nil)
 pumpEvents(0.1);subject.view.drawableSize=visibleSize
 for _ in 0..<3 { _=frame() }
+print("PASS: Ludicrous menu routing, restored intensity pixels, HUD/EDR bounds, legacy and custom intensity restoration")
 print("PASS: ray quality stability/restoration/HUD/mesh reuse, legacy custom presets, and minimized-window GPU suppression")
 print("PASS: volumetric sources/density/toggles/HUD/pause, HDR showcase/custom presets, live EDR output, resize, save/load, repeated HDR/SDR switching, graphics preset persistence/checkmarks, and disabled window tabs")
 }

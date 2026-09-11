@@ -345,7 +345,7 @@ opaque or alpha-tested hit is sufficient. AO continues finding nearest distances
 This preserves finite light ranges, grille holes and one-sided surface emitters.
 
 **View → Ray Quality** selects Balanced (8 AO rays, 4 soft-shadow rays, 16 haze
-midpoints) or High (16/8/32). Presets choose Balanced; High retains build 104's
+midpoints) or High (16/8/32). All presets except Ludicrous choose Balanced; High retains build 104's
 sample counts. Neither setting changes resolution, texture filtering, HDR peak,
 light budget or haze density. Changes do not rebuild the world structure, are
 included in diagnostics/benchmark identity, and round-trip through custom saves.
@@ -365,3 +365,26 @@ This fixes the viewport at 2200×1520, pauses simulation, warms eight frames and
 records 32 GPU durations per case. It fences each frame, so these timings exclude
 display pacing and are not native FPS. Avoid competing renderers. See VALIDATION.md
 for baseline provenance and a live frame-interval comparison at the user's save.
+
+
+### Ludicrous and restored intensities — build 108
+
+Ludicrous appends a fifth built-in effects preset without changing graphics scale
+or frame cap: all twelve switches, HDR, High ray quality (16/8/32), AO 50%/48,
+Atmospheric haze (0.003), 8× peak, added lights at 2× normal energy, bloom at 30% and
+1.5× HDR fullbright world sprites. The moving test light remains off. Showcase
+and the other existing presets retain their restrained build-106 values.
+
+Separate View controls offer added-light strengths of 50/100/200%, bloom at
+6/12/30%, and an HDR fullbright sprite boost toggle. Light gain scales all selected
+point/surface sources, including scattering. Sprite gain only changes world
+billboards in HDR; weapon/HUD vertices stay unchanged and fixed colormaps bypass
+it. Bloom retains its brighter highlight extraction threshold and world-only pass.
+Linear-light blending, the smooth EDR shoulder, deterministic haze and visibility
+optimizations remain enabled; Ludicrous does not restore earlier rendering defects.
+
+New custom intensity fields are optional for decoding older saved setups and
+normalize to the restrained defaults. Snapshots, diagnostics, benchmark identity
+and menu checkmarks include the controls. Apply Saved Custom now uses a separate
+negative menu tag so the fifth built-in cannot intercept it. HDR presentation
+continues using current display headroom; no system brightness is changed.

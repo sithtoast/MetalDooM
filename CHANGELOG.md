@@ -4,6 +4,22 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.8.0 · Build 108 — Ludicrous effects preset
+
+- Add View → Effects Presets → Ludicrous: all effects, High ray quality, 50% AO
+  at 48 units, Atmospheric haze, 200% added light, 30% bloom, 1.5× HDR fullbright
+  world sprites and an HDR ceiling of 8× standard white. Keep the recent
+  visibility optimizations, smooth textures, steady haze and correct HDR mapping.
+- Add independent Added Light Strength, Bloom Strength and HDR Fullbright Sprite
+  Boost controls. Preserve restrained Enhanced/Showcase settings and normal HUD,
+  weapon and power-up colors. Retain every choice in saved custom presets;
+  older custom saves remain compatible.
+- Validate native build 108 on macOS 27, plus Ultimate Doom and Doom II GPU
+  regressions for preset routing, intensity changes, HDR bounds, HUD isolation,
+  resize, save/load and clean shutdown. Ludicrous intentionally costs more GPU
+  time; no new controlled FPS comparison or cause for the reported macOS
+  mediaanalysisd CPU spike is established.
+
 ## 0.8.0 · Build 106 — Lower frame intervals for lighting presets
 
 - Resolve world visibility in a cheap alpha-tested depth pass before expensive

@@ -31,6 +31,7 @@ preset=EffectsPreset.builtins[3];preset.effects.remove(SceneEffect.volumetrics.r
 try profile("Showcase without volumetrics",preset)
 preset=EffectsPreset.builtins[3];preset.highRayQuality=true
 try profile("Showcase High",preset)
+try profile("Ludicrous",EffectsPreset.builtins[4])
 subject.applicationWillTerminate(Notification(name:NSApplication.willTerminateNotification))
 subject.window.performClose(nil)
 }
