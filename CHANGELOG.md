@@ -4,6 +4,24 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.8.0 · Build 106 — Lower frame intervals for lighting presets
+
+- Resolve world visibility in a cheap alpha-tested depth pass before expensive
+  ray shading. Reject hidden fragments early, and let finite shadow rays stop at
+  the first valid blocker while AO retains nearest-hit distances.
+- Add View → Ray Quality: Balanced (8 AO / 4 soft-shadow / 16 haze samples) and
+  High (16 / 8 / 32). Presets select Balanced; High retains the prior sample
+  quality. Preserve smooth textures, restrained HDR, steady haze and all switches.
+- Stop rendering fully occluded/minimized windows so they do not compete for GPU
+  time. Preserve game state and resume rendering when the window becomes visible.
+- At 2200×1520 in an isolated fixed-scene GPU comparison, Enhanced improves from
+  18.84 to 6.16 ms median and Showcase from 28.77 to 9.20 ms. In the user's restored
+  viewpoint, the native HUD improves from roughly 50.5 ms / 20 FPS to 11.3 ms /
+  88 FPS. These are focused measurements, not universal frame-rate guarantees.
+- Pass Ultimate Doom/Doom II lighting, cutout, HUD, quality/custom-preset, resize,
+  save/load, shutdown and ceiling regressions. Inspect native build 106 with the
+  user's separate saved snapshot restored; previous quick saves are untouched.
+
 ## 0.8.0 · Build 104 — Calmer Enhanced and Showcase presets
 
 - Reduce the grainy, over-contrasted appearance of the first HDR/effects presets.

@@ -103,8 +103,9 @@ final class AmbientOcclusion {
     struct AOVertex { float4 position; float4 uv; };
     struct DynamicLight { float4 positionRadius; float4 colorIntensity; float4 options; float4 facing; };
     float aoHitDistance(ray r, primitive_acceleration_structure world,
-            const device AOVertex *vertices, const device uint4 *materials, const device uchar *alpha) {
+            const device AOVertex *vertices, const device uint4 *materials, const device uchar *alpha, bool anyHit=false) {
         intersection_params params;
+        params.accept_any_intersection(anyHit);
         params.assume_geometry_type(geometry_type::triangle);
         intersection_query<triangle_data> hits(r,world,params);
         while (hits.next()) {
@@ -138,12 +139,12 @@ final class AmbientOcclusion {
             float3 sampleNormal=dot(light.facing.xyz,light.facing.xyz)>0.5 ? light.facing.xyz:direction;
             float3 tangent=normalize(cross(sampleNormal,abs(sampleNormal.y)<0.9 ? float3(0,1,0):float3(1,0,0)));
             float3 bitangent=cross(sampleNormal,tangent);
-            uint samples=light.options.y>0 ? 8:1;
+            uint samples=light.options.y>0 ? (light.options.z>0 ? uint(clamp(light.options.z,1.0,8.0)):8u):1u;
             visibility=0;
             for (uint i=0;i<samples;i++) {
                 float3 target=light.positionRadius.xyz;
                 if (samples>1) {
-                    float r=sqrt((float(i)+0.5)/8.0)*light.options.y, angle=float(i)*2.39996323;
+                    float r=sqrt((float(i)+0.5)/float(samples))*light.options.y, angle=float(i)*2.39996323;
                     target+=tangent*(r*cos(angle))+bitangent*(r*sin(angle));
                 }
                 ray shadow;
@@ -151,7 +152,7 @@ final class AmbientOcclusion {
                 float3 toLight=target-shadow.origin;
                 shadow.max_distance=length(toLight);shadow.min_distance=0.05;
                 shadow.direction=toLight/shadow.max_distance;
-                visibility+=aoHitDistance(shadow,world,vertices,materials,alpha)>=shadow.max_distance ? 1.0:0.0;
+                visibility+=aoHitDistance(shadow,world,vertices,materials,alpha,true)>=shadow.max_distance ? 1.0:0.0;
             }
             visibility/=float(samples);
         }
@@ -176,7 +177,7 @@ final class AmbientOcclusion {
         }
         return float4(powerColor(litPalette(c.rgb,shade,illumination-float3(shade)),power),1);
     }
-    fragment float4 aoFragment(Out in [[stage_in]], bool front [[front_facing]],
+    [[early_fragment_tests]] fragment float4 aoFragment(Out in [[stage_in]], bool front [[front_facing]],
             texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]],
             constant float4 &eye [[buffer(3)]], primitive_acceleration_structure world [[buffer(4)]],
             const device AOVertex *vertices [[buffer(5)]], const device uint4 *materials [[buffer(6)]],
@@ -198,8 +199,9 @@ final class AmbientOcclusion {
             float occlusion=0;
             // Fixed cosine-weighted hemisphere directions: stable while paused
             // or moving, without temporal history, noise or a denoising pass.
-            for (uint i=0;i<16;i++) {
-                float r=sqrt((float(i)+0.5)/16.0), angle=float(i)*2.39996323;
+            uint samples=settings.z>0 ? uint(clamp(settings.z,1.0,16.0)):16u;
+            for (uint i=0;i<samples;i++) {
+                float r=sqrt((float(i)+0.5)/float(samples)), angle=float(i)*2.39996323;
                 ray query;
                 query.origin=in.world+n*0.15;
                 query.direction=tangent*(r*cos(angle))+bitangent*(r*sin(angle))+n*sqrt(1-r*r);
@@ -207,7 +209,7 @@ final class AmbientOcclusion {
                 float distance=aoHitDistance(query,world,vertices,materials,alpha);
                 occlusion+=1.0-smoothstep(0.0,settings.x,distance);
             }
-            shade*=1.0-settings.y*(occlusion/16.0);
+            shade*=1.0-settings.y*(occlusion/float(samples));
         }
         float3 illumination=float3(shade);
         if (power.x==0 && power.y==0)

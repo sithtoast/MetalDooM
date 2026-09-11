@@ -3,6 +3,44 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.8.0, build 106 — Frame interval and ray-work reduction
+
+- Native build 104 at the user's actual viewpoint showed 2200×1520, 19.82 FPS and
+  50.45 ms frame interval. Saved a separate snapshot, loaded it in build 106,
+  selected Showcase/Balanced without changing resolution, and observed 88.40 FPS
+  / 11.31 ms in the native Metal HUD. Game progress and quick saves were preserved.
+  These are observed HUD snapshots, not sustained campaign benchmarks.
+- Controlled GPU profiles use eight warm-up frames and 32 samples per preset,
+  paused game time, 2200×1520, no image readback and Metal validation disabled.
+  Build-104 baseline comes from archived source at `a442f0e` with the same new
+  profile driver; the old running game was briefly suspended with guaranteed
+  resume during each measurement to remove competing GPU submissions.
+
+  | Preset | Build 104 median / p95 | Build 106 Balanced median / p95 |
+  | --- | --- | --- |
+  | Classic | 0.496 / 0.498 ms | 0.499 / 0.519 ms |
+  | Enhanced | 18.844 / 20.591 ms | 6.156 / 6.447 ms |
+  | HDR Showcase | 28.766 / 30.554 ms | 9.198 / 10.213 ms |
+
+  Showcase High: 16.603 / 20.071 ms. GPU duration excludes display pacing;
+  serialized fences and a fixed torch scene limit extrapolation to gameplay.
+  Logs: `build/perf-isolated-build104`, `build/perf-isolated-balanced`.
+  Earlier profile runs without process isolation were contaminated by the old
+  build's background rendering and are not valid before/after comparisons.
+- Ultimate Doom and Doom II suites pass with Metal API validation, including
+  Classic restoration/zero AO, masked hits and grille coverage, first-blocker
+  shadows, soft-shadow bounds, sprites, particles, HDR, fog, resize/save/load,
+  world replacement and shutdown. Ultimate also retains all 48 ceiling captures.
+  Logs: `build/performance-final`, `build/performance-doom2`.
+- Balanced/High changes preserve paused stability and HUD, reuse the world mesh,
+  restore exact pixels and survive custom saves; legacy presets decode as
+  Balanced. A minimized live-mode window submits no GPU frames, then resumes
+  correctly after restoration. Manual test draws retain focus independence.
+- Visibility-first shading preserves the existing samples in High mode. Balanced
+  additionally reduces sample counts while retaining filtering, restrained HDR,
+  deterministic haze, all sources and the native resolution. Other Macs and
+  sustained crowded combat remain untested.
+
 ## 0.8.0, build 104 — Preset grain and brightness refinement
 
 - Native build 104 succeeds. Enhanced and HDR Showcase were visually compared

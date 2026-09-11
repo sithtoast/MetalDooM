@@ -32,6 +32,14 @@ try renderer.setSceneEffect(.volumetrics,enabled:false)
 let lightOnly=frame()
 try renderer.setSceneEffect(.volumetrics,enabled:true)
 let fog=frame()
+let qualityMesh=renderer.ambientOcclusion!,qualityBuilds=renderer.ambientOcclusion!.buildCount
+renderer.setHighRayQuality(true)
+let highFog=frame()
+validationRequire(frame()==highFog,"High ray quality is unstable")
+validationRequire(highFog[hudStart...]==fog[hudStart...],"Ray quality changed HUD")
+validationRequire(qualityMesh.buildCount==qualityBuilds,"Ray quality rebuilt world geometry")
+renderer.setHighRayQuality(false)
+validationRequire(frame()==fog,"Balanced quality did not restore exact pixels")
 validationRequire(fog != lightOnly,"Volumetric light is invisible")
 validationRequire(fog[hudStart...]==lightOnly[hudStart...],"Fog affected HUD")
 validationRequire(frame()==fog,"Paused fog flickers")
@@ -129,6 +137,9 @@ for headroom:Float in [1,2,4,8] {
 }
 print("PASS: linear EDR transfer, unclipped highlights, monotonic shoulder and 1x/2x/4x/8x headroom limits")
 
+let legacyData=Data("{\"effects\":[],\"ao\":false,\"testLight\":false,\"testShadows\":true,\"hdr\":false,\"strength\":0.5,\"radius\":48,\"density\":0.003,\"peak\":4}".utf8)
+let legacyPreset=try JSONDecoder().decode(EffectsPreset.self,from:legacyData)
+validationRequire(legacyPreset.highRayQuality==nil,"Legacy custom presets failed to decode")
 let savedCustom=UserDefaults.standard.data(forKey:"customEffectsPreset.v1")
 defer {
     if let savedCustom { UserDefaults.standard.set(savedCustom,forKey:"customEffectsPreset.v1") }
@@ -154,6 +165,7 @@ for i in stride(from:hudStart,to:hdr.count,by:4) {
 print("HDR live display: current headroom \(headroom)x, potential \(subject.window.screen?.maximumPotentialExtendedDynamicRangeColorComponentValue ?? 1)x; drawable maximum \(maximum)")
 renderer.setHDRPeak(8);renderer.setFogDensity(0.006)
 validationRequire(subject.effectsPresetName=="Custom","Manual adjustments leave stale preset checkmark")
+renderer.setHighRayQuality(true)
 subject.saveEffectsPreset()
 let custom=EffectsPreset(renderer:renderer)
 validationRequire(subject.savedEffectsPreset==custom,"Custom preset persistence failed")
@@ -201,5 +213,14 @@ do {
     }
 }
 for _ in 0..<3 { _=frame() }
+let visibleSize=subject.view.drawableSize
+subject.view.isPaused=false;subject.window.miniaturize(nil);pumpEvents(0.1)
+let hiddenFrames=renderer.renderedFrames
+for _ in 0..<5 { renderer.draw(in:subject.view) }
+validationRequire(renderer.renderedFrames==hiddenFrames,"Minimized window still submits GPU frames")
+subject.view.isPaused=true;subject.window.deminiaturize(nil);subject.window.makeKeyAndOrderFront(nil)
+pumpEvents(0.1);subject.view.drawableSize=visibleSize
+for _ in 0..<3 { _=frame() }
+print("PASS: ray quality stability/restoration/HUD/mesh reuse, legacy custom presets, and minimized-window GPU suppression")
 print("PASS: volumetric sources/density/toggles/HUD/pause, HDR showcase/custom presets, live EDR output, resize, save/load, repeated HDR/SDR switching, graphics preset persistence/checkmarks, and disabled window tabs")
 }

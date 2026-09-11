@@ -12,7 +12,7 @@ The active experiment is on `codex/metal-experiments`; check Git status/log befo
 continuing. The user selected **ray-traced ambient occlusion**. It is implemented
 as a per-session View menu option, with classic rendering still the default.
 
-Current version: **0.8.0**, successful local app **build 104**. `Info.plist` owns
+Current version: **0.8.0**, successful local app **build 106**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
 This is an experimental branch, not a published release. No push was requested.
 
@@ -147,6 +147,33 @@ compared with build 102 in the same torch fixture. The old comparison preview wa
 closed; `build/polish-preview/MetalDooM.app` is left open with the revised Showcase.
 The user's exact viewpoint was not supplied. The smoother sampling costs more GPU
 time; avoid claiming a sustained FPS improvement. Still on release version 0.8.0.
+
+## Latest performance fix — build 106
+
+The user's build 104 window showed ~50.45 ms / 19.82 FPS at 2200×1520. Preserve
+that game: a separate snapshot was saved through File → Save Game to
+`build/frame-interval-build104.mdsave` (advanced-preview.wad stack). It was loaded
+into build 106, with Showcase/Balanced and the Metal HUD enabled. That restored
+view showed ~11.31 ms / 88.40 FPS. Only the new app remains running, at
+`build/performance-preview/MetalDooM.app`; the old process was resumed after each
+profiling suspension, then closed only after its snapshot was verified saved.
+Quick saves were not touched.
+
+Changes: world alpha/depth visibility pass before equal-depth early-tested ray
+shading; first-valid-blocker shadow queries; Balanced/High sample budgets
+(8/4/16 versus 16/8/32 for AO/soft shadows/haze); skip GPU work for fully occluded
+or minimized windows. Presets use Balanced. Shader tests, legacy custom decoding,
+quality restoration/mesh reuse and minimized-window suppression pass. Manual GPU
+harness drawing still bypasses visibility gating, preserving focus independence.
+
+Isolated profiles at 2200×1520: archived build-104 source `a442f0e`,
+`build/perf-isolated-build104` (Enhanced 18.844, Showcase 28.766 ms median);
+new `build/perf-isolated-balanced` (6.156 / 9.198 ms; High Showcase 16.603 ms).
+The old game process was suspended with an EXIT/INT/TERM resume trap during these
+comparisons. Earlier uncontended-looking results were actually polluted by its
+background rendering and should not be quoted. Final GPU regressions:
+`build/performance-final` (Ultimate + ceiling), `build/performance-doom2`.
+No pushes requested; release stays 0.8.0 as a refinement of the experiment.
 
 ## Current behavior and important boundaries
 

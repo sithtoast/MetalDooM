@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 extension App {
     var benchmarkSettings: String {
-        "\(view.drawableSize)|\(view.renderScale)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)|\(renderer.aoSettings.strength)|\(renderer.aoSettings.radius)|\(renderer.dynamicLightEnabled)|\(renderer.dynamicLightShadows)|\(renderer.sceneEffectsKey)|\(renderer.hdrEnabled)|\(renderer.hdrPeak)|\(renderer.fogDensity)"
+        "\(view.drawableSize)|\(view.renderScale)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)|\(renderer.aoSettings.strength)|\(renderer.aoSettings.radius)|\(renderer.dynamicLightEnabled)|\(renderer.dynamicLightShadows)|\(renderer.sceneEffectsKey)|\(renderer.hdrEnabled)|\(renderer.hdrPeak)|\(renderer.fogDensity)|\(renderer.highRayQuality)"
     }
     @objc func runBenchmark() {
         guard benchmark == nil else { return }
@@ -91,6 +91,10 @@ extension App {
         if item.action == #selector(toggleHDR) {
             item.state=renderer.hdrEnabled ? .on:.off
             return renderer.hdrEnabled || hdrDisplayAvailable
+        }
+        if item.action == #selector(selectRayQuality(_:)) {
+            item.state=renderer.highRayQuality == (item.tag==1) ? .on:.off
+            return renderer.ambientOcclusionSupported
         }
         if item.action == #selector(selectHDRPeak(_:)) {
             item.state=renderer.hdrPeak==Float(item.tag) ? .on:.off;return true

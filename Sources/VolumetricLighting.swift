@@ -33,7 +33,7 @@ final class VolumetricLighting {
         depthState=depth
     }
     func prepare(command:MTLCommandBuffer,depth:MTLTexture,worldHeight:Int,inverse:simd_float4x4,
-                 eye:SIMD3<Float>,lights:[DynamicLightUniforms],ao:AmbientOcclusion,alpha:MTLBuffer,density:Float) throws {
+                 eye:SIMD3<Float>,lights:[DynamicLightUniforms],ao:AmbientOcclusion,alpha:MTLBuffer,density:Float,steps:Int=32) throws {
         guard let structure=ao.structure, let vertices=ao.vertices, let materials=ao.materials else {
             throw PortError("Volumetric world is not ready.")
         }
@@ -55,7 +55,7 @@ final class VolumetricLighting {
             let da=distance(a.element),db=distance(b.element)
             return da==db ? a.offset<b.offset:da<db
         }.prefix(4).map(\.element)
-        var uniforms=VolumeUniforms(inverse:inverse,eye:SIMD4(eye,1),settings:SIMD4(density,Float(selected.count),Float(depth.width),Float(worldHeight)))
+        var uniforms=VolumeUniforms(inverse:inverse,eye:SIMD4(eye,Float(min(32,max(8,steps)))),settings:SIMD4(density,Float(selected.count),Float(depth.width),Float(worldHeight)))
         if selected.isEmpty { selected=[DynamicLightUniforms()] }
         guard let e=command.makeComputeCommandEncoder() else { throw PortError("Cannot encode volume march.") }
         e.label="Quarter-resolution volumetric light march";e.setComputePipelineState(march)
@@ -93,10 +93,10 @@ final class VolumetricLighting {
         if (p.x>=target.get_width() || p.y>=target.get_height()) return;
         uint2 pixel=min(p*4+2,uint2(u.settings.zw)-1);
         float3 delta=volumeEndpoint(float2(pixel),depth.read(pixel),u)-u.eye.xyz;
-        float distance=min(length(delta),768.0), step=distance/32.0;
+        float distance=min(length(delta),768.0), step=distance/u.eye.w;
         float3 direction=normalize(delta), sum=0;
         // Midpoints replace pixel-random offsets: no screen-space grain pattern.
-        for (uint k=0;k<32;k++) {
+        for (uint k=0;k<uint(u.eye.w);k++) {
             float t=(float(k)+0.5)*step;
             float3 point=u.eye.xyz+direction*t;
             for (uint i=0;i<uint(u.settings.y);i++) {
@@ -108,7 +108,7 @@ final class VolumetricLighting {
                 if (facing<=0) continue;
                 if (light.options.x>0) {
                     ray shadow;shadow.origin=point;shadow.direction=toLight;shadow.min_distance=0.05;shadow.max_distance=max(0.06,d-0.5);
-                    if (aoHitDistance(shadow,world,vertices,materials,alpha)<shadow.max_distance) continue;
+                    if (aoHitDistance(shadow,world,vertices,materials,alpha,true)<shadow.max_distance) continue;
                 }
                 float attenuation=1.0-d/radius;
                 sum+=light.colorIntensity.rgb*light.colorIntensity.w*attenuation*attenuation*facing

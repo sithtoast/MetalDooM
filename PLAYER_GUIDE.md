@@ -349,3 +349,11 @@ reduced bloom and smoother world textures. Showcase uses lighter, steadier haze.
 HDR peak now limits brightness without exaggerating near-white texture contrast.
 Reselect the preset after updating; previously saved custom choices are preserved.
 Turn off **Smooth World Textures** if you prefer the original blocky world texels.
+
+
+For lower frame intervals, use **View → Ray Quality → Balanced** (the preset
+and launch default). **High** doubles AO, soft-shadow and haze sampling for
+additional refinement at a higher GPU cost. Both retain smooth world textures
+and steady haze. This setting is included when saving a custom effects preset;
+older custom presets load with Balanced quality. Minimized or fully covered
+windows stop rendering until visible again.

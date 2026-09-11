@@ -17,7 +17,7 @@ last for the session, including toggles and map changes. Both settings appear
 in diagnostics and benchmark identity. Changing settings does not rebuild the
 ray mesh. Zero strength produces the same pixels as classic rendering.
 
-The experiment shades nearby wall/floor/ceiling intersections using sixteen fixed,
+The experiment shades nearby wall/floor/ceiling intersections using eight (Balanced) or sixteen (High) fixed,
 cosine-weighted hemisphere rays per world fragment. Distance-weighted occlusion
 reduces existing sector/distance lighting by up to the selected strength. It
 adds no light sources and leaves power-up fullbright/inverse rendering, skies,
@@ -157,7 +157,7 @@ Four more independent View → More Metal Effects switches start off each launch
   These 256-unit-radius sources always test world occlusion, independently of
   Gameplay Light Shadows. Moving sectors/material changes invalidate the source
   cache; sector-light flicker alone does not. Map/save loads rebuild it.
-- **Soft Shadows** uses eight fixed disk samples instead of the hard-shadow ray
+- **Soft Shadows** uses four (Balanced) or eight (High) fixed disk samples instead of the hard-shadow ray
   when a source has shadows enabled. Test/gameplay source radius is six units;
   emissive patches use twelve. Samples on emissive sources stay parallel to the
   emitting plane. Hard shadows return exactly when switched off. This small
@@ -257,7 +257,7 @@ existing test/gameplay/surface sources. It does not create a sun or extra light
 sources. **View → Volumetric Density** offers Light Haze, Atmospheric, Dense and
 Thick (0.001, 0.003, 0.006 and 0.01 inverse Doom units). Default: Atmospheric.
 
-The compute pass marches 32 fixed midpoint samples at quarter width/height,
+The compute pass marches 16 (Balanced) or 32 (High) fixed midpoint samples at quarter width/height,
 selecting four nearest lights from the existing bounded source list. Marches stop
 at raster depth or 768 units. Each source retains finite falloff and one-sided
 surface emission; enabled shadows trace the same alpha-tested world. Volumetric
@@ -329,3 +329,39 @@ Built-in AO strength is reduced to 25%; Enhanced uses a 16-unit radius,
 Atmospheric/Showcase 32 units and 0.001 haze density. These are visual-quality
 choices with additional GPU cost, not a performance improvement. Existing saved
 custom sets are preserved; reselect a built-in or resave custom to adopt changes.
+
+
+### Performance and ray quality — build 106
+
+Ray shading previously ran during ordinary world drawing, potentially tracing
+rays for surfaces later hidden by nearer batches. A color-write-disabled world
+pass now resolves nearest depth with the original binary alpha masks. The ray
+color pass uses equal-depth, no depth writes and `early_fragment_tests`; sprites
+then return to normal depth writes. Sky and masked geometry retain their original
+coverage. Only the ray path needs the extra visibility pass; Classic is unchanged.
+
+Shadow queries use Metal's accept-any-intersection option so the first accepted
+opaque or alpha-tested hit is sufficient. AO continues finding nearest distances.
+This preserves finite light ranges, grille holes and one-sided surface emitters.
+
+**View → Ray Quality** selects Balanced (8 AO rays, 4 soft-shadow rays, 16 haze
+midpoints) or High (16/8/32). Presets choose Balanced; High retains build 104's
+sample counts. Neither setting changes resolution, texture filtering, HDR peak,
+light budget or haze density. Changes do not rebuild the world structure, are
+included in diagnostics/benchmark identity, and round-trip through custom saves.
+Older saved presets without the new field load as Balanced.
+
+Occluded/minimized live windows skip GPU submissions and pause audio. Explicit
+manual draws in the GPU harness remain available without a focus prerequisite.
+
+For comparable per-preset GPU timings without pixel readback:
+
+```sh
+AO_PROFILE=1 AO_VALIDATION_LAYER=0 AO_OUTPUT="$PWD/build/effects-profile" \
+  bash scripts/test-ambient-occlusion.sh /path/to/DOOM.WAD
+```
+
+This fixes the viewport at 2200×1520, pauses simulation, warms eight frames and
+records 32 GPU durations per case. It fences each frame, so these timings exclude
+display pacing and are not native FPS. Avoid competing renderers. See VALIDATION.md
+for baseline provenance and a live frame-interval comparison at the user's save.

@@ -3,6 +3,8 @@ import AppKit
 
 struct EffectsPreset: Codable, Equatable {
     var effects: Set<Int> = []
+    // Optional for backward-compatible decoding of saved build-104 custom presets.
+    var highRayQuality: Bool? = nil
     var ao=false, testLight=false, testShadows=true, hdr=false
     var strength: Float=0.5, radius: Float=48, density: Float=0.003, peak: Float=4
     var switches: Set<SceneEffect> { Set(effects.compactMap(SceneEffect.init(rawValue:))) }
@@ -14,6 +16,7 @@ struct EffectsPreset: Codable, Equatable {
                 Self(effects:Set(SceneEffect.allCases.map(\.rawValue)),ao:true,hdr:true,strength:0.25,radius:32,density:0.001)]
     }()
     init(renderer:Renderer) {
+        highRayQuality=renderer.highRayQuality ? true:nil
         effects=Set(renderer.sceneEffects.map(\.rawValue));ao=renderer.ambientOcclusionEnabled
         testLight=renderer.dynamicLightEnabled;testShadows=renderer.dynamicLightShadows;hdr=renderer.hdrEnabled
         strength=renderer.aoSettings.strength;radius=renderer.aoSettings.radius
@@ -43,6 +46,10 @@ extension App {
         let graphics=submenu("Graphics Presets")
         for (i,title) in ["Performance — 50%, 120 FPS","Balanced — 75%, 120 FPS","Native — 100%, 120 FPS","Quiet — 75%, 60 FPS"].enumerated() {
             let item=graphics.addItem(withTitle:title,action:#selector(selectGraphicsPreset(_:)),keyEquivalent:"");item.tag=i;item.target=self
+        }
+        let quality=submenu("Ray Quality")
+        for (i,title) in ["Balanced", "High"].enumerated() {
+            let item=quality.addItem(withTitle:title,action:#selector(selectRayQuality(_:)),keyEquivalent:"");item.tag=i;item.target=self
         }
         let effects=submenu("Effects Presets")
         for (i,title) in EffectsPreset.names.enumerated() {
@@ -82,6 +89,7 @@ extension App {
     @objc func toggleHDR() {
         do { try renderer.setHDR(!renderer.hdrEnabled,view:view) } catch { show(error) }
     }
+    @objc func selectRayQuality(_ sender:NSMenuItem) { renderer.setHighRayQuality(sender.tag==1) }
     @objc func selectHDRPeak(_ sender:NSMenuItem) { renderer.setHDRPeak(Float(sender.tag)) }
     @objc func selectFogDensity(_ sender:NSMenuItem) { renderer.setFogDensity(Float(sender.tag)/1000) }
 }

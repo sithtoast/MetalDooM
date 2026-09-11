@@ -3,7 +3,7 @@ import MetalKit
 
 /// A complete set prevents mixing SDR and HDR attachment formats during toggles.
 struct WorldPrograms {
-    let world, sky, skySurface, sprite, tint, fuzz: MTLRenderPipelineState
+    let world, sky, skySurface, sprite, tint, fuzz, visibility: MTLRenderPipelineState
     init(device: MTLDevice, shader: String, format: MTLPixelFormat) throws {
         let library=try device.makeLibrary(source:shader,options:nil)
         let d=MTLRenderPipelineDescriptor()
@@ -12,6 +12,9 @@ struct WorldPrograms {
             d.vertexFunction=library.makeFunction(name:vertex);d.fragmentFunction=library.makeFunction(name:fragment)
             return try device.makeRenderPipelineState(descriptor:d)
         }
+        d.colorAttachments[0].writeMask=[]
+        visibility=try make("visibilityFragment")
+        d.colorAttachments[0].writeMask = .all
         world=try make("worldFragment");skySurface=try make("skySurfaceFragment")
         sprite=try make("spriteFragment");fuzz=try make("fuzzFragment");sky=try make("skyFragment","skyVertex")
         d.colorAttachments[0].isBlendingEnabled=true

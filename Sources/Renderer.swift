@@ -69,7 +69,7 @@ private struct GPUBatch { let vertices: MTLBuffer, texture: MTLTexture; let mate
 private struct Uniforms { var matrix: simd_float4x4 }
 
 final class Renderer: NSObject, MTKViewDelegate {
-    let device: MTLDevice, queue: MTLCommandQueue, depth: MTLDepthStencilState, fuzzDepth: MTLDepthStencilState
+    let device: MTLDevice, queue: MTLCommandQueue, depth: MTLDepthStencilState, fuzzDepth: MTLDepthStencilState, visibleDepth: MTLDepthStencilState
     private var programs: WorldPrograms
     var pipeline: MTLRenderPipelineState { programs.world }
     var skyPipeline: MTLRenderPipelineState { programs.sky }
@@ -77,6 +77,8 @@ final class Renderer: NSObject, MTKViewDelegate {
     var spritePipeline: MTLRenderPipelineState { programs.sprite }
     var tintPipeline: MTLRenderPipelineState { programs.tint }
     var fuzzPipeline: MTLRenderPipelineState { programs.fuzz }
+    private(set) var highRayQuality=false
+    func setHighRayQuality(_ enabled:Bool) { highRayQuality=enabled }
     private var hdrOutput: HDROutput?
     var hdrEnabled: Bool { hdrOutput != nil }
     private(set) var hdrPeak: Float = 4
@@ -103,6 +105,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         let nextVolume=switches.contains(.volumetrics) ? try VolumetricLighting(device:device,shader:worldShader,format:format):nil
         programs=nextPrograms;hdrOutput=nextOutput;ambientOcclusion=nextAO;bloom=nextBloom;particles=nextParticles;volume=nextVolume
         ambientOcclusionEnabled=preset.ao;dynamicLightEnabled=preset.testLight;dynamicLightShadows=preset.testShadows
+        highRayQuality=preset.highRayQuality == true
         sceneEffects=switches;setAOSettings(strength:preset.strength,radius:preset.radius)
         setFogDensity(preset.density);setHDRPeak(preset.peak)
         worldFormat=format;aoGeometryDirty=true;sceneSnapshot=nil
@@ -211,6 +214,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         if sceneEffects.contains(.softShadows) {
             for i in lights.indices { lights[i].options.y=lights[i].facing == .zero ? 6:12 }
         }
+        for i in lights.indices { lights[i].options.z=highRayQuality ? 8:4 }
         // Keep decoration emitters inside their actual sector, including low ceilings.
         if let map {
             for i in lights.indices {
@@ -374,6 +378,11 @@ final class Renderer: NSObject, MTKViewDelegate {
             }
             return mix(lit,max(lit,color*emission.y),mask);
         }
+        fragment void visibilityFragment(Out in [[stage_in]],bool front [[front_facing]],texture2d<float> tex [[texture(0)]]) {
+            if (in.fullbright>0.5 && !front) discard_fragment();
+            constexpr sampler s(coord::normalized,address::repeat,filter::nearest);
+            if (tex.sample(s,in.uv/float2(tex.get_width(),tex.get_height())).a<0.5) discard_fragment();
+        }
         fragment float4 worldFragment(Out in [[stage_in]], bool front [[front_facing]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]], constant float4 &emission [[buffer(11)]]) {
             if (in.fullbright > 0.5 && !front) discard_fragment();
             constexpr sampler s(coord::normalized, address::repeat, filter::nearest);
@@ -434,6 +443,9 @@ final class Renderer: NSObject, MTKViewDelegate {
         self.depth = depth
         state.isDepthWriteEnabled=false;state.depthCompareFunction = .lessEqual
         guard let fuzzDepth=device.makeDepthStencilState(descriptor:state) else { throw PortError("Cannot create fuzz depth state.") };self.fuzzDepth=fuzzDepth
+        state.depthCompareFunction = .equal
+        guard let visibleDepth=device.makeDepthStencilState(descriptor:state) else { throw PortError("Cannot create visible-surface depth state.") }
+        self.visibleDepth=visibleDepth
         super.init()
     }
     func load(wad: WAD, map name: String, continuing: Bool = false, restorePath: String? = nil, demo: String? = nil) throws -> (triangles:Int,missing:[String]) {
@@ -623,6 +635,10 @@ final class Renderer: NSObject, MTKViewDelegate {
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
     func draw(in mtkView: MTKView) {
         guard let view = mtkView as? GameView else { return }
+        // Occluded/minimized windows must not compete with the active game for GPU time.
+        if !view.isPaused && (view.window?.isMiniaturized == true || view.window?.occlusionState.contains(.visible) == false) {
+            lastTime=CACurrentMediaTime();pauseAudio();return
+        }
         let time = CACurrentMediaTime(), delta = min(time-lastTime,0.25); lastTime = time
         do { try update(view:view,delta:delta) }
         catch { engineReady = false; view.releaseMouse(); DispatchQueue.main.async { [weak self] in self?.onError?(error) } }
@@ -713,6 +729,14 @@ final class Renderer: NSObject, MTKViewDelegate {
                 encoder.setRenderPipelineState(pipeline)
             }
             if let ao=ambientOcclusion, let structure=ao.structure, let vertices=ao.vertices, let materials=ao.materials, let alpha=aoAlphaBuffer {
+                // Resolve exact world visibility cheaply before running any per-pixel rays.
+                // Alpha coverage matches the shading pass; this pass never writes color.
+                encoder.setRenderPipelineState(programs.visibility);encoder.setDepthStencilState(depth)
+                for batch in batches {
+                    encoder.setVertexBuffer(batch.vertices,offset:0,index:0);encoder.setFragmentTexture(animatedTexture(batch),index:0)
+                    encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:batch.count)
+                }
+                encoder.setDepthStencilState(visibleDepth)
                 var aoEye=SIMD4(eye,1)
                 encoder.setRenderPipelineState(ao.pipeline)
                 encoder.setFragmentBytes(&aoEye,length:MemoryLayout<SIMD4<Float>>.stride,index:3)
@@ -721,6 +745,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                 encoder.setFragmentBuffer(materials,offset:0,index:6)
                 encoder.setFragmentBuffer(alpha,offset:0,index:7)
                 var settings=aoSettings.uniform
+                settings.z=highRayQuality ? 16:8
                 if !ambientOcclusionEnabled { settings.y=0 }
                 encoder.setFragmentBytes(&settings,length:MemoryLayout<SIMD4<Float>>.stride,index:8)
                 var lights=sceneLights()
@@ -735,6 +760,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                 encoder.setVertexBuffer(batch.vertices,offset:0,index:0); encoder.setFragmentTexture(animatedTexture(batch),index:0)
                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:batch.count)
             }
+            encoder.setDepthStencilState(depth)
             if let sprites, engineReady {
                 encoder.setRenderPipelineState(sceneEffects.contains(.spriteLighting) && ambientOcclusion?.structure != nil
                     ? ambientOcclusion!.spritePipeline:spritePipeline)
@@ -773,7 +799,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                     var ready=false
                     do {
                         try volume.prepare(command:command,depth:depthTexture,worldHeight:Int(worldHeight),
-                            inverse:uniform.matrix.inverse,eye:eye,lights:sceneLights(),ao:ao,alpha:alpha,density:fogDensity)
+                            inverse:uniform.matrix.inverse,eye:eye,lights:sceneLights(),ao:ao,alpha:alpha,density:fogDensity,steps:highRayQuality ? 32:16)
                         ready=true
                     } catch {
                         self.volume=nil;sceneEffects.remove(.volumetrics)
