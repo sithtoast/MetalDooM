@@ -3,6 +3,24 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.9.0 refinement, build 124 — Optional Minimal HUD portrait
+
+- Full build and strict signature verification pass; native window and bundle
+  plist confirm 0.9.0 build 124. Same unreleased feature milestone/version.
+- Original Ultimate Doom and KEX Doom II `AO_RESOLUTION=1` suites pass with Metal
+  API validation: all 42 face indices render; god/dead faces differ from neutral;
+  portrait on/off restores exact pixels; the setting leaves Classic unchanged.
+  Portrait-inclusive masks preserve native artwork at all four HUD sizes and all
+  world scales, including HDR, with unchanged world/weapon geometry. Preference
+  writes, transparency, resize, effects and invisibility checks pass.
+- Evidence: `build/hud-portrait-validation`, `build/hud-portrait-kex-validation`.
+  These are renderer checks, not new gameplay/face-state logic; the existing engine
+  supplies faceIndex. Physical HDR brightness and other GPUs remain untested.
+- Native NRFTL preview confirms readable Options → HUD layout, portrait toggle,
+  transparent face beside health, and persisted enabled state after relaunch.
+  `build/hud-portrait-preview/MetalDooM.app` is left fullscreen at Minimal 50% with
+  portrait on. Other game instances were preserved.
+
 ## 0.9.0 refinement, build 123 — Transparent Minimal HUD
 
 - Full build and strict bundle-signature verification pass; native app title and

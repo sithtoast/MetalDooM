@@ -85,6 +85,13 @@ final class LevelStatsView: NSView {
 }
 
 extension App {
+    func applyMinimalHUDPortrait(_ visible:Bool) {
+        guard benchmark == nil else { return }
+        renderer.setMinimalHUDPortrait(visible)
+        UserDefaults.standard.set(visible,forKey:"minimalHUDPortrait")
+        gameMenu?.refreshHUD()
+    }
+    @objc func toggleMinimalHUDPortrait() { applyMinimalHUDPortrait(!renderer.minimalHUDPortrait) }
     func applyHUDStyle(_ style:HUDStyle) {
         guard benchmark == nil else { return }
         renderer.setHUDStyle(style)

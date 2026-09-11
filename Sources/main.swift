@@ -80,6 +80,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 let item=hudStyleMenu.addItem(withTitle:style.title,action:#selector(selectHUDStyle(_:)),keyEquivalent:"")
                 item.tag=style.rawValue;item.target=self
             }
+            viewMenu.addItem(withTitle:"Doomguy Portrait in Minimal HUD",action:#selector(toggleMinimalHUDPortrait),keyEquivalent:"").target=self
             let hudSizeItem=NSMenuItem(title:"HUD Status Bar Size",action:nil,keyEquivalent:"")
             let hudSizeMenu=NSMenu(title:"HUD Status Bar Size");hudSizeItem.submenu=hudSizeMenu;viewMenu.addItem(hudSizeItem)
             for percent in SpriteRenderer.hudSizes {
@@ -146,6 +147,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             view.preferredFramesPerSecond = 120; view.framebufferOnly = false
             configureMetalHUD()
             renderer = try Renderer(view:view); view.delegate = renderer
+            renderer.setMinimalHUDPortrait(UserDefaults.standard.bool(forKey:"minimalHUDPortrait"))
             renderer.setHUDStyle(HUDStyle(rawValue:UserDefaults.standard.integer(forKey:"hudStyle")) ?? .classic)
             renderer.setHUDSize(UserDefaults.standard.object(forKey:"hudStatusBarSize") as? Int ?? 100)
             view.onEscape = { [weak self] in self?.openGameMenu() }

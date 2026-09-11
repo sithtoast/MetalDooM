@@ -258,6 +258,8 @@ final class Renderer: NSObject, MTKViewDelegate {
     func releaseMusic() { music?.update(active:false);music=nil }
     func pauseAudio() { try? sound?.setActive(false); music?.update(active:false) }
     private var hud = MD_HUD()
+    private(set) var minimalHUDPortrait = false
+    func setMinimalHUDPortrait(_ visible: Bool) { minimalHUDPortrait=visible }
     private(set) var hudStyle: HUDStyle = .classic
     func setHUDStyle(_ style: HUDStyle) { hudStyle=style }
     private(set) var hudSizePercent = 100
@@ -846,7 +848,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                     encoder.setRenderPipelineState(spritePipeline)
                 }
                 encoder.setFragmentBytes(&noPower,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
-                sprites.drawHUD(encoder:encoder,state:hud,width:width,height:height,percent:hudSizePercent,style:hudStyle)
+                sprites.drawHUD(encoder:encoder,state:hud,width:width,height:height,percent:hudSizePercent,style:hudStyle,portrait:minimalHUDPortrait)
             }
         }
         encoder.endEncoding()

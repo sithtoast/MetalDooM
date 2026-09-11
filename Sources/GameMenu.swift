@@ -199,26 +199,28 @@ final class GameMenu: NSView {
     func refreshHUD() { if page=="HUD" { hudOptions(selected:classic?.selected ?? 0) } }
     private func hudOptions(selected:Int=0) {
         canvas("HUD",art:[("M_OPTTTL",108,15)],items:[
-            .init(title:"HUD style",patch:"",x:48,y:44,action:{},value:{ [weak self] in self?.app.renderer.hudStyle.title.uppercased() ?? "CLASSIC" },
+            .init(title:"HUD style",patch:"",x:48,y:40,action:{},value:{ [weak self] in self?.app.renderer.hudStyle.title.uppercased() ?? "CLASSIC" },
                 adjust:{ [weak self] _ in
                     guard let self else { return }
                     self.app.applyHUDStyle(self.app.renderer.hudStyle == .classic ? .minimal:.classic)
                 }),
-            .init(title:"Status bar size",patch:"",x:48,y:64,action:{},value:{ [weak self] in "\(self?.app.renderer.hudSizePercent ?? 100)%" },
+            .init(title:"Status bar size",patch:"",x:48,y:58,action:{},value:{ [weak self] in "\(self?.app.renderer.hudSizePercent ?? 100)%" },
                 adjust:{ [weak self] step in
                     guard let self else { return }
                     let values=SpriteRenderer.hudSizes
                     let index=values.firstIndex(of:self.app.renderer.hudSizePercent) ?? 3
                     self.app.applyHUDSize(values[(index+step+values.count)%values.count])
                 }),
-            .init(title:"Level stats",patch:"",x:48,y:84,action:{},value:{ [weak self] in self?.app.levelStatsVisible == true ? "ON" : "OFF" },
+            .init(title:"Doomguy portrait",patch:"",x:48,y:76,action:{},value:{ [weak self] in self?.app.renderer.minimalHUDPortrait == true ? "ON":"OFF" },
+                adjust:{ [weak self] _ in self?.app.toggleMinimalHUDPortrait() }),
+            .init(title:"Level stats",patch:"",x:48,y:94,action:{},value:{ [weak self] in self?.app.levelStatsVisible == true ? "ON" : "OFF" },
                 adjust:{ [weak self] _ in self?.app.toggleLevelStats() }),
-            .init(title:"Par time",patch:"",x:48,y:104,action:{},value:{ [weak self] in self?.app.parTimeVisible == true ? "ON" : "OFF" },
+            .init(title:"Par time",patch:"",x:48,y:112,action:{},value:{ [weak self] in self?.app.parTimeVisible == true ? "ON" : "OFF" },
                 adjust:{ [weak self] _ in self?.app.toggleParTime() }),
-            .init(title:"Secret notice",patch:"",x:48,y:124,action:{},value:{ [weak self] in self?.app.secretNotifications == true ? "ON" : "OFF" },
+            .init(title:"Secret notice",patch:"",x:48,y:130,action:{},value:{ [weak self] in self?.app.secretNotifications == true ? "ON" : "OFF" },
                 adjust:{ [weak self] _ in self?.app.toggleSecretNotifications() }),
             .init(title:"Back",patch:"",x:48,y:148,action:{ [weak self] in self?.options() })
-         ],selected:selected,labels:[("MINIMAL SHOWS THE WORLD BEHIND HUD",16,168),("PAR REQUIRES LEVEL STATS",40,178),("LEFT/RIGHT ADJUST   ESC BACK",40,188)],back:{ [weak self] in self?.options() })
+         ],selected:selected,labels:[("MINIMAL SHOWS THE WORLD BEHIND HUD",16,168),("PORTRAIT OPTION IS FOR MINIMAL",24,178),("LEFT/RIGHT ADJUST   ESC BACK",40,188)],back:{ [weak self] in self?.options() })
     }
     private func audioOptions() {
         canvas("Audio",art:[("M_SVOL",60,25)],items:[

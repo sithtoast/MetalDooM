@@ -40,7 +40,7 @@ final class SpriteRenderer {
         for name in labelNames {
             if let patch=try art.patch(named:name) { hudPatches[name]=try upload(patch) }
         }
-        for name in Array(hudPatches.keys) where name.hasPrefix("STT") || name.hasPrefix("STKEYS") || labelNames.contains(name) {
+        for name in Array(hudPatches.keys) where name.hasPrefix("STT") || name.hasPrefix("STKEYS") || name.hasPrefix("STF") || labelNames.contains(name) {
             guard let patch=try art.patch(named:name) else { continue }
             var rgba=patch.image.rgba
             for i in stride(from:0,to:rgba.count,by:4) { rgba[i]=0;rgba[i+1]=0;rgba[i+2]=0 }
@@ -129,7 +129,7 @@ final class SpriteRenderer {
         return max(1,(max(1,floor(width/320))*factor*32).rounded()/32)
     }
     static func hudHeight(width: Double, percent: Int = 100) -> Double { 32*hudPixelScale(width:width,percent:percent) }
-    func drawHUD(encoder: MTLRenderCommandEncoder, state: MD_HUD, width: Double, height: Double, percent: Int = 100, style: HUDStyle = .classic) {
+    func drawHUD(encoder: MTLRenderCommandEncoder, state: MD_HUD, width: Double, height: Double, percent: Int = 100, style: HUDStyle = .classic, portrait: Bool = false) {
         encoder.setDepthStencilState(hudDepth)
         encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:height,znear:0,zfar:1))
         let scale = Float(Self.hudPixelScale(width:width,percent:percent))
@@ -163,6 +163,12 @@ final class SpriteRenderer {
                 x -= hudPatches[name]?.width ?? 0; draw(name,x,y)
             }
         }
+        let index=max(0,min(41,Int(state.faceIndex))), pain=index/8, expression=index%8
+        let face: String
+        if index==41 { face="STFDEAD0" }
+        else if index==40 { face="STFGOD0" }
+        else if expression<3 { face="STFST\(pain)\(expression)" }
+        else { face=["STFTR\(pain)0","STFTL\(pain)0","STFOUCH\(pain)","STFEVL\(pain)","STFKILL\(pain)"][expression-3] }
         if style == .minimal {
             let w=Float(width)/scale, h=Float(height)/scale
             func label(_ text: String, _ x: Float, _ y: Float) {
@@ -172,8 +178,12 @@ final class SpriteRenderer {
                     draw(name,cursor,y);cursor += (hudPatches[name]?.width ?? 4)
                 }
             }
-            label("HEALTH",8,h-38);number(max(0,state.health),50,h-26,"STTNUM");draw("STTPRCNT",50,h-26)
-            label("ARMOR",82,h-38);number(state.armor,124,h-26,"STTNUM");draw("STTPRCNT",124,h-26)
+            // Keep the animated portrait beside health, clear of the centered gun.
+            // Switching it off restores the original Minimal layout exactly.
+            let shift: Float = portrait ? 36:0
+            if portrait { draw(face,8,h-36) }
+            label("HEALTH",8+shift,h-38);number(max(0,state.health),50+shift,h-26,"STTNUM");draw("STTPRCNT",50+shift,h-26)
+            label("ARMOR",82+shift,h-38);number(state.armor,124+shift,h-26,"STTNUM");draw("STTPRCNT",124+shift,h-26)
             // Melee weapons have readyAmmo < 0: omit the ammo group entirely.
             if state.readyAmmo >= 0 {
                 label("AMMO",w-50,h-38);number(state.readyAmmo,w-8,h-26,"STTNUM")
@@ -195,12 +205,6 @@ final class SpriteRenderer {
         number(state.readyAmmo,44,3,"STTNUM")
         number(max(0,state.health),90,3,"STTNUM"); draw("STTPRCNT",90,3)
         number(state.armor,221,3,"STTNUM"); draw("STTPRCNT",221,3)
-        let index=max(0,min(41,Int(state.faceIndex))), pain=index/8, expression=index%8
-        let face: String
-        if index==41 { face="STFDEAD0" }
-        else if index==40 { face="STFGOD0" }
-        else if expression<3 { face="STFST\(pain)\(expression)" }
-        else { face=["STFTR\(pain)0","STFTL\(pain)0","STFOUCH\(pain)","STFEVL\(pain)","STFKILL\(pain)"][expression-3] }
         draw(face,143,0)
         for i in 0..<6 {
             let owned = state.weapons & (1 << (i+1)) != 0

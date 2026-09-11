@@ -15,7 +15,11 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.9.0
 
-Final local build: **123**.
+Final local build: **124**.
+
+Minimal HUD now has an optional remembered Doomguy portrait beside health. Toggle
+it in Options → HUD or View → Doomguy Portrait in Minimal HUD; original face
+expressions and the selected HUD size apply.
 
 Choose Classic or Minimal under Options → HUD or View → HUD Style. The remembered
 Minimal style draws health, armor, ammo and keys over the full-height world, with

@@ -5,8 +5,17 @@
 Active checkout: `/Users/wmh/Dev/MetalDooM`, branch **codex/resolution-kex**,
 branched from main `bb6f707`. This change is a local **0.9.0** feature milestone.
 `Info.plist` remains the semantic-version source; latest successful app build is
-**123**. Recheck git status/log and running app before continuing. Nothing was
+**124**. Recheck git status/log and running app before continuing. Nothing was
 pushed and the existing v0.8.0 tag was not moved.
+
+## Latest refinement — Optional Minimal HUD portrait (build 124)
+
+Options → HUD → Doomguy portrait and View → Doomguy Portrait in Minimal HUD control
+a remembered, default-off portrait. It uses the engine faceIndex and the same
+42 face patches as Classic, drawn with a shadow beside health. Counters shift right
+when enabled; disabling restores the prior Minimal pixels. It scales with HUD size,
+leaving world and weapon unchanged. Classic ignores this preference. Version stays
+0.9.0 as another refinement of the unreleased HUD/resolution feature milestone.
 
 ## Latest refinement — Transparent Minimal HUD (build 123)
 
@@ -78,12 +87,13 @@ Never commit these files, generated fixtures or bundles.
 
 ## Validation and workflow
 
-Build 123 at `build/minimal-hud-preview/MetalDooM.app` is the current NRFTL MAP01
-preview, using remembered Minimal style and 50% size. Native fullscreen/windowed
-presentation, menu controls and persistence after restart were checked. Existing
-game instances were preserved. Build-122/build-120 preview notes are historical.
-Original Ultimate Doom and KEX Doom II GPU suites pass, including native overlay
-pixel masks, full-height world, all sizes, Classic restoration, HDR and invisibility.
+Build 124 at `build/hud-portrait-preview/MetalDooM.app` is the current NRFTL MAP01
+preview, fullscreen with remembered Minimal style, 50% size and portrait enabled.
+Native menu layout, on/off controls and portrait persistence after restart were
+checked. Existing game instances were preserved; older preview notes are historical.
+Original Ultimate Doom and KEX Doom II GPU suites pass, including all 42 faces,
+portrait toggle/Classic restoration, native pixel masks across sizes/scales, HDR
+and invisibility. Evidence is in `build/hud-portrait*-validation`.
 
 See the newest `docs/VALIDATION.md` entry. Useful commands:
 

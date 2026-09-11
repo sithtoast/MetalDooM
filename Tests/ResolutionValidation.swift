@@ -3,6 +3,7 @@ func scale(_ value:CGFloat,_ metalFX:Bool=true) {
     subject.view.renderScale=value;subject.view.metalFXEnabled=metalFX
     subject.view.drawableSize=CGSize(width:1280,height:800)
 }
+subject.renderer.setMinimalHUDPortrait(false)
 subject.renderer.setHUDStyle(.classic)
 subject.renderer.setHUDSize(100)
 scale(1)
@@ -52,6 +53,9 @@ print("PASS: 25/50/75/100% HUD geometry, persistent setting, reclaimed viewport,
 let savedHUDStyle=UserDefaults.standard.object(forKey:"hudStyle")
 subject.applyHUDStyle(.minimal)
 validationRequire(UserDefaults.standard.integer(forKey:"hudStyle")==HUDStyle.minimal.rawValue,"HUD style was not saved")
+let savedPortrait=UserDefaults.standard.object(forKey:"minimalHUDPortrait")
+subject.applyMinimalHUDPortrait(true)
+validationRequire(UserDefaults.standard.bool(forKey:"minimalHUDPortrait"),"Portrait preference was not saved")
 let liveHUD=MD_GetHUD()
 var fixtureHUD=liveHUD;fixtureHUD.health=137;fixtureHUD.armor=84;fixtureHUD.readyAmmo=23;fixtureHUD.keys=63
 subject.renderer.validationHUD(fixtureHUD)
@@ -78,9 +82,31 @@ scale(1);subject.renderer.setHUDSize(50);subject.renderer.validationHUDVisible=t
 fixtureHUD.readyAmmo = -1;fixtureHUD.keys=0;fixtureHUD.health=0;fixtureHUD.armor=0
 subject.renderer.validationHUD(fixtureHUD)
 try png(frame(),"minimal-melee-empty")
+// All engine face indices use the same animated artwork as Classic.
+fixtureHUD.health=100;fixtureHUD.faceIndex=0
+subject.renderer.validationHUD(fixtureHUD)
+let normalPortrait=frame()
+for index in 0...41 {
+    fixtureHUD.faceIndex=Int32(index);subject.renderer.validationHUD(fixtureHUD)
+    let faceFrame=frame()
+    if index==40 || index==41 {
+        validationRequire(faceFrame != normalPortrait,"God/dead portrait did not change")
+        try png(faceFrame,index==40 ? "portrait-god":"portrait-dead")
+    }
+}
+fixtureHUD.faceIndex=0;subject.renderer.validationHUD(fixtureHUD)
+subject.applyMinimalHUDPortrait(false);let noPortrait=frame()
+validationRequire(noPortrait != normalPortrait,"Portrait toggle did not affect pixels")
+subject.applyMinimalHUDPortrait(true);validationRequire(frame()==normalPortrait,"Portrait toggle did not restore layout")
+subject.applyMinimalHUDPortrait(false);validationRequire(frame()==noPortrait,"Portrait-off layout did not restore")
+if let savedPortrait { UserDefaults.standard.set(savedPortrait,forKey:"minimalHUDPortrait") }
+else { UserDefaults.standard.removeObject(forKey:"minimalHUDPortrait") }
 subject.renderer.validationHUD(liveHUD)
 subject.renderer.setHUDStyle(.classic);subject.renderer.setHUDSize(100)
 validationRequire(frame()==reference,"Classic style did not restore original pixels")
+subject.renderer.setMinimalHUDPortrait(true)
+validationRequire(frame()==reference,"Minimal portrait preference changed Classic")
+print("PASS: all 42 face indices, distinct god/dead faces, persisted portrait toggle, exact off/on and Classic restoration")
 if let savedHUDStyle { UserDefaults.standard.set(savedHUDStyle,forKey:"hudStyle") }
 else { UserDefaults.standard.removeObject(forKey:"hudStyle") }
 print("PASS: transparent full-height world, minimal health/armor/ammo and six keys, size-independent weapon/camera, native overlay pixels at all world scales, Classic restoration")

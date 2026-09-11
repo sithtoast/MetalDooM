@@ -42,6 +42,15 @@ in HDR. Its weapon is bottom-anchored on a 200-line canvas; changing HUD size do
 not change weapon scale or world projection. Changing style adjusts the world
 viewport. Both styles share the size setting below; stats and menus are independent.
 
+### Optional Doomguy portrait
+
+Options → HUD → Doomguy portrait and View → Doomguy Portrait in Minimal HUD toggle
+an animated face beside the health readout. This preference starts off and is
+remembered. The face uses the engine's original expressions, including pain, glances,
+god mode and death. It scales with the Minimal HUD and has a pixel shadow with no
+background panel. Turning it off restores the existing Minimal layout exactly.
+Classic always retains its original face, regardless of this preference.
+
 ## Status bar size
 
 Esc → Options → HUD → Status bar size, or View → HUD Status Bar Size, offers

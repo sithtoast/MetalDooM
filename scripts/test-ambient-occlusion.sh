@@ -22,7 +22,7 @@ renderer=(root/'Sources/Renderer.swift').read_text()
 renderer=renderer.replace('final class Renderer: NSObject, MTKViewDelegate {',
     'final class Renderer: NSObject, MTKViewDelegate {\n    var validationHUDVisible=true')
 renderer=renderer.replace('                sprites.drawHUD(', '                if validationHUDVisible { sprites.drawHUD(')
-renderer=renderer.replace('percent:hudSizePercent,style:hudStyle)', 'percent:hudSizePercent,style:hudStyle) }')
+renderer=renderer.replace('percent:hudSizePercent,style:hudStyle,portrait:minimalHUDPortrait)', 'percent:hudSizePercent,style:hudStyle,portrait:minimalHUDPortrait) }')
 (output/'Renderer.swift').write_text(renderer+"""
 // Test-only bridge in this copied source file; not part of app builds.
 extension Renderer {

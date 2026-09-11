@@ -4,6 +4,16 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.9.0 refinement — Optional Minimal HUD portrait (build 124)
+
+- Add a remembered Doomguy portrait toggle under Options → HUD and View →
+  Doomguy Portrait in Minimal HUD. It starts off and applies to Minimal only.
+- Show the original animated face beside health, including damage, glance, god
+  and death expressions, with a transparent background and pixel shadow. Portrait
+  and counters share HUD size; weapon size and world resolution remain independent.
+- Preserve the existing portrait-free Minimal layout when disabled and the Classic
+  status bar at all times. Continue the unreleased 0.9.0 HUD/resolution refinement.
+
 ## 0.9.0 refinement — Transparent Minimal HUD (build 123)
 
 - Add remembered Classic / Minimal HUD styles under Options → HUD and View → HUD
