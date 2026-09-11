@@ -173,7 +173,7 @@ final class AmbientOcclusion {
             // Isotropic reception avoids billboard-facing brightness changes.
             if (length(delta)>0.2) illumination+=directLight(in.world,normalize(delta),lights[i],world,vertices,materials,alpha);
         }
-        return float4(powerColor(c.rgb*illumination,power),1);
+        return float4(powerColor(c.rgb*illumination*(power.w>0 && in.fullbright>0.5 && power.x==0 && power.y==0 ? 1.5:1.0),power),1);
     }
     fragment float4 aoFragment(Out in [[stage_in]], bool front [[front_facing]],
             texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]],

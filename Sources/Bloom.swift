@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import Metal
 
-/// World-only LDR bloom. Quarter-resolution extraction and separable blur, no history.
+/// World-only bloom on the active SDR or extended floating-point scene. Quarter-resolution extraction and separable blur, no history.
 final class Bloom {
     private let device: MTLDevice
     private let extract, blur: MTLComputePipelineState

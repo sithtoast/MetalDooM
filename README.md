@@ -3,12 +3,14 @@
 Classic Doom on Apple Silicon, with native Metal rendering and gameplay powered
 by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
-**Version 0.7.0 · experimental source preview · not notarized.**
+**Version 0.8.0 · experimental source preview · not notarized.**
 
 This branch adds independently switchable AO, test/torch/projectile/muzzle
 lighting, sprite light reception, hard/soft world shadows, emissive surface
-lighting, bloom, embers and projectile trails. Find the new switches in
-**View → More Metal Effects**. All effects start off. Local builds are ad-hoc signed; release packages
+lighting, bloom, embers, projectile trails, volumetric haze and HDR display output.
+Try **View → Effects Presets → HDR Showcase**, or adjust individual switches.
+Separate graphics presets set resolution/frame cap, and custom effects can be
+saved. Effects start in Classic. Local builds are ad-hoc signed; release packages
 use the separate signing workflow. See [Metal experiments](docs/METAL_EXPERIMENTS.md).
 
 ## Get started

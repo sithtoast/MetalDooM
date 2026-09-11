@@ -1,4 +1,4 @@
-# MetalDooM 0.7.0 — Apple Silicon preview
+# MetalDooM 0.8.0 — Apple Silicon preview
 
 A native Metal source port for classic Doom, powered by Chocolate Doom.
 Requires Apple Silicon and macOS 14 or later. This is an early preview.
@@ -13,20 +13,19 @@ and confirm. See INSTALL.md inside the ZIP.
 Supply your own Doom/Ultimate Doom, Doom II, TNT or Plutonia IWAD. Standard SIGIL
 Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
-## New in 0.7.0
+## New in 0.8.0
 
-- Add independent **Sprite Lighting**, **Emissive Surface Lighting**, **Soft
-  Shadows** and **Embers & Projectile Trails** switches under View → More Metal
-  Effects. All start off and combine with the existing lighting, AO and bloom.
-- Monsters and pickups receive existing colored lights with world occlusion;
-  original fullbright frames, invisibility, the weapon and HUD keep their paths.
-- Selected lamp/computer/liquid materials illuminate nearby surfaces through
-  bounded, one-sided source patches. Self-emission remains a separate switch.
-- Four fixed shadow samples soften edges without temporal noise. Torch embers and
-  projectile sparks follow game time and freeze while paused.
-- Keep a 16-light budget (up to four emissive patches) and 128-particle budget.
-  Sprites remain billboards and do not cast shadows. Surface lighting and trails
-  are approximations; crowded combat and other GPUs still need broader testing.
+- Add **HDR Display Output** for extended highlights on compatible displays.
+  Lights, flames, emissive surfaces and bloom retain brightness beyond standard
+  white; HUD and weapon artwork stay at standard white. Peak choices of 2×, 4×
+  and 8× adapt to the display's current EDR headroom.
+- Add independent **Volumetric Lighting** with four haze densities. Existing
+  sources scatter light through the room, with world shadows and depth-aware
+  edges. No sources means no haze glow; weapons and HUD are drawn afterward.
+- Add separate graphics and effects presets. Choose Classic, Enhanced,
+  Atmospheric or HDR Showcase, keep individual controls, and save/apply a
+  custom effects setup. Classic effects still start each launch.
+- Remove macOS automatic window tab commands, which had no game function.
 
 ## Included in this preview
 
@@ -40,13 +39,12 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 - Fixed phantom imps caused by drawing invisible teleport destinations.
 - Shorter About credits and separate player, developer and testing guides.
 
-Local experimental build: **100**, version **0.7.0**. GPU checks cover analytic
-wall/grille/soft shadows, one-sided surface emission, sprite reception, real light
-sources, flash timing and rocket trails, independent/combined toggles, HUD/classic
-restoration, resize, power-ups, the ceiling regression, doors,
-native save/load, map replacement and shutdown.
-Native controls and lighting were inspected on the M5 Pro; other GPUs and sustained
-frame-rate comparisons remain untested. Details are in docs/VALIDATION.md. GitHub
+Local experimental build: **102**, version **0.8.0**. GPU checks cover the existing
+AO/lighting regressions plus fog sources, density, wall occlusion, HUD isolation,
+linear EDR mapping, live headroom, preset restoration, resize and HDR/SDR switches.
+Native controls and HDR Showcase were inspected on the M5 Pro. Haze is a bounded
+single-scattering approximation; other displays/GPUs and sustained crowded-combat
+frame rates remain untested. Details are in docs/VALIDATION.md. GitHub
 artifacts use their own CI build number. Multiplayer, general GZDoom/Boom/MBF mods,
 SIGIL II and Legacy of Rust are not supported. Full manual campaign playthrough coverage remains ongoing.
 

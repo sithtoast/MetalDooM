@@ -12,7 +12,7 @@ The active experiment is on `codex/metal-experiments`; check Git status/log befo
 continuing. The user selected **ray-traced ambient occlusion**. It is implemented
 as a per-session View menu option, with classic rendering still the default.
 
-Current version: **0.7.0**, successful local app **build 100**. `Info.plist` owns
+Current version: **0.8.0**, successful local app **build 102**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
 This is an experimental branch, not a published release. No push was requested.
 
@@ -81,7 +81,7 @@ independent torch/lamp, projectile, muzzle-flash, gameplay-shadow, emissive-surf
 and bloom switches, all off by default. Scene lights have a shared 16-source cap;
 world surfaces receive/cast light, billboard sprites do not. Emission uses known
 material families and selective color thresholds; bloom is a world-only LDR pass
-before the weapon/HUD. No HDR, indirect surface lighting or soft shadows yet.
+before the weapon/HUD. Those were the 0.6.0 boundaries; the additions below supersede them.
 Build 96 passes Ultimate Doom/Doom II GPU toggles, real flash/expiry, fixed-colormap
 powerups, invisibility, resize, save/load, map replacement/shutdown, the 48 ceiling
 captures, level stats and diagnostics. A separate build 96 preview remains open at
@@ -107,6 +107,27 @@ ember origins relative to flame tips. Native build 100 is open in
 adds torches, a medikit and barrel to original E1M1 geometry. New controls,
 sprite reception/soft shadows and final ember placement were inspected. See
 `docs/VALIDATION.md` for exact coverage and performance limits. Nothing pushed.
+
+## Latest feature milestone — 0.8.0 build 102
+
+HDR/EDR display output, volumetric lighting and graphics/effects presets are now
+implemented. See docs/METAL_EXPERIMENTS.md for budgets and color management.
+HDR uses an RGBA16Float scene and linear-sRGB EDR drawable with live headroom
+mapping, standard-white HUD/weapon, and 2×/4×/8× peak choices. Volumetrics use twelve
+samples at quarter resolution, four nearest sources, world shadow rays, raster
+depth and depth-aware upsampling. It is additive lit haze with no temporal history.
+
+View has separate graphics presets (scale/cap) and effects presets (Classic,
+Enhanced, Atmospheric, HDR Showcase), plus Save Current as Custom / Apply Saved
+Custom. Effects still start Classic; custom storage is opt-in, graphics settings
+persist. Changes to individual switches remove the built-in preset checkmark.
+Automatic AppKit window tabbing is disabled globally and on the game window.
+
+Final GPU evidence lives in `build/hdr-volume-final` and
+`build/hdr-volume-doom2`. Native HDR preview: `build/hdr-final/MetalDooM.app`, using
+`build/advanced-preview.wad`; generated fixtures remain private and ignored.
+Screenshots cannot prove physical HDR luminance. Test float readback measured
+headroom and enforces it; no system brightness changes or pushes were requested.
 
 ## Current behavior and important boundaries
 

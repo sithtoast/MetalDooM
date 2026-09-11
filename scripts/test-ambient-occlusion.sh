@@ -21,6 +21,7 @@ source=source[:start]+'    func show(_ error: Error) { validationFail(String(des
 // Test-only bridge in this copied source file; not part of app builds.
 extension Renderer {
     func validationLightPhase(_ tics:Int32) { hud.levelTics=tics }
+    var validationWorldShader: String { worldShader }
     var validationMapName: String? { map?.name }
     var validationSelectedLights: [DynamicLightUniforms] { sceneLights() }
     var validationSurfaceLights: [DynamicLightUniforms] { rebuildSurfaceLights();return surfaceLights }
@@ -34,7 +35,7 @@ extension Renderer {
     }
 }
 """)
-(output/'main.swift').write_text(source+'\n'+(root/'Tests/AOAlphaValidation.swift').read_text()+'\n'+(root/'Tests/AmbientOcclusionValidation.swift').read_text().replace('// Exercise map replacement', (root/'Tests/SceneEffectsValidation.swift').read_text()+'\n'+(root/'Tests/AdvancedEffectsValidation.swift').read_text()+'\n// Exercise map replacement'))
+(output/'main.swift').write_text(source+'\n'+(root/'Tests/AOAlphaValidation.swift').read_text()+'\n'+(root/'Tests/AmbientOcclusionValidation.swift').read_text().replace('// Exercise map replacement', (root/'Tests/SceneEffectsValidation.swift').read_text()+'\n'+(root/'Tests/AdvancedEffectsValidation.swift').read_text()+'\n'+(root/'Tests/HDRVolumeValidation.swift').read_text()+'\n// Exercise map replacement'))
 PY
 SOURCES=()
 for source in "$PROJECT_DIR"/Sources/*.swift; do

@@ -68,7 +68,7 @@ Direct light is added after AO darkens ambient sector lighting. It affects world
 surfaces only: sprites/weapon/HUD/sky and fixed-colormap power-ups retain their
 existing paths unless Sprite Lighting is selected (0.7.0). Billboard sprites
 do not cast shadows. The original 0.5.0 experiment had no other light sources or bloom; 0.6.0 adds
-the independent options below. HDR and multi-bounce indirect illumination remain unimplemented.
+the independent options below. HDR is available in 0.8.0 below; multi-bounce indirect illumination remains unimplemented.
 
 The existing GPU script now also checks analytic light attenuation, opaque and
 masked blockers, geometry beyond the light, shadow bypass, independent toggles,
@@ -118,7 +118,7 @@ family while sampling the current engine texture frame.
 
 Bloom copies only the world viewport, extracts highlights at quarter resolution,
 runs a separable nine-tap blur and adds a restrained 30% glow before the weapon,
-damage tint and HUD. It is LDR bloom, not HDR tone mapping. Skies and fullbright
+damage tint and HUD. In SDR this is LDR bloom; in HDR the same pass preserves extended highlights before display mapping. Skies and fullbright
 world sprites can bloom too. Invisibility uses the existing world snapshot and
 the weapon is drawn afterward. Fixed-colormap power-ups bypass bloom and added
 lighting/emission. There is no temporal history. Disabling bloom releases its
@@ -248,3 +248,57 @@ open that WAD and look up. The long ceiling slit reported in build
 flat mesh. Build 87 uses original linedef clipping and shared flat/wall edge
 vertices to close the slit and smaller T-junction gaps. This adds triangles; the
 older performance figures above should not be treated as build 87 measurements.
+
+
+## Volumetric lighting, HDR and presets — 0.8.0
+
+**View → More Metal Effects → Volumetric Lighting** adds light scattering from
+existing test/gameplay/surface sources. It does not create a sun or extra light
+sources. **View → Volumetric Density** offers Light Haze, Atmospheric, Dense and
+Thick (0.001, 0.003, 0.006 and 0.01 inverse Doom units). Default: Atmospheric.
+
+The compute pass marches twelve fixed-jitter samples at quarter width/height,
+selecting four nearest lights from the existing bounded source list. Marches stop
+at raster depth or 768 units. Each source retains finite falloff and one-sided
+surface emission; enabled shadows trace the same alpha-tested world. Volumetric
+shadows use one ray per step even when surface Soft Shadows is selected. The
+resolve weights four neighbors by depth to avoid bleeding over foreground edges.
+Compositing is additive, before bloom and the weapons/HUD. Power-up fixed colormaps
+bypass it, and paused frames have no temporal noise. Sprites bound the viewing
+ray through raster depth but still do not cast light shadows. Four-source selection
+can pop, twelve steps can show grain, and this is lit haze rather than a full
+participating-media simulation with multiple scattering or dense fog extinction.
+
+**View → HDR Display Output** swaps the complete render pipeline set to RGBA16Float
+and enables CAMetalLayer EDR with extended linear sRGB. The intermediate scene
+preserves Doom's existing palette/distance lighting in an extended range rather
+than replacing its look with physically based materials. The final pass decodes
+the sRGB transfer function, preserves SDR midtones, and maps over-range highlights
+through a hue-preserving shoulder. Normal-world fullbright sprites gain 1.5× in
+this optional path; fullbright power-ups, weapons and HUD remain standard white.
+Bloom can consume over-range light/emission values before this mapping.
+
+Peak controls request up to 2×, 4× (default) or 8× standard white, constrained by
+`NSScreen.maximumExtendedDynamicRangeColorComponentValue` every frame. This is
+relative brightness, not a promise of a specific nit level. Potential headroom
+controls whether HDR can be enabled from the menu; moving an enabled window to an
+SDR display maps back to 1× automatically. System brightness is never changed.
+The app uses Apple's [custom EDR tone-mapping setup](https://developer.apple.com/documentation/metal/performing-your-own-tone-mapping).
+
+**Graphics Presets** change and remember render scale/frame cap only: Performance
+50%/120, Balanced 75%/120, Native 100%/120 and Quiet 75%/60. **Effects Presets** do
+not change resolution, frame rate or gameplay. Classic disables all effects;
+Enhanced uses AO at 50%/32 units plus torch/projectile/muzzle lights, gameplay
+shadows, emissive surfaces, bloom and sprite reception. Atmospheric enables all
+eleven scene switches with AO at 50%/48 units. HDR Showcase adds HDR output to
+Atmospheric. Built-ins leave the moving test light off. Manual overrides remove
+the built-in checkmark; Save Current as Custom stores one full effects setup,
+including test lighting, AO, density and HDR controls. Apply Saved Custom restores
+it after relaunch. Launch effects remain Classic; graphics preferences persist.
+
+Preset and HDR changes allocate a full compatible set before switching state.
+Failure leaves the prior setup intact. New settings are reflected in diagnostics,
+benchmark identity and benchmark locking. Tests in HDRVolumeValidation.swift use
+real half-float GPU readback, including an opaque-partition scattering probe,
+SDR HUD color equivalence, synthetic 1×/2×/4×/8× headroom, live display output,
+resize, save/load and repeated format switching.

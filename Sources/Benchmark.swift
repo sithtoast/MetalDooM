@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 extension App {
     var benchmarkSettings: String {
-        "\(view.drawableSize)|\(view.renderScale)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)|\(renderer.aoSettings.strength)|\(renderer.aoSettings.radius)|\(renderer.dynamicLightEnabled)|\(renderer.dynamicLightShadows)|\(renderer.sceneEffectsKey)"
+        "\(view.drawableSize)|\(view.renderScale)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)|\(renderer.aoSettings.strength)|\(renderer.aoSettings.radius)|\(renderer.dynamicLightEnabled)|\(renderer.dynamicLightShadows)|\(renderer.sceneEffectsKey)|\(renderer.hdrEnabled)|\(renderer.hdrPeak)|\(renderer.fogDensity)"
     }
     @objc func runBenchmark() {
         guard benchmark == nil else { return }
@@ -78,6 +78,27 @@ extension App {
         if item.action == #selector(selectOPL(_:)) { item.state=MusicPlayer.preferredBackend == "opl" ? .on : .off }
         if item.action == #selector(selectAppleMIDI(_:)) { item.state=MusicPlayer.preferredBackend == "apple" ? .on : .off }
         if benchmark != nil { return item.action == #selector(cancelBenchmark) || item.action == #selector(NSApplication.terminate(_:)) }
+        if item.action == #selector(selectGraphicsPreset(_:)), Self.graphicsPresets.indices.contains(item.tag) {
+            let (scale,fps)=Self.graphicsPresets[item.tag]
+            item.state=view.renderScale==scale && view.preferredFramesPerSecond==fps ? .on:.off
+        }
+        if item.action == #selector(selectEffectsPreset(_:)) {
+            let preset=EffectsPreset.builtins.indices.contains(item.tag) ? EffectsPreset.builtins[item.tag]:savedEffectsPreset
+            guard let preset else { return false }
+            item.state=EffectsPreset(renderer:renderer)==preset ? .on:.off
+            return (!preset.hdr || hdrDisplayAvailable) && (!(preset.ao || preset.testLight || preset.switches.contains(where: { $0.needsRays })) || renderer.ambientOcclusionSupported)
+        }
+        if item.action == #selector(toggleHDR) {
+            item.state=renderer.hdrEnabled ? .on:.off
+            return renderer.hdrEnabled || hdrDisplayAvailable
+        }
+        if item.action == #selector(selectHDRPeak(_:)) {
+            item.state=renderer.hdrPeak==Float(item.tag) ? .on:.off;return true
+        }
+        if item.action == #selector(selectFogDensity(_:)) {
+            item.state=abs(renderer.fogDensity-Float(item.tag)/1000)<0.00001 ? .on:.off
+            return renderer.ambientOcclusionSupported
+        }
         if item.action == #selector(selectAOStrength(_:)) {
             item.state=Int(renderer.aoSettings.strength*100)==item.tag ? .on:.off
             return renderer.ambientOcclusionSupported

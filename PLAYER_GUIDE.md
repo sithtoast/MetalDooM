@@ -317,3 +317,27 @@ Plutonia saves cannot be mixed, and renaming an identical IWAD preserves saves.
 This is dedicated Final Doom support, not general GAMECONF/UMAPINFO or DeHackEd
 support. Classic/enhanced mode selection, SIGIL II, Legacy of Rust/ID24 and Doom 64
 remain future milestones.
+
+
+## Graphics presets, HDR and volumetric lighting
+
+Start with **View → Effects Presets → HDR Showcase** on a compatible HDR display.
+It enables the lighting effects, bloom, ambient occlusion and illuminated haze.
+**HDR Highlight Peak** requests up to 2×, 4× or 8× standard white; actual brightness
+adapts to the display's available headroom. The HUD and weapon stay at normal
+brightness. HDR output can be toggled separately, and Classic returns to the
+original presentation. Screenshots may not reproduce the screen's HDR brightness.
+
+**Volumetric Lighting** is a separate switch under **More Metal Effects**. It
+needs light sources such as torch, projectile, surface or test lights; select
+**Volumetric Density** to adjust the haze. Try Atmospheric for all effects in SDR,
+or Enhanced for fewer effects. Every individual switch remains available.
+
+**Save Current as Custom** remembers one effects setup; **Apply Saved Custom**
+restores it. Effects start in Classic on each launch. Graphics presets separately
+set resolution and frame cap: Performance (50%/120 FPS), Balanced (75%/120),
+Native (100%/120), or Quiet (75%/60). These graphics settings persist. Frame caps
+are targets, not guaranteed performance with every effect enabled.
+
+The previous Show Tab Bar and Show All Tabs items were automatic macOS window
+commands. MetalDooM doesn't use window tabs, so those commands are now disabled.

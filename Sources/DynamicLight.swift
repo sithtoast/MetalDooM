@@ -21,7 +21,7 @@ struct DynamicLightUniforms {
 /// Session-local switches: none changes the simulation or save format.
 enum SceneEffect: Int, CaseIterable {
     case torches, projectiles, muzzleFlash, shadows, emissive, bloom
-    case spriteLighting, surfaceLighting, softShadows, particles
+    case spriteLighting, surfaceLighting, softShadows, particles, volumetrics
     var title: String {
         switch self {
         case .torches: return "Torch & Lamp Lights"
@@ -33,10 +33,11 @@ enum SceneEffect: Int, CaseIterable {
         case .spriteLighting: return "Sprite Lighting"
         case .surfaceLighting: return "Emissive Surface Lighting"
         case .softShadows: return "Soft Shadows"
+        case .volumetrics: return "Volumetric Lighting"
         case .particles: return "Embers & Projectile Trails"
         }
     }
-    var needsRays: Bool { self == .torches || self == .projectiles || self == .muzzleFlash || self == .spriteLighting || self == .surfaceLighting }
+    var needsRays: Bool { self == .volumetrics || self == .torches || self == .projectiles || self == .muzzleFlash || self == .spriteLighting || self == .surfaceLighting }
 }
 
 extension DynamicLightUniforms {

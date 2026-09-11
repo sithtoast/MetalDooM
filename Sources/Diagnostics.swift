@@ -77,6 +77,11 @@ extension App {
         Render scale: \(Int(view.renderScale * 100))%
         Display backing scale: \(window.backingScaleFactor)
         Display maximum refresh: \(window.screen?.maximumFramesPerSecond ?? 0) Hz
+        Effects preset: \(effectsPresetName)
+        HDR output: \(renderer.hdrEnabled ? "On (RGBA16Float, linear sRGB EDR)":"Off")
+        HDR peak request: \(renderer.hdrPeak)x standard white
+        Display EDR headroom: current \(window.screen?.maximumExtendedDynamicRangeColorComponentValue ?? 1)x, potential \(window.screen?.maximumPotentialExtendedDynamicRangeColorComponentValue ?? 1)x
+        Volumetric density: \(renderer.fogDensity); quarter resolution, 12 steps, 4 nearest lights
         Fullscreen: \(window.styleMask.contains(.fullScreen))
         Frame limit: \(view.preferredFramesPerSecond) FPS
         Recent renderer FPS: \(fps) (not a benchmark)

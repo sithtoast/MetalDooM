@@ -3,6 +3,40 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.8.0, build 102 — HDR, volumetric lighting and presets
+
+- Build 102 succeeds and its native window identifies **MetalDooM 0.8.0 (build 102)**.
+  View menus contain separate graphics/effects presets, custom save/apply, HDR
+  output/peak and volumetric density. Automatic tab commands are absent. HDR
+  Showcase was inspected in a separate original-geometry torch fixture at
+  `build/hdr-final/MetalDooM.app` using `build/advanced-preview.wad`.
+- Ultimate Doom: `AO_CEILING=1`, `build/hdr-volume-final/results.txt`; Doom II:
+  `build/hdr-volume-doom2/results.txt`. Both complete with Metal API validation.
+  Existing AO/alpha, lighting, particles, power-up overrides, odd-size resize,
+  save/load, map replacement and shutdown checks pass. Ultimate Doom retains
+  all 48 ceiling images and the original-room light-shadow comparisons.
+- Volumetrics without sources are byte-identical to Classic. Adding the moving
+  test light produces visible haze; density zero and disabling haze restore the
+  source-only frame exactly. Paused frames are stable; HUD bytes stay unchanged.
+  An isolated production march/resolve probe puts an opaque partition between
+  view-ray samples and a light: shadowed scattering is zero, bypass restores it.
+- Actual RGBA16Float GPU readback validates sRGB-to-linear transfer, standard white,
+  monotonic over-range highlights and 1×/2×/4×/8× headroom bounds. Live Ultimate
+  Doom capture reports about 3.32× current headroom and 2.38× maximum output;
+  Doom II reports about 3.45× / 2.41×. Potential display headroom reports 16×.
+  These are relative EDR components, not measurements of panel luminance. Current
+  headroom changes with display/system conditions and EDR activation.
+- HDR HUD values stay at or below 1 and match decoded SDR colors within 0.002.
+  Showcase selection, manual overrides, JSON custom persistence/restoration,
+  odd-size HDR resize, save/load and repeated HDR/SDR switches pass. All four
+  graphics presets apply/persist scale and cap, update checkmarks and preserve
+  effects. The harness restores preexisting graphics and custom preferences.
+- Diagnostics tests pass separately with and without a WAD. Shader/API checks
+  and native previews use the M5 Pro on macOS 27 beta. Other GPUs/displays,
+  monitor migration, physical brightness, HDR capture fidelity and sustained
+  crowded-combat performance remain unverified. Harness timings are not a
+  controlled native-resolution benchmark.
+
 ## 0.7.0, build 100 — Sprite/surface lighting, soft shadows and particles
 
 - Native GPU suites pass for Ultimate Doom E1M1 and Doom II MAP01 with Metal API

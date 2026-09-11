@@ -4,6 +4,28 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.8.0 · Build 102 — HDR, volumetric lighting and presets
+
+- Add optional HDR/EDR output with a floating-point scene, extended highlights,
+  live display-headroom mapping and 2×/4×/8× peak controls. Preserve standard-white
+  HUD/weapon art and exact Classic restoration when HDR/effects are disabled.
+- Add independent volumetric lighting and four density choices. Existing lights
+  scatter through haze bounded by raster depth; world geometry blocks shadowed
+  sources. Use twelve samples at quarter resolution and four nearest lights.
+- Add separate graphics presets (resolution/frame cap) and effects presets:
+  Classic, Enhanced, Atmospheric and HDR Showcase. Keep individual switches and
+  save/apply one custom effects setup. Effects launch Classic; graphics settings
+  and explicitly saved custom setups persist.
+- Remove the unused macOS Show Tab Bar / Show All Tabs commands by disabling
+  automatic window tabbing. Include new effects in diagnostics and benchmark locks.
+- Validate Ultimate Doom and Doom II GPU suites, opaque-partition scattering,
+  linear EDR output and headroom limits, HUD colors, toggles, custom/graphics
+  presets, resize, save/load, map replacement, shutdown and the 48 ceiling captures.
+  Inspect version 0.8.0 build 102 with HDR Showcase in a separate native preview.
+- Haze is a bounded additive approximation; fullbright world sprites can gain HDR
+  highlights. Other displays/GPUs, physical peak luminance and sustained crowded
+  combat remain unmeasured. System brightness is unchanged.
+
 ## 0.7.0 · Build 100 — Connected lighting and particles
 
 - Add separate Sprite Lighting, Emissive Surface Lighting, Soft Shadows and

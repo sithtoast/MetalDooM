@@ -69,7 +69,47 @@ private struct GPUBatch { let vertices: MTLBuffer, texture: MTLTexture; let mate
 private struct Uniforms { var matrix: simd_float4x4 }
 
 final class Renderer: NSObject, MTKViewDelegate {
-    let device: MTLDevice, queue: MTLCommandQueue, pipeline: MTLRenderPipelineState, skyPipeline: MTLRenderPipelineState, skySurfacePipeline: MTLRenderPipelineState, spritePipeline: MTLRenderPipelineState, tintPipeline: MTLRenderPipelineState, fuzzPipeline: MTLRenderPipelineState, depth: MTLDepthStencilState, fuzzDepth: MTLDepthStencilState
+    let device: MTLDevice, queue: MTLCommandQueue, depth: MTLDepthStencilState, fuzzDepth: MTLDepthStencilState
+    private var programs: WorldPrograms
+    var pipeline: MTLRenderPipelineState { programs.world }
+    var skyPipeline: MTLRenderPipelineState { programs.sky }
+    var skySurfacePipeline: MTLRenderPipelineState { programs.skySurface }
+    var spritePipeline: MTLRenderPipelineState { programs.sprite }
+    var tintPipeline: MTLRenderPipelineState { programs.tint }
+    var fuzzPipeline: MTLRenderPipelineState { programs.fuzz }
+    private var hdrOutput: HDROutput?
+    var hdrEnabled: Bool { hdrOutput != nil }
+    private(set) var hdrPeak: Float = 4
+    private(set) var fogDensity: Float = 0.003
+    func setHDRPeak(_ value: Float) { hdrPeak=value.isFinite ? min(8,max(1,value)):4 }
+    func setFogDensity(_ value: Float) { fogDensity=value.isFinite ? min(0.01,max(0,value)):0.003 }
+    private var volume: VolumetricLighting?
+    private var effectDepth: MTLTexture?
+    func setHDR(_ enabled: Bool, view: GameView) throws {
+        guard enabled != hdrEnabled else { return }
+        var preset=EffectsPreset(renderer:self);preset.hdr=enabled
+        try applyEffectsPreset(preset,view:view)
+    }
+
+    func applyEffectsPreset(_ preset: EffectsPreset, view: GameView) throws {
+        let format:MTLPixelFormat=preset.hdr ? .rgba16Float:.bgra8Unorm
+        let switches=preset.switches
+        let nextPrograms=try WorldPrograms(device:device,shader:worldShader,format:format)
+        let nextOutput=preset.hdr ? try HDROutput(device:device):nil
+        let nextAO=(preset.ao || preset.testLight || switches.contains(where: { $0.needsRays }))
+            ? try AmbientOcclusion(device:device,shader:worldShader,format:format):nil
+        let nextBloom=switches.contains(.bloom) ? try Bloom(device:device,format:format):nil
+        let nextParticles=switches.contains(.particles) ? try ParticleRenderer(device:device,format:format):nil
+        let nextVolume=switches.contains(.volumetrics) ? try VolumetricLighting(device:device,shader:worldShader,format:format):nil
+        programs=nextPrograms;hdrOutput=nextOutput;ambientOcclusion=nextAO;bloom=nextBloom;particles=nextParticles;volume=nextVolume
+        ambientOcclusionEnabled=preset.ao;dynamicLightEnabled=preset.testLight;dynamicLightShadows=preset.testShadows
+        sceneEffects=switches;setAOSettings(strength:preset.strength,radius:preset.radius)
+        setFogDensity(preset.density);setHDRPeak(preset.peak)
+        worldFormat=format;aoGeometryDirty=true;sceneSnapshot=nil
+        view.releaseDrawables();view.colorPixelFormat=format
+        view.colorspace=preset.hdr ? CGColorSpace(name:CGColorSpace.extendedLinearSRGB):nil
+        (view.layer as? CAMetalLayer)?.wantsExtendedDynamicRangeContent=preset.hdr
+    }
     private var batches: [GPUBatch] = []
     private var worldShader = ""
     private var worldFormat: MTLPixelFormat = .bgra8Unorm
@@ -138,6 +178,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         if effect == .bloom {
             bloom=enabled ? try Bloom(device:device,format:worldFormat):nil
         }
+        if effect == .volumetrics { volume=enabled ? try VolumetricLighting(device:device,shader:worldShader,format:worldFormat):nil }
         if effect == .particles { particles=enabled ? try ParticleRenderer(device:device,format:worldFormat):nil }
         sceneEffects=next
         if !ambientOcclusionEnabled && !dynamicLightEnabled && !next.contains(where: { $0.needsRays }) { ambientOcclusion=nil }
@@ -189,7 +230,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         if !ao && !light && !sceneEffects.contains(where: { $0.needsRays }) { ambientOcclusion=nil }
     }
     private func disableRayEffects() {
-        ambientOcclusion=nil;ambientOcclusionEnabled=false;dynamicLightEnabled=false
+        ambientOcclusion=nil;ambientOcclusionEnabled=false;dynamicLightEnabled=false;volume=nil
         sceneEffects=sceneEffects.filter { !$0.needsRays }
     }
     private func movingLightUniforms() -> DynamicLightUniforms {
@@ -345,7 +386,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             float4 c = tex.sample(s,in.uv / float2(tex.get_width(),tex.get_height()));
             if (c.a < 0.5) discard_fragment();
             float shade = (in.fullbright > 0.5 || power.x>0 || power.y>0) ? 1.0 : in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
-            return float4(powerColor(c.rgb*shade,power),1.0);
+            return float4(powerColor(c.rgb*shade*(power.w>0 && in.fullbright>0.5 && power.x==0 && power.y==0 ? 1.5:1.0),power),1.0);
         }
         fragment float4 fuzzFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]],
                 texture2d<float, access::read> scene [[texture(1)]], constant float4 &power [[buffer(2)]]) {
@@ -386,27 +427,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         """
         worldShader=shader;worldFormat=view.colorPixelFormat
-        let library = try device.makeLibrary(source:shader,options:nil)
-        let descriptor = MTLRenderPipelineDescriptor()
-        descriptor.vertexFunction = library.makeFunction(name:"worldVertex")
-        descriptor.fragmentFunction = library.makeFunction(name:"worldFragment")
-        descriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
-        descriptor.depthAttachmentPixelFormat = .depth32Float
-        pipeline = try device.makeRenderPipelineState(descriptor:descriptor)
-        descriptor.fragmentFunction = library.makeFunction(name:"skySurfaceFragment")
-        skySurfacePipeline = try device.makeRenderPipelineState(descriptor:descriptor)
-        descriptor.fragmentFunction = library.makeFunction(name:"spriteFragment")
-        spritePipeline = try device.makeRenderPipelineState(descriptor:descriptor)
-        descriptor.fragmentFunction = library.makeFunction(name:"fuzzFragment")
-        fuzzPipeline = try device.makeRenderPipelineState(descriptor:descriptor)
-        descriptor.vertexFunction = library.makeFunction(name:"skyVertex")
-        descriptor.fragmentFunction = library.makeFunction(name:"skyFragment")
-        skyPipeline = try device.makeRenderPipelineState(descriptor:descriptor)
-        descriptor.fragmentFunction = library.makeFunction(name:"tintFragment")
-        descriptor.colorAttachments[0].isBlendingEnabled = true
-        descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-        descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        tintPipeline = try device.makeRenderPipelineState(descriptor:descriptor)
+        programs=try WorldPrograms(device:device,shader:shader,format:view.colorPixelFormat)
         let state = MTLDepthStencilDescriptor(); state.depthCompareFunction = .less; state.isDepthWriteEnabled = true
         guard let depth = device.makeDepthStencilState(descriptor:state) else { throw PortError("Cannot create Metal depth state.") }
         self.depth = depth
@@ -624,11 +645,33 @@ final class Renderer: NSObject, MTKViewDelegate {
             disableRayEffects()
             DispatchQueue.main.async { [weak self] in self?.onWarning?("Ray-traced effects disabled: \(error)") }
         }
+        // HDR retains the original palette shading in an extended floating-point scene.
+        // Presentation converts its transfer function to linear EDR after the HUD.
+        var sceneTarget=drawable.texture
+        do {
+            if let hdrOutput {
+                sceneTarget=try hdrOutput.scene(width:drawable.texture.width,height:drawable.texture.height)
+                pass.colorAttachments[0].texture=sceneTarget
+            }
+            if volume != nil {
+                if effectDepth?.width != sceneTarget.width || effectDepth?.height != sceneTarget.height {
+                    let d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.depth32Float,width:sceneTarget.width,height:sceneTarget.height,mipmapped:false)
+                    d.storageMode = .private;d.usage = [.renderTarget,.shaderRead]
+                    guard let texture=device.makeTexture(descriptor:d) else { throw PortError("Cannot allocate volumetric depth.") }
+                    effectDepth=texture
+                }
+                pass.depthAttachment.texture=effectDepth
+            }
+        } catch {
+            command.commit()
+            DispatchQueue.main.async { [weak self] in self?.onWarning?("Cannot allocate effects frame: \(error)") }
+            return
+        }
         pass.depthAttachment.storeAction = .store
         // A BVH build may already be encoded. Submit it even if the render
         // encoder fails, so the next frame never consumes an unbuilt structure.
         guard var encoder = command.makeRenderCommandEncoder(descriptor:pass) else { command.commit(); return }
-        var power=SIMD4<Float>(hud.fixedColorMap==32 ? 1:0,hud.fixedColorMap==1 ? 1:0,Float(hud.tick),0)
+        var power=SIMD4<Float>(hud.fixedColorMap==32 ? 1:0,hud.fixedColorMap==1 ? 1:0,Float(hud.tick),hdrEnabled ? 1:0)
         var noPower=SIMD4<Float>.zero
         encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
         encoder.setRenderPipelineState(pipeline); encoder.setDepthStencilState(depth); encoder.setCullMode(.none); encoder.setFrontFacing(.counterClockwise)
@@ -698,7 +741,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                     if let snapshot=sceneSnapshot {
                         encoder.endEncoding()
                         if let blit=command.makeBlitCommandEncoder() {
-                            blit.copy(from:drawable.texture,sourceSlice:0,sourceLevel:0,sourceOrigin:MTLOrigin(x:0,y:0,z:0),sourceSize:MTLSize(width:Int(width),height:Int(height),depth:1),to:snapshot,destinationSlice:0,destinationLevel:0,destinationOrigin:MTLOrigin(x:0,y:0,z:0));blit.endEncoding()
+                            blit.copy(from:sceneTarget,sourceSlice:0,sourceLevel:0,sourceOrigin:MTLOrigin(x:0,y:0,z:0),sourceSize:MTLSize(width:Int(width),height:Int(height),depth:1),to:snapshot,destinationSlice:0,destinationLevel:0,destinationOrigin:MTLOrigin(x:0,y:0,z:0));blit.endEncoding()
                         }
                         pass.colorAttachments[0].loadAction = .load;pass.depthAttachment.loadAction = .load
                         guard let resumed=command.makeRenderCommandEncoder(descriptor:pass) else { command.commit();return }
@@ -717,11 +760,29 @@ final class Renderer: NSObject, MTKViewDelegate {
                         DispatchQueue.main.async { [weak self] in self?.onWarning?("Particles disabled: \(error)") }
                     }
                 }
+                if let volume, let ao=ambientOcclusion, let alpha=aoAlphaBuffer,
+                   let depthTexture=effectDepth, power.x==0 && power.y==0 {
+                    encoder.endEncoding()
+                    var ready=false
+                    do {
+                        try volume.prepare(command:command,depth:depthTexture,worldHeight:Int(worldHeight),
+                            inverse:uniform.matrix.inverse,eye:eye,lights:sceneLights(),ao:ao,alpha:alpha,density:fogDensity)
+                        ready=true
+                    } catch {
+                        self.volume=nil;sceneEffects.remove(.volumetrics)
+                        DispatchQueue.main.async { [weak self] in self?.onWarning?("Volumetric lighting disabled: \(error)") }
+                    }
+                    pass.colorAttachments[0].loadAction = .load;pass.depthAttachment.loadAction = .load
+                    guard let resumed=command.makeRenderCommandEncoder(descriptor:pass) else { command.commit();return }
+                    encoder=resumed;encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:worldHeight,znear:0,zfar:1))
+                    if ready { volume.draw(encoder:encoder) }
+                    encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
+                }
                 // Complete world effects before either weapon pass and the HUD.
                 if let bloom, power.x==0 && power.y==0 {
                     encoder.endEncoding()
                     var ready=false
-                    do { try bloom.prepare(command:command,source:drawable.texture,worldHeight:Int(worldHeight));ready=true }
+                    do { try bloom.prepare(command:command,source:sceneTarget,worldHeight:Int(worldHeight));ready=true }
                     catch {
                         self.bloom=nil;sceneEffects.remove(.bloom)
                         DispatchQueue.main.async { [weak self] in self?.onWarning?("Bloom disabled: \(error)") }
@@ -733,6 +794,8 @@ final class Renderer: NSObject, MTKViewDelegate {
                     if ready { bloom.draw(encoder:encoder,width:width,height:worldHeight) }
                     encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
                 }
+                // Weapons and HUD stay at standard white in HDR.
+                power.w=0;encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
                 if (hud.invisibility>128 || (hud.invisibility&8) != 0), let snapshot=sceneSnapshot {
                     encoder.setFragmentTexture(snapshot,index:1);encoder.setRenderPipelineState(fuzzPipeline)
                     sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,fuzz:true)
@@ -752,7 +815,12 @@ final class Renderer: NSObject, MTKViewDelegate {
                 sprites.drawHUD(encoder:encoder,state:hud,width:width,height:height)
             }
         }
-        encoder.endEncoding(); command.present(drawable); command.commit(); renderedFrames += 1
+        encoder.endEncoding()
+        if let hdrOutput {
+            hdrOutput.present(command:command,source:sceneTarget,target:drawable.texture,
+                headroom:Float(view.window?.screen?.maximumExtendedDynamicRangeColorComponentValue ?? 1),peak:hdrPeak)
+        }
+        command.present(drawable); command.commit(); renderedFrames += 1
         onSubmittedFrame?(CACurrentMediaTime())
         frames += 1
         if time-reportTime >= 0.5 { onFrame?(Double(frames)/(time-reportTime)); frames = 0; reportTime = time }

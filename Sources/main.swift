@@ -53,6 +53,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var loggedSettings = ""
     var summary = "Open a Doom WAD to explore a map"
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSWindow.allowsAutomaticWindowTabbing=false
         do {
             let menu = NSMenu(), appMenu = NSMenu()
             let appItem = NSMenuItem(); appItem.submenu = appMenu; menu.addItem(appItem)
@@ -71,6 +72,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             quickLoad.target = self; quickLoad.keyEquivalentModifierMask = [.command,.shift]
             let viewItem=NSMenuItem(), viewMenu=NSMenu(title:"View")
             viewItem.submenu=viewMenu; menu.addItem(viewItem)
+            addGraphicsMenus(to:viewMenu)
             statusBarMenuItem=viewMenu.addItem(withTitle:"Show Status Bar",action:#selector(toggleStatusBar),keyEquivalent:"")
             statusBarMenuItem?.target=self
             levelStatsMenuItem=viewMenu.addItem(withTitle:"Show Level Stats",action:#selector(toggleLevelStats),keyEquivalent:"")
@@ -121,6 +123,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSApp.mainMenu = menu
             window = NSWindow(contentRect:NSRect(x:0,y:0,width:1100,height:760),styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)
             window.title = "\(appTitle) — Gameplay Preview"; window.minSize = NSSize(width:720,height:640)
+            window.tabbingMode = .disallowed
             window.isReleasedWhenClosed = false
             window.delegate = self; window.acceptsMouseMovedEvents = true
             let root = NSView(); window.contentView = root
