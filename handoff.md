@@ -2,95 +2,86 @@
 
 ## Where to resume
 
-The active repository is `/Users/wmh/Dev/MetalDooM`. At this handoff it is on
-**main**, at merge commit **c47a4a2** (PR #1, the Metal experiments), with a local
-**v0.8.0** tag pointing to that merge. The working tree was clean before this
-handoff-only edit. Recheck branch/status/log/tags before starting the next change.
-The previous experiment branch was `codex/metal-experiments`; do not assume it is
-still checked out. Start the next feature branch from current main using `codex/`.
+Active checkout: `/Users/wmh/Dev/MetalDooM`, branch **codex/resolution-kex**,
+branched from main `bb6f707`. This change is a local **0.9.0** feature milestone.
+`Info.plist` remains the semantic-version source; latest successful app build is
+**120**. Recheck git status/log and running app before continuing. Nothing was
+pushed and the existing v0.8.0 tag was not moved.
 
-The saved project may point to `/Users/wmh/Documents/ChatGPT/MetalDooM`, a separate
-outer staging repository. Work in the Dev checkout above. Do not copy the staging
-tree over newer source or commit the outer repository.
+## Resolution enhancements
 
-Current semantic version: **0.8.0**. Latest locally built and visually checked app:
-**build 115**. `Info.plist` owns the version; `scripts/build.sh` increments
-`BUILD_NUMBER`. Hosted Actions/release completion has not been checked this turn;
-a local tag/merge is not proof of a successful public release. CI builds use their
-own 10000+ run-based build number. The assistant has not pushed this handoff.
+The user chose **both** sharper output and upscaling performance. Implemented:
 
-## User's next priorities
+- Native-size drawable and native weapon/HUD/menu/intermission composition.
+- World scales 50/75/100/150/200%; optional device-gated MetalFX spatial below
+  native, nearest fallback, four-tap filtered supersampling above native.
+- HDR linearization around MetalFX, preserving the existing final EDR mapping;
+  native weapon invisibility snapshot, world effects before scaling, original
+  camera aspect, buffer replacement on resize/format/mode changes.
+- Esc → Options → Display and View → Graphics Presets controls; console scale
+  values and benchmark identity updated. No temporal scaling/frame generation.
 
-The user wants the next chat to work on **resolution enhancements** and loading
-the additional rerelease WADs toward **complete KEX support**. This turn only
-prepares the handoff; neither feature has been implemented. Keep the MetalDooM
-name. Heretic/Hexen support is a separate future interest, not the immediate work.
+See `docs/RESOLUTION.md`. Pixel tests preserve the HUD exactly and restore Classic
+exactly. Full Metal/effects/ceiling regressions pass. Local 2200×1520 Medium HDR
+GPU medians: native 5.672 ms; MetalFX 75% 4.571 ms; 50% 3.119 ms. Small-scene
+MetalFX overhead can be slower than native. These are paused-scene GPU samples,
+not sustained gameplay FPS. Physical HDR and cross-display backing-scale changes
+remain unverified. API/device checks used the local macOS 27 SDK and M5 Pro.
 
-### Resolution enhancements
+## Additional KEX campaigns
 
-- Current rendering is direct Metal. GameView computes drawable size from view
-  bounds × display backing scale × render scale. Graphics presets provide
-  50%/75%/100% scale and 60/120 FPS caps; they are independent of effects presets.
-  No MetalFX upscaling or frame generation is integrated.
-- Begin by distinguishing the desired result: sharper native output/supersampling,
-  better performance at native presentation size through upscaling, or both.
-  The user has not chosen an algorithm or approved particular performance claims.
-- Candidate first experiment: optional MetalFX spatial upscaling with separate
-  world-render and output sizes, retaining a direct native path. Verify current
-  Apple API/SDK/device support before implementation. Temporal reconstruction
-  requires an explicit motion/depth/history design; do not treat it as a toggle.
-- Preserve original HUD, weapon, menu and stats sharpness, Classic sampling, HDR
-  color/headroom, masked sprites/grilles and existing individual effect switches.
-  Decide composition order explicitly so world scaling does not blur UI artwork.
-- Inspect `Sources/GameView.swift`, `Renderer.swift`, `GraphicsPresets.swift`,
-  `WorldSampling.swift`, `HDROutput.swift`, `Bloom.swift` and `GameMenu.swift`.
-  Compare equal camera, output size and effects settings; measure GPU duration
-  separately from wall-clock frame intervals. Test resize, display-scale changes,
-  HDR/SDR transitions and Classic restoration. macOS occlusion can suppress frames;
-  avoid mistaking a covered automation window for a frozen render loop.
+The user explicitly chose **bundled single-player content**; multiplayer and the
+online add-on catalog are outside this work. Three dedicated rerelease profiles
+are implemented: **No Rest for the Living**, **Master Levels**, **SIGIL II**.
+Load Doom II + nerve.wad/masterlevels.wad, or Ultimate Doom + sigil2.wad, one
+campaign add-on at a time. All 39 maps pass resource, music-decoding, progression,
+secret-route and save tests. Boss tests cover disabled MAP07 behavior, Master
+Levels tag-666 floors and SIGIL II's 9,000-health spider/disabled boss exit.
+SIGIL II's extra FLMWAL01–03 animation is registered in the engine animation table.
 
-### Additional KEX rerelease WADs
+The profiles use full-file hashes of the installed rerelease editions; renamed
+files work, other/edited editions stay rejected. Metadata supplies names, music,
+skies and ending text; this is not general UMAPINFO/DeHackEd support. Campaign maps
+are filtered in selectors and engine loads/saves. Inherited base demos are disabled
+for these profiles. See `docs/KEX_SUPPORT.md` for the complete inventory and limits.
 
-- Installed data directory (verified at handoff):
-  `/Users/wmh/Library/Application Support/CrossOver/Bottles/Steam/drive_c/Program Files (x86)/Steam/steamapps/common/Ultimate Doom/rerelease/`.
-- Files present: `doom.wad`, `doom2.wad`, `tnt.wad`, `plutonia.wad`, `sigil.wad`,
-  `sigil2.wad`, `nerve.wad`, `masterlevels.wad`, `extras.wad`, `id1.wad`,
-  `id1-res.wad`, `id1-weap.wad`, `id1-tex.wad`, `id1-mus.wad`, `id24res.wad`,
-  and `iddm1.wad`. This is a filesystem inventory, not a validated load order or
-  a compatibility claim. Never commit or distribute these game data files.
-- Current validated campaign scope: Doom/Ultimate Doom, Doom II, TNT, Plutonia,
-  and standard SIGIL with Ultimate Doom. KEX edition labels, bounded GAMECONF
-  title parsing and corrected rerelease HUD artwork already exist.
-- GAMECONF currently supplies identity only, not load/options directives.
-  The renderer/engine WAD stack has dedicated SIGIL handling and rejects general
-  DeHackEd/MAPINFO/UMAPINFO add-ons and Episode 6. Chocolate Doom remains the
-  gameplay engine. Loading a file successfully is insufficient for compatibility.
-- Start with a per-campaign requirements inventory: inspect installed metadata,
-  declared base/resources/load order, maps, patches, new actors/weapons, music and
-  progression. Define what "complete KEX support" includes (bundled campaigns,
-  resource/music replacements, and whether deathmatch/add-on catalog features are
-  included). Proposed staging: investigate `nerve.wad` and `masterlevels.wad`,
-  then SIGIL II, then the `id1*`/ID24 resource family. Determine feasibility from
-  metadata and engine requirements rather than assuming every file is additive.
-- Implement required metadata/gameplay behavior before relaxing rejection guards.
-  Validate map/secret-exit progression, endings, sprites, sounds/music, saves and
-  resource precedence for each supported campaign. Preserve current Doom-family
-  regressions. Do not claim broad Boom/MBF/GZDoom/ID24 compatibility from picker
-  recognition or from only loading the first level.
-- Inspect `Sources/WAD.swift`, `WADStackPanel.swift`, `MapNames.swift`,
-  `IntermissionSequence.swift`, `MusicPlayer.swift`, `Engine/Bridge.h`, the engine
-  integration and `Vendor/ChocolateDoom`. Existing WAD tests and
-  `docs/VALIDATION.md` record supported behavior and known boundaries.
+**Legacy of Rust remains unsupported.** Its GAMECONF declares ID24, extended
+actors/states/weapons, MBF21 rules, animated/switch resources and intermission
+animation. Do not assume the id1* family is one additive load order; GAMECONF's
+pwadfiles/dehfiles are null. Audit id24res/extras and optional resource/music
+replacements before defining the next implementation milestone. There are 17 map
+blocks in installed id1.wad despite its 16-level description. Do not claim complete
+KEX support or relax rejection guards based on loading a level.
 
-## Workflow for the next chat
+Installed data remains under:
+`/Users/wmh/Library/Application Support/CrossOver/Bottles/Steam/drive_c/Program Files (x86)/Steam/steamapps/common/Ultimate Doom/rerelease/`.
+Never commit these files, generated fixtures or bundles.
 
-Read this handoff and AGENTS.md, inspect current main/status, then make a focused
-feature branch. The 0.8.0 line now has a local release tag: assess a new minor
-version for delivered features or patch for fixes, rather than carrying forward
-old notes that kept all experiments on unreleased 0.8.0. Do not move v0.8.0.
-Update Info.plist and current docs together, keep historical changelog entries,
-validate the actual running build, and commit locally. Push only when requested.
-Documentation-only handoffs do not rebuild or bump the version.
+## Validation and workflow
+
+Final build 120 is left open, paused on SIGIL II E6M1 with native world scale.
+The earlier NRFTL and Master Levels validation previews were closed.
+
+See the newest `docs/VALIDATION.md` entry. Useful commands:
+
+```sh
+bash scripts/build.sh
+bash scripts/test-kex-campaign.sh BASE.wad CAMPAIGN.wad
+AO_RESOLUTION=1 bash scripts/test-ambient-occlusion.sh IWAD.wad
+AO_PROFILE=1 AO_RESOLUTION_PROFILE=1 AO_VALIDATION_LAYER=0 bash scripts/test-ambient-occlusion.sh IWAD.wad
+```
+
+Native icon generation and Metal GPU access required permitted host execution;
+sandbox failures were environment boundaries. KEX tests report normal exit-code
+failures rather than Swift top-level crash dialogs. The early Master Levels test
+incorrectly expected a tag-667 floor in MAP20; the installed map has none, and the
+test was corrected to recognize the declared no-op. This was a test correction,
+not a gameplay fix.
+
+Honor AGENTS.md: update CHANGELOG and current docs, validate final running version/
+build and commit locally for each change. New feature milestone = minor version;
+refinements stay on the chosen release. Do not push unless asked. Keep unrelated
+work intact; no WADs, generated bundles, or signing material in Git.
 
 The following sections retain historical implementation and validation context.
 Their branch/release/preview statements describe those earlier steps; the current

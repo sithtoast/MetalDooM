@@ -222,6 +222,9 @@ final class Renderer: NSObject, MTKViewDelegate {
         try ao.updateMaterials(info,device:device)
     }
     private var sceneSnapshot: MTLTexture?
+    private var resolution: WorldResolution?
+    private var resolutionKey = ""
+    private var weaponSnapshot: MTLTexture?
     private var sky: MTLTexture?
     private var skyGeometry: MTLBuffer?
     private var skyVertexCount = 0
@@ -406,6 +409,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         guard wad.signature == "IWAD" else { throw PortError("Choose a base IWAD before adding PWADs.") }
         if wad.sourceURLs.count>1 {
+            guard MD_ConfigureCampaign(wad.campaign?.id ?? 0,wad.campaign?.story ?? "") != 0 else { throw PortError("Cannot change the active campaign profile.") }
             let configured=wad.sourceURLs.map(\.path).joined(separator:"\n").withCString { paths in
                 wad.engineOrder.withUnsafeBufferPointer { MD_ConfigureWADStack(paths,$0.baseAddress,Int32($0.count)) }
             }
@@ -623,12 +627,29 @@ final class Renderer: NSObject, MTKViewDelegate {
         // HDR retains the original palette shading in an extended floating-point scene.
         // Presentation converts its transfer function to linear EDR after the HUD.
         var sceneTarget=drawable.texture
+        var outputTarget=drawable.texture
+        let outputWidth=Double(drawable.texture.width),outputHeight=Double(drawable.texture.height)
+        let outputWorldHeight=max(1,outputHeight-SpriteRenderer.hudHeight(width:outputWidth))
+        let scaledWorld=progress.phase == 0 && map != nil && view.renderScale != 1
+        let nativeDepth=pass.depthAttachment.texture
+        if !scaledWorld { resolution=nil;resolutionKey="" }
         do {
             if let hdrOutput {
                 sceneTarget=try hdrOutput.scene(width:drawable.texture.width,height:drawable.texture.height)
                 pass.colorAttachments[0].texture=sceneTarget
             }
-            if volume != nil {
+            outputTarget=sceneTarget
+            if scaledWorld {
+                let w=max(1,Int((outputWidth*view.renderScale).rounded())),h=max(1,Int((outputWorldHeight*view.renderScale).rounded()))
+                let key="\(w)x\(h):\(Int(outputWidth))x\(Int(outputWorldHeight)):\(worldFormat.rawValue):\(view.metalFXEnabled)"
+                if resolutionKey != key {
+                    resolution=try WorldResolution(device:device,width:w,height:h,outputWidth:Int(outputWidth),outputHeight:Int(outputWorldHeight),format:worldFormat,metalFX:view.metalFXEnabled)
+                    resolutionKey=key
+                }
+                sceneTarget=resolution!.color;pass.colorAttachments[0].texture=sceneTarget
+                pass.depthAttachment.texture=resolution!.depth
+                effectDepth=resolution!.depth
+            } else if volume != nil {
                 if effectDepth?.width != sceneTarget.width || effectDepth?.height != sceneTarget.height {
                     let d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.depth32Float,width:sceneTarget.width,height:sceneTarget.height,mipmapped:false)
                     d.storageMode = .private;d.usage = [.renderTarget,.shaderRead]
@@ -638,6 +659,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                 pass.depthAttachment.texture=effectDepth
             }
         } catch {
+            if scaledWorld { view.renderScale=1;resolution=nil;resolutionKey="" }
             command.commit()
             DispatchQueue.main.async { [weak self] in self?.onWarning?("Cannot allocate effects frame: \(error)") }
             return
@@ -655,10 +677,10 @@ final class Renderer: NSObject, MTKViewDelegate {
             encoder.setFragmentBytes(&noPower,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
             intermissionArt.draw(encoder:encoder,state:progress,sequence:intermission,finale:finale,width:max(1,view.drawableSize.width),height:max(1,view.drawableSize.height))
         } else if map != nil {
-            let width = max(1,view.drawableSize.width), height = max(1,view.drawableSize.height)
-            let worldHeight = max(1,height-SpriteRenderer.hudHeight(width:width))
+            var width=Double(sceneTarget.width),height=Double(sceneTarget.height)
+            var worldHeight=scaledWorld ? height:max(1,height-SpriteRenderer.hudHeight(width:width))
             encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:worldHeight,znear:0,zfar:1))
-            let aspect = Float(width/worldHeight)
+            let aspect = Float(outputWidth/outputWorldHeight)
             if let sky {
                 var camera = SIMD4(yaw,pitch,aspect,0)
                 encoder.setRenderPipelineState(skyPipeline)
@@ -779,9 +801,32 @@ final class Renderer: NSObject, MTKViewDelegate {
                     if ready { bloom.draw(encoder:encoder,width:width,height:worldHeight,strength:bloomStrength) }
                     encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
                 }
+                if scaledWorld, let resolution {
+                    encoder.endEncoding();resolution.prepare(command:command)
+                    sceneTarget=outputTarget
+                    pass.colorAttachments[0].texture=outputTarget;pass.colorAttachments[0].loadAction = .clear
+                    pass.depthAttachment.texture=nativeDepth;pass.depthAttachment.loadAction = .clear
+                    guard let resumed=command.makeRenderCommandEncoder(descriptor:pass) else { command.commit();return }
+                    encoder=resumed;width=outputWidth;height=outputHeight;worldHeight=outputWorldHeight
+                    encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:worldHeight,znear:0,zfar:1))
+                    resolution.draw(encoder:encoder)
+                    if hud.invisibility>128 || (hud.invisibility&8) != 0 {
+                        if weaponSnapshot?.width != Int(width) || weaponSnapshot?.height != Int(height) || weaponSnapshot?.pixelFormat != worldFormat {
+                            let d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:worldFormat,width:Int(width),height:Int(height),mipmapped:false)
+                            d.storageMode = .private;d.usage = .shaderRead;weaponSnapshot=device.makeTexture(descriptor:d)
+                        }
+                        encoder.endEncoding()
+                        if let snapshot=weaponSnapshot,let blit=command.makeBlitCommandEncoder() {
+                            blit.copy(from:outputTarget,sourceSlice:0,sourceLevel:0,sourceOrigin:MTLOrigin(x:0,y:0,z:0),sourceSize:MTLSize(width:Int(width),height:Int(height),depth:1),to:snapshot,destinationSlice:0,destinationLevel:0,destinationOrigin:MTLOrigin(x:0,y:0,z:0));blit.endEncoding()
+                        }
+                        pass.colorAttachments[0].loadAction = .load;pass.depthAttachment.loadAction = .load
+                        guard let resumed=command.makeRenderCommandEncoder(descriptor:pass) else { command.commit();return }
+                        encoder=resumed;encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:worldHeight,znear:0,zfar:1))
+                    }
+                }
                 // Weapons and HUD stay at standard white in HDR.
                 power.w=0;encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
-                if (hud.invisibility>128 || (hud.invisibility&8) != 0), let snapshot=sceneSnapshot {
+                if (hud.invisibility>128 || (hud.invisibility&8) != 0), let snapshot=scaledWorld ? weaponSnapshot:sceneSnapshot {
                     encoder.setFragmentTexture(snapshot,index:1);encoder.setRenderPipelineState(fuzzPipeline)
                     sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,fuzz:true)
                 }
@@ -833,7 +878,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             } else if progress.phase==3 {
                 _ = finale.update(seconds:delta,pressed:pressed)
                 if finale.art {
-                    if progress.map==30 {
+                    if progress.map == (wad?.campaign?.endingMap ?? 30) {
                         guard MD_StartCast() != 0 else { throw PortError("Cannot begin the cast ending.") }
                         progress=MD_GetProgress(); accumulator=0; castAttackQueued=false; try music?.select("D_EVIL")
                     } else if let wad {
@@ -901,7 +946,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             if progress.phase != 0 {
                 view.releaseMouse(); accumulator = 0; intermissionTime = 0; messageUntil = 0
                 intermission = IntermissionSequence(progress)
-                finale = FinaleSequence(episode:progress.episode,textLength:(progress.episode==5 ? (wad?.sigilStory ?? "") : String(cString:MD_FinaleText(progress.episode))).count)
+                finale = FinaleSequence(episode:progress.episode,textLength:(progress.episode==6 ? (wad?.campaign?.story ?? "") : progress.episode==5 ? (wad?.sigilStory ?? "") : String(cString:MD_FinaleText(progress.episode))).count)
                 try music?.select(MusicPlayer.endTrack(progress))
                 break
             }

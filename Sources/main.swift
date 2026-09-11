@@ -1,5 +1,6 @@
 import AppKit
 import MetalKit
+import MetalFX
 import UniformTypeIdentifiers
 
 let version = Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "development"
@@ -135,6 +136,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             renderer = try Renderer(view:view); view.delegate = renderer
             view.onEscape = { [weak self] in self?.openGameMenu() }
             view.onBlockedClick = { [weak self] in if self?.attractActive==true && self?.consoleVisible==false { self?.openGameMenu() } }
+            view.metalFXEnabled=(UserDefaults.standard.object(forKey:"metalFXSpatial") as? Bool ?? true) && MTLFXSpatialScalerDescriptor.supportsDevice(renderer.device)
             view.renderScale=CGFloat(UserDefaults.standard.object(forKey:"renderScale") as? Double ?? 1)
             view.preferredFramesPerSecond=UserDefaults.standard.object(forKey:"frameLimit") as? Int ?? 120
             menuKeyMonitor=NSEvent.addLocalMonitorForEvents(matching:.keyDown) { [weak self] event in
@@ -444,7 +446,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             switch try ConsoleCommand.parse(text) {
             case .simple(let name):
                 switch name {
-                case "help": return "help / clear / status / maps / map <name> / restart / close\nvolume <0–1> / musicvolume <0–1> / music on|off\nrender_scale <50|75|100> / fps <35|60|120> / fullscreen on|off\ngod / noclip / give all / give ammo (or classic cheat codes)\nMap and restart begin a fresh level; save your progress first."
+                case "help": return "help / clear / status / maps / map <name> / restart / close\nvolume <0–1> / musicvolume <0–1> / music on|off\nrender_scale <50|75|100|150|200> / fps <35|60|120> / fullscreen on|off\ngod / noclip / give all / give ammo (or classic cheat codes)\nMap and restart begin a fresh level; save your progress first."
                 case "give": return "Usage: give all | give ammo"
                 case "clear": console?.clear(); return ""
                 case "close": toggleConsole(); return ""
@@ -454,7 +456,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     endAttract();try renderer.reset(); return "Level restarted."
                 default:
                     let size=view.drawableSize
-                    return "\(appTitle)\n\(wad?.displayName ?? "No WAD") — \(summary)\n\(renderer.playerStatus)\nGPU: \(renderer.device.name)\nRender: \(Int(size.width))x\(Int(size.height)) at \(Int(view.renderScale*100))%; limit \(view.preferredFramesPerSecond) FPS\nEffects: \(renderer.effectsVolume); music: \(renderer.musicVolume) (\(renderer.musicEnabled ? "on" : "off"))"
+                    return "\(appTitle)\n\(wad?.displayName ?? "No WAD") — \(summary)\n\(renderer.playerStatus)\nGPU: \(renderer.device.name)\nOutput: \(Int(size.width))x\(Int(size.height)); world \(Int(view.renderScale*100))%; limit \(view.preferredFramesPerSecond) FPS\nEffects: \(renderer.effectsVolume); music: \(renderer.musicVolume) (\(renderer.musicEnabled ? "on" : "off"))"
                 }
             case .map(let name):
                 guard let wad else { throw ConsoleError("No WAD loaded.") }

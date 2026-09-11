@@ -3,6 +3,46 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.9.0, build 120 — World resolution and bundled KEX profiles
+
+- Final local app build 120, version 0.9.0; bundle signature and plist validated.
+  Native inspection covered NRFTL MAP01 (build 116), Master Levels MAP20 (119),
+  SIGIL II E6M1 and its episode menu (119/120). World scale 50% MetalFX and 200%
+  supersampling retained native 2200×1520 output and sharp HUD/menu artwork.
+  Build 120 only aligns the filtered episode menu beneath its heading.
+- `AO_RESOLUTION=1` passes on the M5 Pro with Metal API validation: 50/75% nearest
+  and MetalFX, 150/200% supersampling, exact HUD equality, stable paused output,
+  exact Classic restoration, all effects, weapon invisibility, HDR/SDR changes,
+  finite bounded HDR and resize. Evidence: `build/resolution-validation`.
+- The existing full Ultimate Doom Metal suite including `AO_CEILING=1` passes:
+  alpha rays/grilles, 48 ceiling views, lighting/particles/bloom/volume, HDR transfer,
+  presets/custom settings, menu controls, save/load, map replacement and shutdown.
+  Evidence: `build/resolution-full-regression` and its `.log`.
+- At equal 2200×1520 output with Medium HDR, fixed paused E1M1 and API validation
+  off, 32 GPU samples give native median/p95 5.672/7.076 ms, 75% MetalFX
+  4.571/6.094 ms and 50% 3.119/5.451 ms. The 1280×800 Medium test with API validation
+  enabled was slower with MetalFX than native. See `docs/RESOLUTION.md` and
+  `build/resolution-profile`; no universal or sustained gameplay FPS claim.
+- `test-kex-campaign.sh` passes for all nine NRFTL, 21 Master Levels and nine
+  SIGIL II maps: geometry, material/sprite resolution, sky/music/name metadata,
+  MUS/MIDI data, normal/secret routing, inventory continuation, story/cast or
+  episode ending, every-map save round trip, modified-edition and base-map rejection.
+  It additionally verifies disabled MAP07 boss actions, Master Levels boss floors,
+  SIGIL II spider health/disabled boss exit and its extra flame-wall animation.
+  Logs: `build/kex-{nerve,masterlevels,sigil2}-validation.txt`.
+- Master Levels MAP20 has no sector tagged 667, despite declaring that boss action;
+  the test initially failed by expecting one. The correction verifies the actual
+  map's no-op rather than inventing floor movement. Existing engine REJECT-padding
+  notices are printed for some Master Levels maps; map/resource/save tests pass.
+- Doom II gameplay/progression/boss checks, SIGIL stack/sprites/routes/saves,
+  all TNT/Plutonia maps/routes/music/stories/saves and native input/console parsing
+  regressions pass. WADs, binaries, captures and local logs remain ignored.
+- Remaining boundaries: full manual campaign playthroughs, every original sound
+  mix, other rerelease revisions, other GPUs/OS releases, physical HDR luminance
+  and cross-display scale/headroom transitions have not been established.
+  Legacy of Rust/ID24 and optional resource-pack precedence are still incomplete;
+  multiplayer/catalog features are outside the user's selected single-player scope.
+
 ## 0.8.0, build 115 — Pre-merge test dependencies
 
 - The supplied GitHub log fails while compiling `test-input.sh`: its explicit

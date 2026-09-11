@@ -10,8 +10,8 @@ enum ConsoleCommand {
         let args=Array(words.dropFirst())
         if ["volume","musicvolume","render_scale","fps"].contains(name) {
             guard args.count==1, let value=Float(args[0]), value.isFinite else { throw ConsoleError("Usage: \(name) <number>") }
-            let valid = name=="fps" ? [35,60,120].contains(value) : name=="render_scale" ? [50,75,100].contains(value) : (0...1).contains(value)
-            guard valid else { throw ConsoleError(name=="fps" ? "FPS must be 35, 60 or 120." : name=="render_scale" ? "Render scale must be 50, 75 or 100." : "Volume must be between 0 and 1.") }
+            let valid = name=="fps" ? [35,60,120].contains(value) : name=="render_scale" ? [50,75,100,150,200].contains(value) : (0...1).contains(value)
+            guard valid else { throw ConsoleError(name=="fps" ? "FPS must be 35, 60 or 120." : name=="render_scale" ? "World scale must be 50, 75, 100, 150 or 200." : "Volume must be between 0 and 1.") }
             return .number(name,value)
         }
         if ["music","fullscreen"].contains(name) {

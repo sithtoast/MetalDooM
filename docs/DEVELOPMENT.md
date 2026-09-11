@@ -33,7 +33,7 @@ GAMECONF load directives, ID24, or Legacy of Rust.
 increments it and sets the app's `CFBundleVersion`. The version/build appear in the
 window title and About window; About includes a UTC build timestamp. Failed builds
 preserve the previous app and counter. Concurrent builds are rejected. Marketing
-version `0.8.0` is maintained separately in `Info.plist`. Commit `BUILD_NUMBER` with
+version `0.9.0` is maintained separately in `Info.plist`. Commit `BUILD_NUMBER` with
 releases; independent checkouts do not share a global numbering sequence.
 
 ## Implemented
@@ -109,8 +109,8 @@ releases; independent checkouts do not share a global numbering sequence.
   fuzz are implemented as Metal approximations rather than exact palette/software output.
 - Classic binary Doom maps only; no UDMF, Hexen format, extended/compressed nodes,
   Boom/MBF extensions or GZDoom mods. General MAPINFO/UMAPINFO and DeHackEd
-  behavior are unsupported; standard SIGIL v1.23 uses a dedicated Episode 5 profile.
-  SIGIL COMPAT, SIGIL II and compressed/MP3 music are outside this implementation.
+  behavior are unsupported; SIGIL and three additional rerelease campaigns use dedicated profiles (see KEX_SUPPORT.md).
+  SIGIL COMPAT and compressed/MP3 music are outside this implementation.
 - All geometry is submitted each frame. Sector height/light changes rebuild geometry
   while retaining textures; visibility culling and selective updates are pending.
 - Fatal engine errors require restarting the app. Malformed-file checks do not mean

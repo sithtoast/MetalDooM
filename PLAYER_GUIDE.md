@@ -139,7 +139,7 @@ an occupied slot replaces it. Earlier saves without names remain compatible. Fil
 quick-save shortcuts are still available.
 
 Options offers window sizes from 960×720 to 1920×1080 macOS points (clamped to
-the screen), fullscreen, 50/75/100% Metal render scale, and 35/60/120 FPS limits.
+the screen), fullscreen, 50/75/100/150/200% world render scale, and 35/60/120 FPS limits.
 The pixel dimensions shown reflect the actual drawable, including Retina scaling.
 Fullscreen uses the current desktop display mode; it does not switch the monitor's
 resolution. Window preset, render scale, frame limit, music enablement, and separate
@@ -317,7 +317,7 @@ Quit before switching base games. Saves identify IWAD contents, so TNT and
 Plutonia saves cannot be mixed, and renaming an identical IWAD preserves saves.
 
 This is dedicated Final Doom support, not general GAMECONF/UMAPINFO or DeHackEd
-support. Classic/enhanced mode selection, SIGIL II, Legacy of Rust/ID24 and Doom 64
+support. Legacy of Rust/ID24 and Doom 64
 remain future milestones.
 
 
@@ -401,3 +401,13 @@ press selects Medium. A brief message names the selected preset. Use Save
 Current as Custom before comparing if you want to restore a manually tuned setup.
 The shortcut leaves resolution, frame cap, saved custom presets and game progress
 unchanged. It is disabled while benchmarking and does not activate the E/Use key.
+
+## Resolution and additional rerelease campaigns
+
+World scale changes world rendering while the HUD, weapon and menus stay at native
+display resolution. Below 100%, choose optional MetalFX Spatial or Nearest; above
+100%, supersampling can smooth edges at greater GPU cost. See [resolution](docs/RESOLUTION.md).
+
+The validated KEX editions of No Rest for the Living and Master Levels use Doom II;
+SIGIL II uses Ultimate Doom. Add one campaign PWAD in Open WAD. See
+[campaign support](docs/KEX_SUPPORT.md) for file editions and remaining ID24 work.

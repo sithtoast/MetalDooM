@@ -37,11 +37,50 @@ static char *stackPaths;
 static int32_t *stackOrder;
 static int stackCount;
 static int sigilEpisode;
+static int campaignProfile;
+extern boolean secretexit;
+static char campaignStory[8192];
+int MD_ConfigureCampaign(int profile,const char *story) {
+    if(profile<0 || profile>3 || !story || strlen(story)>=sizeof(campaignStory)) return 0;
+    if(initialized) return profile==campaignProfile && !strcmp(story,campaignStory);
+    campaignProfile=profile;strcpy(campaignStory,story);return 1;
+}
+static int CampaignAllowsMap(int episode,int map) {
+    if(!campaignProfile) return 1;
+    return episode==(campaignProfile==3 ? 6:1) && map>=1 && map<=(campaignProfile==2 ? 21:9);
+}
+static int CampaignEndMap(void) { return campaignProfile==1 ? 8:campaignProfile==2 ? 20:30; }
+static int CampaignPar(void) {
+    static const int nerve[]={75,105,120,105,210,105,165,105,135};
+    static const int sigil2[]={480,300,240,420,510,840,960,390,450};
+    if(campaignProfile==1 && gamemap>=1 && gamemap<=9) return nerve[gamemap-1];
+    if(campaignProfile==3 && gameepisode==6 && gamemap>=1 && gamemap<=9) return sigil2[gamemap-1];
+    return 0; // Master Levels declares no par times; never reuse Doom II's.
+}
+// Called only by the native build's A_BossDeath hook. Preserve vanilla logic otherwise.
+int MD_CampaignBossDeath(void *object) {
+    if(!campaignProfile) return 0;
+    mobj_t *mo=object;
+    if(campaignProfile!=2 || (gamemap!=19 && gamemap!=20)) return 1;
+    if(mo->type!=MT_FATSO && !(gamemap==20 && mo->type==MT_BABY)) return 1;
+    int alive=0;
+    for(int i=0;i<MAXPLAYERS;i++) if(playeringame[i] && players[i].health>0) alive=1;
+    if(!alive) return 1;
+    for(thinker_t *th=thinkercap.next;th!=&thinkercap;th=th->next) {
+        if(th->function.acp1!=(actionf_p1)P_MobjThinker) continue;
+        mobj_t *other=(mobj_t *)th;
+        if(other!=mo && other->type==mo->type && other->health>0) return 1;
+    }
+    line_t trigger={0};trigger.tag=mo->type==MT_FATSO ? 666:667;
+    EV_DoFloor(&trigger,mo->type==MT_FATSO ? lowerFloorToLowest:raiseToTexture);
+    return 1;
+}
 static char *arguments[] = {"MetalDooM", NULL};
 static char lastMessage[128];
 static int messageSerial;
 static int monstersEnabled = 1;
 static void RefreshAnimations(void);
+static void ConfigureCampaignAnimations(void);
 static void RevealMap(void);
 static int weaponGrinTicks;
 static byte *nativeDemo;
@@ -155,11 +194,22 @@ static void CompleteLevel(void) {
         .maxSecrets=totalsecret,.seconds=leveltime/TICRATE};
     // SIGIL follows episode 3's secret return, without episode 3's boss action.
     int originalEpisode=gameepisode;
-    if(sigilEpisode && gameepisode==5) gameepisode=3;
+    if((sigilEpisode && gameepisode==5) || (campaignProfile==3 && gameepisode==6)) gameepisode=3;
     G_DoCompleted(); gameepisode=originalEpisode;
     if(sigilEpisode && gameepisode==5) {
         static const int pars[]={90,150,360,420,780,420,780,300,660};
         wminfo.epsd=4;wminfo.partime=pars[gamemap-1]*TICRATE;
+    }
+    if(campaignProfile) {
+        wminfo.partime=CampaignPar()*TICRATE;
+        if(campaignProfile==3) {
+            wminfo.epsd=5;
+            wminfo.next=gamemap==9 ? 3:secretexit && gamemap==3 ? 8:gamemap;
+        } else {
+            int secretSource=campaignProfile==1 ? 4:18,secretMap=campaignProfile==1 ? 9:21;
+            wminfo.next=gamemap==secretMap ? secretSource:secretexit && gamemap==secretSource ? secretMap-1:gamemap;
+            if(gamemap==CampaignEndMap()) wminfo.next=-1;
+        }
     }
     progress.didSecret = players[0].didsecret;
     if (gameaction == ga_victory) {
@@ -169,7 +219,7 @@ static void CompleteLevel(void) {
     }
 }
 int MD_Continue(void) {
-    if (!loaded || poisoned || (progress.phase != 1 && progress.phase != 3) || (gamemode == commercial && gamemap == 30)) return 0;
+    if (!loaded || poisoned || (progress.phase != 1 && progress.phase != 3) || (gamemode == commercial && gamemap == CampaignEndMap())) return 0;
     char name[16];
     if (gamemode == commercial) snprintf(name,sizeof(name),"MAP%02d",progress.nextMap);
     else snprintf(name,sizeof(name),"E%dM%d",gameepisode,progress.nextMap);
@@ -219,8 +269,9 @@ int MD_ReadSave(const char *path) {
     unsigned char header[50];int32_t extra[MD_SAVE_WORDS];char version[16]={0};
     snprintf(version,sizeof(version),"version %i",G_VanillaVersionCode());
     int ok=fread(header,sizeof(header),1,save_stream)==1;
-    ok=ok && !memcmp(header+24,version,16) && header[40]<=4 && header[41]>=1 && header[41]<=(sigilEpisode ? 5:4)
+    ok=ok && !memcmp(header+24,version,16) && header[40]<=4 && header[41]>=1 && header[41]<=(campaignProfile==3 ? 6:sigilEpisode ? 5:4)
         && header[42]>=1 && header[42]<=(gamemode==commercial ? 32 : 9)
+        && CampaignAllowsMap(header[41],header[42])
         && header[43]==1 && !header[44] && !header[45] && !header[46];
     ok=ok && !fseek(save_stream,-(long)sizeof(extra),SEEK_END) && fread(extra,sizeof(extra),1,save_stream)==1
         && extra[0]==0x4d445331 && extra[5]==1 && extra[1]>=0 && extra[2]>=0
@@ -333,9 +384,11 @@ int MD_LoadSkill(const char *path, int episode, int map, int skill) {
         gamemission = finalDoom == 1 ? pack_tnt : finalDoom == 2 ? pack_plut : W_CheckNumForName("MAP01") >= 0 ? doom2 : doom;
         gamemode = gamemission != doom ? commercial : W_CheckNumForName("E4M1") >= 0 ? retail : W_CheckNumForName("E2M1") >= 0 ? registered : shareware;
         gameversion = finalDoom ? exe_final : gamemode == retail ? exe_ultimate : exe_doom_1_9;
-        R_InitData(); CacheTextureNames(); P_Init();
+        if(campaignProfile==3) mobjinfo[MT_SPIDER].spawnhealth=9000;
+        R_InitData(); CacheTextureNames(); P_Init(); ConfigureCampaignAnimations();
         strcpy(loadedPath,path); initialized = 1;
     }
+    if(!CampaignAllowsMap(episode,map)) { snprintf(errorText,sizeof(errorText),"Map is outside the active campaign.");guarded=0;return 0; }
     char mapName[16];
     if (gamemode == commercial) snprintf(mapName,sizeof(mapName),"MAP%02d",map);
     else snprintf(mapName,sizeof(mapName),"E%dM%d",episode,map);
@@ -529,6 +582,7 @@ MD_HUD MD_GetHUD(void) {
         static const int pars[] = {90,150,360,420,780,420,780,300,660};
         hud.parSeconds = pars[gamemap-1];
     }
+    if(campaignProfile) hud.parSeconds=CampaignPar();
     hud.damageFlash = player->damagecount; hud.kills = player->killcount; hud.totalKills = totalkills;
     hud.bonusFlash = player->bonuscount; hud.messageSerial = messageSerial; hud.tick = gametic;
     snprintf(hud.message,sizeof(hud.message),"%s",lastMessage);
@@ -610,6 +664,14 @@ int MD_TestKeyDoor(int key, float *x, float *y, float *angle, int *sector) {
 // Layout from pinned p_spec.c; no engine-owned pointers cross the bridge.
 typedef struct { boolean istexture; int picnum,basepic,numpics,speed; } MD_EngineAnim;
 extern MD_EngineAnim anims[], *lastanim;
+static void ConfigureCampaignAnimations(void) {
+    if(campaignProfile!=3) return;
+    // The validated SIGIL II ANIMATED adds this one sequence to vanilla's table.
+    // Its SWITCHES table matches vanilla; no general Boom parser is enabled.
+    int first=R_TextureNumForName("FLMWAL01"),last=R_TextureNumForName("FLMWAL03");
+    if(last-first!=2 || lastanim-anims>=32) I_Error("Invalid SIGIL II flame animation");
+    *lastanim++=(MD_EngineAnim){true,last,first,3,8};
+}
 int MD_CopyAnimatedMaterials(MD_Material *output,int capacity) {
     if (!loaded || poisoned) return 0;
     int count=0;
@@ -650,7 +712,7 @@ int MD_StartDemo(const char *name) {
     byte *data=malloc(size); if(!data) return 0;
     guarded=1;if(setjmp(errorBoundary)) { free(data);guarded=0;return 0; }
     W_ReadLump(lump,data);
-    int valid=(data[0]==108 || data[0]==109) && data[1]<=4 && data[2]>=1 && data[2]<=(sigilEpisode ? 5:4) && data[3]>=1
+    int valid=!campaignProfile && (data[0]==108 || data[0]==109) && data[1]<=4 && data[2]>=1 && data[2]<=(campaignProfile==3 ? 6:sigilEpisode ? 5:4) && data[3]>=1
         && data[3]<=(gamemode==commercial ? 32:9) && !data[4] && data[5]<=1 && data[6]<=1 && data[7]<=1
         && !data[8] && data[9]==1 && !data[10] && !data[11] && !data[12];
     int end=13;while(end<size && data[end]!=0x80) end+=4;
@@ -728,14 +790,18 @@ extern boolean castdeath;
 extern struct { const char *name; mobjtype_t type; } castorder[];
 int MD_BeginStory(void) {
     if (!loaded || poisoned || progress.phase!=1 || gamemode!=commercial) return 0;
-    G_WorldDone();
+    if(campaignProfile) {
+        if(gamemap!=CampaignEndMap()) return 0;
+        finaletext=campaignStory;finaleflat=campaignProfile==1 ? "SLIME16":"CEIL4_2";
+        gameaction=ga_nothing;gamestate=GS_FINALE;
+    } else G_WorldDone();
     if (gamestate!=GS_FINALE) return 0;
     progress.phase=3; memset(&players[0].cmd,0,sizeof(players[0].cmd)); return 1;
 }
 const char *MD_StoryText(void) { return progress.phase>=3 && finaletext ? finaletext : ""; }
 const char *MD_StoryFlat(void) { return progress.phase>=3 && finaleflat ? finaleflat : ""; }
 int MD_StartCast(void) {
-    if (!loaded || poisoned || progress.phase!=3 || gamemap!=30) return 0;
+    if (!loaded || poisoned || progress.phase!=3 || gamemap!=CampaignEndMap()) return 0;
     F_StartCast(); progress.phase=4; return 1;
 }
 int MD_CastTick(int attack) {

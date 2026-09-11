@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import simd
 
 struct PortError: Error, CustomStringConvertible {
@@ -66,6 +67,7 @@ struct WAD {
         else { return false }
         return data["title"] as? String == title && data["mode"] as? String == mode
     }
+    let campaign: KEXCampaign?
     let finalDoom: Int // 0: other, 1: TNT, 2: Plutonia
     private static func finalDoomProfile(_ names: Set<String>) -> Int {
         guard names.contains("MAP01") else { return 0 }
@@ -74,6 +76,7 @@ struct WAD {
         return 0
     }
     var gameName: String {
+        if let campaign { return campaign.title }
         if finalDoom == 1 { return "Final Doom: TNT: Evilution" }
         if finalDoom == 2 { return "Final Doom: The Plutonia Experiment" }
         if maps.contains("MAP01") { return "Doom II" }
@@ -98,6 +101,7 @@ struct WAD {
             try b.check(offset, size)
             found.append(Lump(name: try b.name(entry + 8), bytes: Bytes(data: b.data.subdata(in: offset..<offset+size))))
         }
+        campaign=nil
         finalDoom=Self.finalDoomProfile(Set(found.map(\.name)))
         isKEXEdition=Self.kexProfile(found,signature:signature,finalDoom:finalDoom)
         lumps = found
@@ -117,6 +121,14 @@ struct WAD {
         guard !base.maps.contains("E1M1") || base.maps.contains("E2M1") else { throw PortError("Add-ons require the registered or Ultimate Doom IWAD.") }
         let extras=try addOns.map { try WAD(url:$0) }
         guard extras.allSatisfy({$0.signature=="PWAD"}) else { throw PortError("Add-ons must be PWAD files; choose only one base IWAD.") }
+        let profiles=extras.compactMap(KEXCampaign.identify)
+        campaign=profiles.first
+        if let campaign {
+            guard extras.count==1 else { throw PortError("Load this dedicated KEX campaign by itself with its base IWAD.") }
+            guard campaign.id==3 ? base.maps.contains("E4M1") && !base.maps.contains("MAP01") : base.maps.contains("MAP01") && base.finalDoom==0 else {
+                throw PortError(campaign.id==3 ? "SIGIL II requires Ultimate Doom.":"This campaign requires Doom II.")
+            }
+        }
         finalDoom=base.finalDoom
         isKEXEdition=base.isKEXEdition
         self.url=base.url; signature="IWAD"
@@ -149,7 +161,7 @@ struct WAD {
         }
         let order=general+[spriteStart]+sprite.values.sorted()+[spriteEnd,flatStart]+flat.values.sorted()+[flatEnd]
         engineOrder=order.map(Int32.init);let effective=order.map{all[$0]};lumps=effective
-        maps=Array(Set(effective.indices.compactMap { i -> String? in
+        maps=campaign?.maps ?? Array(Set(effective.indices.compactMap { i -> String? in
             guard i+1<effective.count,effective[i+1].name=="THINGS" else { return nil };return effective[i].name
         })).sorted()
         if maps.contains("E5M1") {
@@ -158,15 +170,16 @@ struct WAD {
                 throw PortError("Episode 5 currently supports standard SIGIL with Ultimate Doom.")
             }
         }
-        if extras.contains(where:{ ($0.lump("DEHACKED") != nil || $0.lump("UMAPINFO") != nil || $0.lump("MAPINFO") != nil) && !(isSigil && $0.lump("E5TEXT") != nil && $0.lump("SIGILINT") != nil) }) {
-            throw PortError("This add-on requires unsupported map metadata or DeHackEd changes. Standard SIGIL v1.23 has a dedicated Episode 5 profile.")
+        if campaign == nil && extras.contains(where:{ ($0.lump("DEHACKED") != nil || $0.lump("UMAPINFO") != nil || $0.lump("MAPINFO") != nil || $0.lump("ANIMATED") != nil || $0.lump("SWITCHES") != nil) && !(isSigil && $0.lump("E5TEXT") != nil && $0.lump("SIGILINT") != nil) }) {
+            throw PortError("This add-on requires unsupported map metadata or DeHackEd changes. Legacy of Rust needs ID24 engine support. Only validated editions of SIGIL, SIGIL II, No Rest for the Living and Master Levels have dedicated profiles.")
         }
         guard extras.flatMap(\.maps).allSatisfy({base.maps.contains("MAP01") ? $0.hasPrefix("MAP") : $0.hasPrefix("E")}) else {
             throw PortError("The add-on's map format does not match the base game.")
         }
-        guard !maps.contains(where:{$0.hasPrefix("E6")}) else { throw PortError("Episode 6 / SIGIL II is not supported yet.") }
+        guard campaign?.id==3 || !maps.contains(where:{$0.hasPrefix("E6")}) else { throw PortError("This SIGIL II edition has not been validated. Use the supported bundled rerelease file.") }
     }
     func skyName(for map: String) -> String {
+        if let sky=campaign?.value("skytexture",map:map) { return sky }
         if isSigil && map.hasPrefix("E5") { return "SKY5" }
         if map.hasPrefix("E2") { return "SKY2" }
         if map.hasPrefix("E3") { return "SKY3" }
@@ -285,3 +298,44 @@ struct DoomMap {
 }
 func cross(_ a: SIMD2<Float>, _ b: SIMD2<Float>) -> Float { a.x*b.y-a.y*b.x }
 extension Float { func clamped(_ low: Float, _ high: Float) -> Float { min(high, max(low, self)) } }
+
+/// Dedicated, byte-identified rerelease profiles. This is deliberately not a general
+/// UMAPINFO/DeHackEd interpreter: an edited or different edition must be assessed again.
+struct KEXCampaign {
+    let id: Int32
+    let title: String
+    let maps: [String]
+    let metadata: [String:String]
+    var endingMap: Int { id==1 ? 8:id==2 ? 20:8 }
+    var endingName: String { id==3 ? "E6M8":String(format:"MAP%02d",endingMap) }
+    func value(_ key:String, map:String) -> String? {
+        guard let block=metadata[map], let regex=try? NSRegularExpression(pattern:"(?im)^\\s*"+NSRegularExpression.escapedPattern(for:key)+"\\s*=\\s*\"([^\"]*)\""),
+              let match=regex.firstMatch(in:block,range:NSRange(block.startIndex...,in:block)),let range=Range(match.range(at:1),in:block) else { return nil }
+        return String(block[range])
+    }
+    var story: String {
+        guard let block=metadata[endingName], let start=block.range(of:"(?im)^\\s*intertext\\s*=",options:.regularExpression) else { return "" }
+        let tail=String(block[start.upperBound...])
+        let pattern="^\\s*\"[^\"]*\"(?:\\s*,\\s*\"[^\"]*\")*"
+        guard let range=tail.range(of:pattern,options:.regularExpression) else { return "" }
+        return String(tail[range]).components(separatedBy:"\"").enumerated().filter{$0.offset%2==1}.map(\.element).joined(separator:"\n")
+    }
+    static func identify(_ wad:WAD) -> KEXCampaign? {
+        guard wad.signature=="PWAD" else { return nil }
+        let hash=SHA256.hash(data:wad.sourceData[0]).map{String(format:"%02x",$0)}.joined()
+        let id:Int32,title:String
+        switch hash {
+        case "e2eb4bd5b0e8252fa1198b2c34b5da7602015e2fe5d702a91209bc11d1fbb9f8": id=1;title="No Rest for the Living"
+        case "3e42d71e316a3e3e53d47860509998d63a0758eafd846171c77f218b0043eaef": id=2;title="Master Levels for Doom II"
+        case "ab75c9352d1ae8fedb581014ec47eb09c28933a6a66e367424dff8ee2810e825": id=3;title="SIGIL II"
+        default:return nil
+        }
+        let text=String(decoding:wad.lump("UMAPINFO")!.data,as:UTF8.self)
+        let regex=try! NSRegularExpression(pattern:"(?is)map\\s+(MAP[0-9]+|E[0-9]M[0-9])\\s*\\{([^}]*)\\}")
+        var metadata:[String:String]=[:]
+        for match in regex.matches(in:text,range:NSRange(text.startIndex...,in:text)) {
+            metadata[String(text[Range(match.range(at:1),in:text)!]).uppercased()]=String(text[Range(match.range(at:2),in:text)!])
+        }
+        return KEXCampaign(id:id,title:title,maps:wad.maps.sorted(),metadata:metadata)
+    }
+}

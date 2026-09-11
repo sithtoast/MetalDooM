@@ -92,6 +92,7 @@ int MD_CopyMapLines(MD_MapLine *output,int capacity);
 const char *MD_FinaleText(int episode);
 
 // Doom II: stats -> story -> next map, or the original interactive cast.
+int MD_ConfigureCampaign(int profile, const char *story);
 int MD_BeginStory(void);
 const char *MD_StoryText(void);
 const char *MD_StoryFlat(void);

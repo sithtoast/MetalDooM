@@ -4,6 +4,20 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.9.0 — World resolution and bundled KEX campaigns (build 120)
+
+- Keep weapon, HUD, menus and intermissions at native display resolution while
+  scaling the world to 50/75/100/150/200%; add optional MetalFX Spatial upscaling,
+  filtered supersampling and Sharp/Supersampled graphics presets.
+- Preserve HDR/EDR composition, effects, masked world sprites, weapon invisibility
+  and Classic restoration across resolution changes.
+- Add dedicated profiles for the validated KEX editions of No Rest for the Living,
+  Master Levels and SIGIL II: map/music/sky metadata, campaign routes and endings,
+  boss behavior, pars, exact-stack saves and SIGIL II flame-wall animation.
+- Keep campaign selectors and title/credit cycles separate from inherited base
+  maps/demos. Reject unvalidated editions and general extended resource tables.
+  Legacy of Rust/ID24 remains unsupported; document the remaining single-player scope.
+
 ## Handoff update — no app rebuild (latest local build 115)
 
 - Refresh the main/merge/tag baseline and next-chat plan for resolution
