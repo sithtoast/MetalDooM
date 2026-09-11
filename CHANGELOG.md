@@ -4,6 +4,13 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## Handoff update — no app rebuild (latest local build 115)
+
+- Refresh the main/merge/tag baseline and next-chat plan for resolution
+  enhancements and broader KEX rerelease support. Record installed WAD names,
+  existing compatibility boundaries, source pointers and validation expectations.
+  Documentation only; app behavior and semantic version remain unchanged.
+
 ## 0.8.0 · Build 115 — Repair pre-merge checks
 
 - Fix the no-WAD input check's stale renderer dependencies by moving the unchanged

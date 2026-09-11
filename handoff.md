@@ -2,19 +2,100 @@
 
 ## Where to resume
 
-The active repository is `/Users/wmh/Dev/MetalDooM`, on `codex/metal-experiments`.
-The saved project for this conversation points to
-`/Users/wmh/Documents/ChatGPT/MetalDooM`, a separate outer repository used for
-staging. Do not commit that outer repository or copy its staging tree over newer
-source. Open the active Dev repository in the next chat and inspect its status.
+The active repository is `/Users/wmh/Dev/MetalDooM`. At this handoff it is on
+**main**, at merge commit **c47a4a2** (PR #1, the Metal experiments), with a local
+**v0.8.0** tag pointing to that merge. The working tree was clean before this
+handoff-only edit. Recheck branch/status/log/tags before starting the next change.
+The previous experiment branch was `codex/metal-experiments`; do not assume it is
+still checked out. Start the next feature branch from current main using `codex/`.
 
-The active experiment is on `codex/metal-experiments`; check Git status/log before
-continuing. The user selected **ray-traced ambient occlusion**. It is implemented
-as a per-session View menu option, with classic rendering still the default.
+The saved project may point to `/Users/wmh/Documents/ChatGPT/MetalDooM`, a separate
+outer staging repository. Work in the Dev checkout above. Do not copy the staging
+tree over newer source or commit the outer repository.
 
-Current version: **0.8.0**, successful local app **build 115**. `Info.plist` owns
-the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
-This is an experimental branch, not a published release. No push was requested.
+Current semantic version: **0.8.0**. Latest locally built and visually checked app:
+**build 115**. `Info.plist` owns the version; `scripts/build.sh` increments
+`BUILD_NUMBER`. Hosted Actions/release completion has not been checked this turn;
+a local tag/merge is not proof of a successful public release. CI builds use their
+own 10000+ run-based build number. The assistant has not pushed this handoff.
+
+## User's next priorities
+
+The user wants the next chat to work on **resolution enhancements** and loading
+the additional rerelease WADs toward **complete KEX support**. This turn only
+prepares the handoff; neither feature has been implemented. Keep the MetalDooM
+name. Heretic/Hexen support is a separate future interest, not the immediate work.
+
+### Resolution enhancements
+
+- Current rendering is direct Metal. GameView computes drawable size from view
+  bounds × display backing scale × render scale. Graphics presets provide
+  50%/75%/100% scale and 60/120 FPS caps; they are independent of effects presets.
+  No MetalFX upscaling or frame generation is integrated.
+- Begin by distinguishing the desired result: sharper native output/supersampling,
+  better performance at native presentation size through upscaling, or both.
+  The user has not chosen an algorithm or approved particular performance claims.
+- Candidate first experiment: optional MetalFX spatial upscaling with separate
+  world-render and output sizes, retaining a direct native path. Verify current
+  Apple API/SDK/device support before implementation. Temporal reconstruction
+  requires an explicit motion/depth/history design; do not treat it as a toggle.
+- Preserve original HUD, weapon, menu and stats sharpness, Classic sampling, HDR
+  color/headroom, masked sprites/grilles and existing individual effect switches.
+  Decide composition order explicitly so world scaling does not blur UI artwork.
+- Inspect `Sources/GameView.swift`, `Renderer.swift`, `GraphicsPresets.swift`,
+  `WorldSampling.swift`, `HDROutput.swift`, `Bloom.swift` and `GameMenu.swift`.
+  Compare equal camera, output size and effects settings; measure GPU duration
+  separately from wall-clock frame intervals. Test resize, display-scale changes,
+  HDR/SDR transitions and Classic restoration. macOS occlusion can suppress frames;
+  avoid mistaking a covered automation window for a frozen render loop.
+
+### Additional KEX rerelease WADs
+
+- Installed data directory (verified at handoff):
+  `/Users/wmh/Library/Application Support/CrossOver/Bottles/Steam/drive_c/Program Files (x86)/Steam/steamapps/common/Ultimate Doom/rerelease/`.
+- Files present: `doom.wad`, `doom2.wad`, `tnt.wad`, `plutonia.wad`, `sigil.wad`,
+  `sigil2.wad`, `nerve.wad`, `masterlevels.wad`, `extras.wad`, `id1.wad`,
+  `id1-res.wad`, `id1-weap.wad`, `id1-tex.wad`, `id1-mus.wad`, `id24res.wad`,
+  and `iddm1.wad`. This is a filesystem inventory, not a validated load order or
+  a compatibility claim. Never commit or distribute these game data files.
+- Current validated campaign scope: Doom/Ultimate Doom, Doom II, TNT, Plutonia,
+  and standard SIGIL with Ultimate Doom. KEX edition labels, bounded GAMECONF
+  title parsing and corrected rerelease HUD artwork already exist.
+- GAMECONF currently supplies identity only, not load/options directives.
+  The renderer/engine WAD stack has dedicated SIGIL handling and rejects general
+  DeHackEd/MAPINFO/UMAPINFO add-ons and Episode 6. Chocolate Doom remains the
+  gameplay engine. Loading a file successfully is insufficient for compatibility.
+- Start with a per-campaign requirements inventory: inspect installed metadata,
+  declared base/resources/load order, maps, patches, new actors/weapons, music and
+  progression. Define what "complete KEX support" includes (bundled campaigns,
+  resource/music replacements, and whether deathmatch/add-on catalog features are
+  included). Proposed staging: investigate `nerve.wad` and `masterlevels.wad`,
+  then SIGIL II, then the `id1*`/ID24 resource family. Determine feasibility from
+  metadata and engine requirements rather than assuming every file is additive.
+- Implement required metadata/gameplay behavior before relaxing rejection guards.
+  Validate map/secret-exit progression, endings, sprites, sounds/music, saves and
+  resource precedence for each supported campaign. Preserve current Doom-family
+  regressions. Do not claim broad Boom/MBF/GZDoom/ID24 compatibility from picker
+  recognition or from only loading the first level.
+- Inspect `Sources/WAD.swift`, `WADStackPanel.swift`, `MapNames.swift`,
+  `IntermissionSequence.swift`, `MusicPlayer.swift`, `Engine/Bridge.h`, the engine
+  integration and `Vendor/ChocolateDoom`. Existing WAD tests and
+  `docs/VALIDATION.md` record supported behavior and known boundaries.
+
+## Workflow for the next chat
+
+Read this handoff and AGENTS.md, inspect current main/status, then make a focused
+feature branch. The 0.8.0 line now has a local release tag: assess a new minor
+version for delivered features or patch for fixes, rather than carrying forward
+old notes that kept all experiments on unreleased 0.8.0. Do not move v0.8.0.
+Update Info.plist and current docs together, keep historical changelog entries,
+validate the actual running build, and commit locally. Push only when requested.
+Documentation-only handoffs do not rebuild or bump the version.
+
+The following sections retain historical implementation and validation context.
+Their branch/release/preview statements describe those earlier steps; the current
+checkout and next priorities above take precedence. Do not assume old preview
+processes are still running.
 
 Main also supplies the compact level-stats HUD (kills/items/secrets and a whole-second
 clock), optional campaign par time and independent secret notifications. Keep its
@@ -34,8 +115,9 @@ missing renderer/effects types. `test-input.sh` had a stale explicit source list
 GameView now lives unchanged in `Sources/GameView.swift`; the input check compiles
 that view alone. `test-audio.sh` likewise compiles only its WAD/audio dependencies.
 Input, console, testing-metrics and Ultimate Doom audio checks pass locally, as
-does the full 0.8.0 build 115. GitHub must rerun against the new local fix commit;
-no hosted CI success or new push has been claimed. No gameplay/version change.
+does the full 0.8.0 build 115. Fix commit `b7d6441` is now included in local main
+through merge `c47a4a2`. Hosted CI results have not been independently inspected.
+No gameplay/version change was made for that test-maintenance fix.
 Native build 115 loads E1M1 and opens its pause menu with Escape; the isolated
 validation preview was then closed.
 
@@ -324,9 +406,9 @@ confirm its build number, not just compiler success.
 
 ## Publishing and signing
 
-The remote is the user's GitHub repository, `sithtoast/MetalDooM`. The assistant
-has not pushed these changes. The user may have pushed independently; live remote
-state, current tags and hosted Actions completion have not been checked here.
+The remote is the user's GitHub repository, `sithtoast/MetalDooM`. The user pushed the experiment branch; local main now contains merge `c47a4a2`
+and local tag `v0.8.0`. Remote tag/release state and hosted Actions completion
+have not been independently checked. The assistant has not pushed this handoff.
 
 On clean `main`:
 
