@@ -5,8 +5,18 @@
 Active checkout: `/Users/wmh/Dev/MetalDooM`, branch **codex/resolution-kex**,
 branched from main `bb6f707`. This change is a local **0.9.0** feature milestone.
 `Info.plist` remains the semantic-version source; latest successful app build is
-**122**. Recheck git status/log and running app before continuing. Nothing was
+**123**. Recheck git status/log and running app before continuing. Nothing was
 pushed and the existing v0.8.0 tag was not moved.
+
+## Latest refinement — Transparent Minimal HUD (build 123)
+
+Options → HUD → HUD style and View → HUD Style select remembered Classic / Minimal.
+Classic remains the default. Minimal overlays native WAD health/armor on the left,
+current ammo on the right and both owned cards/skulls above it, with black pixel
+shadows and no background panel. The world fills the entire bottom strip. The
+shared 25/50/75/100% setting controls artwork only in Minimal; its weapon uses a
+bottom-anchored 200-line canvas independent of HUD size. Original Classic rendering
+restores exactly. This is another refinement within unreleased 0.9.0.
 
 ## Latest refinement — HUD status-bar size (build 122)
 
@@ -68,10 +78,12 @@ Never commit these files, generated fixtures or bundles.
 
 ## Validation and workflow
 
-Build 122 at `build/hud-size-preview/MetalDooM.app` is left paused on NRFTL MAP01
-with a remembered 50% HUD. Its fullscreen/windowed controls and persistence were
-checked; the pre-existing game instance was preserved. The earlier build-120
-preview state below is historical.
+Build 123 at `build/minimal-hud-preview/MetalDooM.app` is the current NRFTL MAP01
+preview, using remembered Minimal style and 50% size. Native fullscreen/windowed
+presentation, menu controls and persistence after restart were checked. Existing
+game instances were preserved. Build-122/build-120 preview notes are historical.
+Original Ultimate Doom and KEX Doom II GPU suites pass, including native overlay
+pixel masks, full-height world, all sizes, Classic restoration, HDR and invisibility.
 
 See the newest `docs/VALIDATION.md` entry. Useful commands:
 

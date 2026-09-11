@@ -85,6 +85,16 @@ final class LevelStatsView: NSView {
 }
 
 extension App {
+    func applyHUDStyle(_ style:HUDStyle) {
+        guard benchmark == nil else { return }
+        renderer.setHUDStyle(style)
+        UserDefaults.standard.set(style.rawValue,forKey:"hudStyle")
+        gameMenu?.refreshHUD()
+    }
+    @objc func selectHUDStyle(_ sender:NSMenuItem) {
+        guard let style=HUDStyle(rawValue:sender.tag) else { return }
+        applyHUDStyle(style)
+    }
     func applyHUDSize(_ percent:Int) {
         guard benchmark == nil else { return }
         renderer.setHUDSize(percent)

@@ -258,6 +258,8 @@ final class Renderer: NSObject, MTKViewDelegate {
     func releaseMusic() { music?.update(active:false);music=nil }
     func pauseAudio() { try? sound?.setActive(false); music?.update(active:false) }
     private var hud = MD_HUD()
+    private(set) var hudStyle: HUDStyle = .classic
+    func setHUDStyle(_ style: HUDStyle) { hudStyle=style }
     private(set) var hudSizePercent = 100
     func setHUDSize(_ percent: Int) { hudSizePercent=SpriteRenderer.hudSizes.contains(percent) ? percent:100 }
     private var secretNotice = SecretNotice()
@@ -631,7 +633,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         var sceneTarget=drawable.texture
         var outputTarget=drawable.texture
         let outputWidth=Double(drawable.texture.width),outputHeight=Double(drawable.texture.height)
-        let outputWorldHeight=max(1,outputHeight-SpriteRenderer.hudHeight(width:outputWidth,percent:hudSizePercent))
+        let outputWorldHeight=max(1,outputHeight-(hudStyle == .classic ? SpriteRenderer.hudHeight(width:outputWidth,percent:hudSizePercent):0))
         let scaledWorld=progress.phase == 0 && map != nil && view.renderScale != 1
         let nativeDepth=pass.depthAttachment.texture
         if !scaledWorld { resolution=nil;resolutionKey="" }
@@ -680,7 +682,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             intermissionArt.draw(encoder:encoder,state:progress,sequence:intermission,finale:finale,width:max(1,view.drawableSize.width),height:max(1,view.drawableSize.height))
         } else if map != nil {
             var width=Double(sceneTarget.width),height=Double(sceneTarget.height)
-            var worldHeight=scaledWorld ? height:max(1,height-SpriteRenderer.hudHeight(width:width,percent:hudSizePercent))
+            var worldHeight=scaledWorld ? height:max(1,height-(hudStyle == .classic ? SpriteRenderer.hudHeight(width:width,percent:hudSizePercent):0))
             encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:worldHeight,znear:0,zfar:1))
             let aspect = Float(outputWidth/outputWorldHeight)
             if let sky {
@@ -830,10 +832,10 @@ final class Renderer: NSObject, MTKViewDelegate {
                 power.w=0;encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
                 if (hud.invisibility>128 || (hud.invisibility&8) != 0), let snapshot=scaledWorld ? weaponSnapshot:sceneSnapshot {
                     encoder.setFragmentTexture(snapshot,index:1);encoder.setRenderPipelineState(fuzzPipeline)
-                    sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,fuzz:true)
+                    sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,fuzz:true,overlay:hudStyle == .minimal)
                 }
                 encoder.setRenderPipelineState(spritePipeline)
-                sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight)
+                sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,overlay:hudStyle == .minimal)
                 if hud.damageFlash > 0 || hud.bonusFlash > 0 || hud.suitFlash != 0 || hud.berserkFlash>0 {
                     var tint: SIMD4<Float> = max(hud.damageFlash,hud.berserkFlash)>0
                         ? SIMD4(1,0,0,min(0.45,Float(max(hud.damageFlash,hud.berserkFlash))/80))
@@ -844,7 +846,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                     encoder.setRenderPipelineState(spritePipeline)
                 }
                 encoder.setFragmentBytes(&noPower,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
-                sprites.drawHUD(encoder:encoder,state:hud,width:width,height:height,percent:hudSizePercent)
+                sprites.drawHUD(encoder:encoder,state:hud,width:width,height:height,percent:hudSizePercent,style:hudStyle)
             }
         }
         encoder.endEncoding()

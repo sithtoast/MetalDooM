@@ -28,6 +28,20 @@ motion vectors, temporal upscaling or frame generation is implemented.
 This follows Apple's [spatial scaler API](https://developer.apple.com/documentation/metalfx/mtlfxspatialscaler)
 and [color processing modes](https://developer.apple.com/documentation/metalfx/mtlfxspatialscalercolorprocessingmode).
 
+## HUD style
+
+Esc → Options → HUD → HUD style, or View → HUD Style, selects Classic or Minimal.
+The choice is remembered. Classic remains the default, with the complete original
+bar. Minimal draws health and armor at bottom left, current ammo at bottom right,
+and owned key cards/skulls above ammo. WAD numbers and labels have black pixel
+shadows for readability, with no opaque background. Melee weapons omit ammo.
+
+Minimal renders the world through the bottom edge and composes its artwork after
+world scaling and palette tints, at native output resolution and standard white
+in HDR. Its weapon is bottom-anchored on a 200-line canvas; changing HUD size does
+not change weapon scale or world projection. Changing style adjusts the world
+viewport. Both styles share the size setting below; stats and menus are independent.
+
 ## Status bar size
 
 Esc → Options → HUD → Status bar size, or View → HUD Status Bar Size, offers

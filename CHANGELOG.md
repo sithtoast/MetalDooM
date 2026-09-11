@@ -4,6 +4,17 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.9.0 refinement — Transparent Minimal HUD (build 123)
+
+- Add remembered Classic / Minimal HUD styles under Options → HUD and View → HUD
+  Style. Minimal shows health and armor on the left, current ammo on the right,
+  and owned keys above ammo, using native-resolution WAD artwork with shadows.
+- Render the world behind the Minimal overlay through the bottom edge, eliminating
+  the black side areas of the smaller Classic bar. Retain 25/50/75/100% sizing;
+  Minimal HUD size changes leave the weapon and camera unchanged.
+- Preserve Classic art, world upscaling, supersampling, HDR and weapon invisibility.
+  Continue the unreleased 0.9.0 resolution feature release.
+
 ## 0.9.0 refinement — Adjustable HUD status bar (build 122)
 
 - Add remembered 25/50/75/100% status-bar sizes under Options → HUD and

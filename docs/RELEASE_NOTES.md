@@ -15,7 +15,11 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.9.0
 
-Final local build: **122**.
+Final local build: **123**.
+
+Choose Classic or Minimal under Options → HUD or View → HUD Style. The remembered
+Minimal style draws health, armor, ammo and keys over the full-height world, with
+shadowed WAD artwork and the same adjustable sizes.
 
 Options → HUD and View → HUD Status Bar Size now provide remembered 25/50/75/100%
 bar sizes for windowed/fullscreen play, reclaiming game-view height at smaller sizes.

@@ -10,7 +10,7 @@ lighting, sprite light reception, hard/soft world shadows, emissive surface
 lighting, bloom, embers, projectile trails, volumetric haze, optional smooth world
 textures and HDR display output.
 Try **View → Effects Presets → Medium HDR**, or adjust individual switches.
-World scaling now includes optional MetalFX and 150/200% supersampling with a native-resolution HUD ([details](docs/RESOLUTION.md)).
+World scaling now includes optional MetalFX and 150/200% supersampling with a native-resolution HUD, adjustable size and a transparent Minimal style ([details](docs/RESOLUTION.md)).
 Separate graphics presets set world resolution/frame cap, and custom effects can be
 saved. Effects start in Classic. Local builds are ad-hoc signed; release packages
 use the separate signing workflow. See [Metal experiments](docs/METAL_EXPERIMENTS.md).

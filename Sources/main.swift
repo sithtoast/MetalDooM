@@ -74,6 +74,12 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let viewItem=NSMenuItem(), viewMenu=NSMenu(title:"View")
             viewItem.submenu=viewMenu; menu.addItem(viewItem)
             addGraphicsMenus(to:viewMenu)
+            let hudStyleItem=NSMenuItem(title:"HUD Style",action:nil,keyEquivalent:"")
+            let hudStyleMenu=NSMenu(title:"HUD Style");hudStyleItem.submenu=hudStyleMenu;viewMenu.addItem(hudStyleItem)
+            for style in HUDStyle.allCases {
+                let item=hudStyleMenu.addItem(withTitle:style.title,action:#selector(selectHUDStyle(_:)),keyEquivalent:"")
+                item.tag=style.rawValue;item.target=self
+            }
             let hudSizeItem=NSMenuItem(title:"HUD Status Bar Size",action:nil,keyEquivalent:"")
             let hudSizeMenu=NSMenu(title:"HUD Status Bar Size");hudSizeItem.submenu=hudSizeMenu;viewMenu.addItem(hudSizeItem)
             for percent in SpriteRenderer.hudSizes {
@@ -140,6 +146,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             view.preferredFramesPerSecond = 120; view.framebufferOnly = false
             configureMetalHUD()
             renderer = try Renderer(view:view); view.delegate = renderer
+            renderer.setHUDStyle(HUDStyle(rawValue:UserDefaults.standard.integer(forKey:"hudStyle")) ?? .classic)
             renderer.setHUDSize(UserDefaults.standard.object(forKey:"hudStatusBarSize") as? Int ?? 100)
             view.onEscape = { [weak self] in self?.openGameMenu() }
             view.onBlockedClick = { [weak self] in if self?.attractActive==true && self?.consoleVisible==false { self?.openGameMenu() } }

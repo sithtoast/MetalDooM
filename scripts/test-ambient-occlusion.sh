@@ -17,9 +17,16 @@ source=(root/'Sources/main.swift').read_text().split('\nlet app = NSApplication.
 start=source.index('    func show(_ error: Error) {')
 end=source.index('    @objc func toggleMusic',start)
 source=source[:start]+'    func show(_ error: Error) { validationFail(String(describing:error)) }\n'+source[end:]
-(output/'Renderer.swift').write_text((root/'Sources/Renderer.swift').read_text()+"""
+# Suppress only HUD drawing for identical-scene transparency/pixel comparisons.
+renderer=(root/'Sources/Renderer.swift').read_text()
+renderer=renderer.replace('final class Renderer: NSObject, MTKViewDelegate {',
+    'final class Renderer: NSObject, MTKViewDelegate {\n    var validationHUDVisible=true')
+renderer=renderer.replace('                sprites.drawHUD(', '                if validationHUDVisible { sprites.drawHUD(')
+renderer=renderer.replace('percent:hudSizePercent,style:hudStyle)', 'percent:hudSizePercent,style:hudStyle) }')
+(output/'Renderer.swift').write_text(renderer+"""
 // Test-only bridge in this copied source file; not part of app builds.
 extension Renderer {
+    func validationHUD(_ state:MD_HUD) { hud=state }
     func validationLightPhase(_ tics:Int32) { hud.levelTics=tics }
     var validationWorldShader: String { worldShader }
     var validationMapName: String? { map?.name }

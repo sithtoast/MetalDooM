@@ -3,6 +3,27 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.9.0 refinement, build 123 — Transparent Minimal HUD
+
+- Full build and strict bundle-signature verification pass; native app title and
+  bundle plist confirm 0.9.0 build 123. This continues the unreleased resolution
+  feature milestone, so its semantic version remains 0.9.0.
+- `AO_RESOLUTION=1` passes with Metal API validation for original Ultimate Doom
+  and the KEX Doom II IWAD on M5 Pro. The test-only copied renderer can suppress
+  HUD drawing to compare the identical full-height world against actual overlay
+  pixels. All four sizes preserve world/weapon pixels, show the bottom-edge world,
+  and preserve foreground artwork through 50/75% upscaling and 150/200%
+  supersampling. Classic restores exactly. Synthetic HUD captures cover six keys,
+  health/armor, ammo, zero values and melee without ammo. Minimal HDR foreground
+  equality, finite HDR bounds, resizing and invisibility rendering pass.
+- Evidence: `build/minimal-hud-validation` and `build/minimal-hud-kex-validation`.
+  Screenshots were inspected; timing output is not a performance claim. Physical
+  HDR brightness, other GPUs and cross-display transitions remain unverified.
+- Native CUA checks in NRFTL MAP01 verify the actual fullscreen and windowed
+  transparent overlay, readable menu layout, in-game style selection, native size
+  selection, and remembered Minimal/50% settings after relaunch. A separate
+  `build/minimal-hud-preview/MetalDooM.app` preserves existing game instances.
+
 ## 0.9.0 refinement, build 122 — Adjustable HUD status bar
 
 - `AO_RESOLUTION=1` passes with Metal API validation on the M5 Pro. All four
