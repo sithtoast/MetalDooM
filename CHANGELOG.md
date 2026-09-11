@@ -4,6 +4,16 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.8.0 · Build 115 — Repair pre-merge checks
+
+- Fix the no-WAD input check's stale renderer dependencies by moving the unchanged
+  production GameView into its own source file and testing it independently.
+  The check no longer compiles the renderer or C engine. Remove the same unused
+  renderer dependencies from the native audio test.
+- Pass all three GitHub no-WAD checks (input, console, testing metrics), native
+  pistol/menu audio validation, and the full build. Gameplay behavior is unchanged;
+  this is build/test maintenance within the unreleased 0.8.0 refinement.
+
 ## 0.8.0 · Build 114 — In-game effects presets
 
 - Add Esc → Options → Effects with descriptions for highlighted choices, an

@@ -3,6 +3,24 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.8.0, build 115 — Pre-merge test dependencies
+
+- The supplied GitHub log fails while compiling `test-input.sh`: its explicit
+  source list included Renderer but omitted newer effects and level-stats types.
+  Extract GameView unchanged into its own production file, and compile only that
+  file for the input test. Remove unused renderer dependencies from test-audio.
+- All three exact no-WAD workflow commands pass locally: `test-input.sh`,
+  `test-console.sh`, `test-testing-metrics.sh`. Input assertions exercise actual
+  AppKit events, queued taps/holds, Escape, focus clearing and drawable scaling.
+- `test-audio.sh` with Ultimate Doom passes pistol/menu PCM, pause/resume and
+  malformed DMX checks. The full app build succeeds as 0.8.0 build 115. Compare
+  the extracted GameView class against HEAD: its body is byte-for-byte unchanged.
+- An isolated native build-115 preview loads E1M1 and responds to Escape with the
+  pause menu; window and menu footer both display the expected version/build.
+  Close the temporary preview afterward. No full GPU rerun was needed for this
+  unchanged class move. GitHub Actions must rerun after the fix is pushed;
+  local validation does not establish hosted runner success.
+
 ## 0.8.0, build 114 — In-game effects presets
 
 - Build and signed bundle report 0.8.0 / 114; `codesign --verify --deep --strict`

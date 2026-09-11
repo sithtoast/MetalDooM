@@ -15,6 +15,9 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.8.0
 
+Build 115 repairs the pre-merge input check and audio test's source dependencies.
+Gameplay and effects settings are unchanged.
+
 Build 114 adds **Esc → Options → Effects** with descriptions that follow the
 highlighted preset, explicit Enter/click application and current setup status.
 The presets are now **Classic, Medium, High, Medium HDR and Ludicrous**; these

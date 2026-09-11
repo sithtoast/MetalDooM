@@ -12,7 +12,7 @@ The active experiment is on `codex/metal-experiments`; check Git status/log befo
 continuing. The user selected **ray-traced ambient occlusion**. It is implemented
 as a per-session View menu option, with classic rendering still the default.
 
-Current version: **0.8.0**, successful local app **build 114**. `Info.plist` owns
+Current version: **0.8.0**, successful local app **build 115**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
 This is an experimental branch, not a published release. No push was requested.
 
@@ -27,7 +27,19 @@ the level-stats/secret/save tests and the AO/48-view ceiling GPU suite, and its
 native window was checked with live counters/par time and AO together. The
 separate validation instance was closed afterward.
 
-## Latest refinement — in-game effects presets (build 114)
+## Latest maintenance — pre-merge checks (build 115)
+
+The user pushed the branch and reported GitHub's no-WAD input check failing with
+missing renderer/effects types. `test-input.sh` had a stale explicit source list.
+GameView now lives unchanged in `Sources/GameView.swift`; the input check compiles
+that view alone. `test-audio.sh` likewise compiles only its WAD/audio dependencies.
+Input, console, testing-metrics and Ultimate Doom audio checks pass locally, as
+does the full 0.8.0 build 115. GitHub must rerun against the new local fix commit;
+no hosted CI success or new push has been claimed. No gameplay/version change.
+Native build 115 loads E1M1 and opens its pause menu with Escape; the isolated
+validation preview was then closed.
+
+## In-game effects presets (build 114)
 
 Esc → Options → Effects now offers Classic, Medium, High, Medium HDR and Ludicrous
 with highlight descriptions, current preset/Custom status, Enter/click application
