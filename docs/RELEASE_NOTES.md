@@ -15,7 +15,10 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.9.0
 
-Final local build: **120**.
+Final local build: **122**.
+
+Options → HUD and View → HUD Status Bar Size now provide remembered 25/50/75/100%
+bar sizes for windowed/fullscreen play, reclaiming game-view height at smaller sizes.
 
 World-only MetalFX spatial upscaling and 150/200% supersampling preserve native
 HUD, weapon and menu resolution. No Rest for the Living, Master Levels and SIGIL II

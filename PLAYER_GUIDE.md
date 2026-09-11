@@ -411,3 +411,8 @@ display resolution. Below 100%, choose optional MetalFX Spatial or Nearest; abov
 The validated KEX editions of No Rest for the Living and Master Levels use Doom II;
 SIGIL II uses Ultimate Doom. Add one campaign PWAD in Open WAD. See
 [campaign support](docs/KEX_SUPPORT.md) for file editions and remaining ID24 work.
+
+Use **Esc → Options → HUD → Status bar size** or **View → HUD Status Bar Size**
+to reduce the bottom health/ammo/armor bar to 25%, 50% or 75%; 100% restores the
+original size. The remembered setting applies in fullscreen too. Smaller bars
+free more vertical game space and retain native-resolution artwork.

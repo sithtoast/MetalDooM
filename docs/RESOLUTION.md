@@ -28,6 +28,20 @@ motion vectors, temporal upscaling or frame generation is implemented.
 This follows Apple's [spatial scaler API](https://developer.apple.com/documentation/metalfx/mtlfxspatialscaler)
 and [color processing modes](https://developer.apple.com/documentation/metalfx/mtlfxspatialscalercolorprocessingmode).
 
+## Status bar size
+
+Esc → Options → HUD → Status bar size, or View → HUD Status Bar Size, offers
+25%, 50%, 75% and 100% of the original width-based size. Start with 50% or 75% if
+the health/ammo/armor bar feels too large in fullscreen. The choice persists;
+100% is the original/default layout. Artwork never drops below one output pixel
+per source pixel, so the smallest choices can coincide in small windows.
+
+The entire original status bar stays centered along the bottom, including KEX's
+wide background and aligned foreground widgets. Shrinking it returns the unused
+height to the world viewport. It remains composed at output resolution, independent
+of MetalFX/supersampling; level counters, native window chrome and menus have their
+own existing sizing. The same preference applies in windowed and fullscreen play.
+
 ## Measurements and checks
 
 M5 Pro, fixed E1M1 camera, 2200×1520 output, Medium HDR, 32 GPU command samples per

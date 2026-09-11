@@ -74,6 +74,12 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let viewItem=NSMenuItem(), viewMenu=NSMenu(title:"View")
             viewItem.submenu=viewMenu; menu.addItem(viewItem)
             addGraphicsMenus(to:viewMenu)
+            let hudSizeItem=NSMenuItem(title:"HUD Status Bar Size",action:nil,keyEquivalent:"")
+            let hudSizeMenu=NSMenu(title:"HUD Status Bar Size");hudSizeItem.submenu=hudSizeMenu;viewMenu.addItem(hudSizeItem)
+            for percent in SpriteRenderer.hudSizes {
+                let item=hudSizeMenu.addItem(withTitle:"\(percent)%"+(percent==100 ? " (Original)":""),action:#selector(selectHUDSize(_:)),keyEquivalent:"")
+                item.tag=percent;item.target=self
+            }
             statusBarMenuItem=viewMenu.addItem(withTitle:"Show Status Bar",action:#selector(toggleStatusBar),keyEquivalent:"")
             statusBarMenuItem?.target=self
             levelStatsMenuItem=viewMenu.addItem(withTitle:"Show Level Stats",action:#selector(toggleLevelStats),keyEquivalent:"")
@@ -134,6 +140,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             view.preferredFramesPerSecond = 120; view.framebufferOnly = false
             configureMetalHUD()
             renderer = try Renderer(view:view); view.delegate = renderer
+            renderer.setHUDSize(UserDefaults.standard.object(forKey:"hudStatusBarSize") as? Int ?? 100)
             view.onEscape = { [weak self] in self?.openGameMenu() }
             view.onBlockedClick = { [weak self] in if self?.attractActive==true && self?.consoleVisible==false { self?.openGameMenu() } }
             view.metalFXEnabled=(UserDefaults.standard.object(forKey:"metalFXSpatial") as? Bool ?? true) && MTLFXSpatialScalerDescriptor.supportsDevice(renderer.device)

@@ -5,8 +5,17 @@
 Active checkout: `/Users/wmh/Dev/MetalDooM`, branch **codex/resolution-kex**,
 branched from main `bb6f707`. This change is a local **0.9.0** feature milestone.
 `Info.plist` remains the semantic-version source; latest successful app build is
-**120**. Recheck git status/log and running app before continuing. Nothing was
+**122**. Recheck git status/log and running app before continuing. Nothing was
 pushed and the existing v0.8.0 tag was not moved.
+
+## Latest refinement — HUD status-bar size (build 122)
+
+The user found the health/status bar too large in fullscreen. Options → HUD and
+View → HUD Status Bar Size now offer persistent 25/50/75/100% sizes. Default 100%
+restores the original; smaller sizes keep the complete bar centered and reclaim
+vertical world space. Nearest-sampled artwork stays native-output sized regardless
+of world scale. The minimum is one output pixel per source pixel. This refines
+unreleased 0.9.0; no new semantic release/tag was made.
 
 ## Resolution enhancements
 
@@ -59,8 +68,10 @@ Never commit these files, generated fixtures or bundles.
 
 ## Validation and workflow
 
-Final build 120 is left open, paused on SIGIL II E6M1 with native world scale.
-The earlier NRFTL and Master Levels validation previews were closed.
+Build 122 at `build/hud-size-preview/MetalDooM.app` is left paused on NRFTL MAP01
+with a remembered 50% HUD. Its fullscreen/windowed controls and persistence were
+checked; the pre-existing game instance was preserved. The earlier build-120
+preview state below is historical.
 
 See the newest `docs/VALIDATION.md` entry. Useful commands:
 

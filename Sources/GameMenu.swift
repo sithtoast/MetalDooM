@@ -196,16 +196,24 @@ final class GameMenu: NSView {
         classic.footer="ENTER APPLY   ESC BACK   CMD-SHIFT-E CLASSIC / MEDIUM"
         classic.needsDisplay=true
     }
-    private func hudOptions() {
+    func refreshHUD() { if page=="HUD" { hudOptions(selected:classic?.selected ?? 0) } }
+    private func hudOptions(selected:Int=0) {
         canvas("HUD",art:[("M_OPTTTL",108,15)],items:[
-            .init(title:"Level stats",patch:"",x:48,y:64,action:{},value:{ [weak self] in self?.app.levelStatsVisible == true ? "ON" : "OFF" },
+            .init(title:"Status bar size",patch:"",x:48,y:52,action:{},value:{ [weak self] in "\(self?.app.renderer.hudSizePercent ?? 100)%" },
+                adjust:{ [weak self] step in
+                    guard let self else { return }
+                    let values=SpriteRenderer.hudSizes
+                    let index=values.firstIndex(of:self.app.renderer.hudSizePercent) ?? 3
+                    self.app.applyHUDSize(values[(index+step+values.count)%values.count])
+                }),
+            .init(title:"Level stats",patch:"",x:48,y:76,action:{},value:{ [weak self] in self?.app.levelStatsVisible == true ? "ON" : "OFF" },
                 adjust:{ [weak self] _ in self?.app.toggleLevelStats() }),
-            .init(title:"Par time",patch:"",x:48,y:88,action:{},value:{ [weak self] in self?.app.parTimeVisible == true ? "ON" : "OFF" },
+            .init(title:"Par time",patch:"",x:48,y:100,action:{},value:{ [weak self] in self?.app.parTimeVisible == true ? "ON" : "OFF" },
                 adjust:{ [weak self] _ in self?.app.toggleParTime() }),
-            .init(title:"Secret notice",patch:"",x:48,y:112,action:{},value:{ [weak self] in self?.app.secretNotifications == true ? "ON" : "OFF" },
+            .init(title:"Secret notice",patch:"",x:48,y:124,action:{},value:{ [weak self] in self?.app.secretNotifications == true ? "ON" : "OFF" },
                 adjust:{ [weak self] _ in self?.app.toggleSecretNotifications() }),
-            .init(title:"Back",patch:"",x:48,y:144,action:{ [weak self] in self?.options() })
-        ],labels:[("PAR REQUIRES LEVEL STATS",40,172),("LEFT/RIGHT ADJUST   ESC BACK",40,188)],back:{ [weak self] in self?.options() })
+            .init(title:"Back",patch:"",x:48,y:148,action:{ [weak self] in self?.options() })
+         ],selected:selected,labels:[("SMALLER BAR GIVES MORE GAME VIEW",24,168),("PAR REQUIRES LEVEL STATS",40,178),("LEFT/RIGHT ADJUST   ESC BACK",40,188)],back:{ [weak self] in self?.options() })
     }
     private func audioOptions() {
         canvas("Audio",art:[("M_SVOL",60,25)],items:[

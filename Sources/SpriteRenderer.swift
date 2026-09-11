@@ -101,11 +101,18 @@ final class SpriteRenderer {
             encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:6)
         }
     }
-    static func hudHeight(width: Double) -> Double { 32*max(1,floor(width/320)) }
-    func drawHUD(encoder: MTLRenderCommandEncoder, state: MD_HUD, width: Double, height: Double) {
+    // Percent of the classic width-based size. Keep a one-pixel artwork minimum
+    // and a whole-pixel bar height so the world/HUD boundary cannot leave a seam.
+    static let hudSizes = [25,50,75,100]
+    static func hudPixelScale(width: Double, percent: Int = 100) -> Double {
+        let factor=Double(hudSizes.contains(percent) ? percent:100)/100
+        return max(1,(max(1,floor(width/320))*factor*32).rounded()/32)
+    }
+    static func hudHeight(width: Double, percent: Int = 100) -> Double { 32*hudPixelScale(width:width,percent:percent) }
+    func drawHUD(encoder: MTLRenderCommandEncoder, state: MD_HUD, width: Double, height: Double, percent: Int = 100) {
         encoder.setDepthStencilState(hudDepth)
         encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:height,znear:0,zfar:1))
-        let scale = Float(max(1,floor(width/320))), originX = (Float(width)-320*scale)/2, originY = Float(height)-32*scale
+        let scale = Float(Self.hudPixelScale(width:width,percent:percent)), originX = (Float(width)-320*scale)/2, originY = Float(height)-32*scale
         // Identity transform lets the shared vertex shader draw screen-space quads.
         var matrix = matrix_identity_float4x4
         encoder.setVertexBytes(&matrix,length:MemoryLayout<simd_float4x4>.stride,index:1)

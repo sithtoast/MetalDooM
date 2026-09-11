@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 
 extension App {
     var benchmarkSettings: String {
-        "\(view.drawableSize)|\(view.renderScale)|\(view.metalFXEnabled)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)|\(renderer.aoSettings.strength)|\(renderer.aoSettings.radius)|\(renderer.dynamicLightEnabled)|\(renderer.dynamicLightShadows)|\(renderer.sceneEffectsKey)|\(renderer.hdrEnabled)|\(renderer.hdrPeak)|\(renderer.fogDensity)|\(renderer.highRayQuality)|\(renderer.lightGain)|\(renderer.bloomStrength)|\(renderer.hdrSpriteBoost)"
+        "\(view.drawableSize)|\(view.renderScale)|\(view.metalFXEnabled)|\(renderer.hudSizePercent)|\(view.preferredFramesPerSecond)|\(window.styleMask.contains(.fullScreen))|\(window.backingScaleFactor)|\(metalHUDEnabled)|\(MusicPlayer.preferredBackend)|\(renderer.ambientOcclusionEnabled)|\(renderer.aoSettings.strength)|\(renderer.aoSettings.radius)|\(renderer.dynamicLightEnabled)|\(renderer.dynamicLightShadows)|\(renderer.sceneEffectsKey)|\(renderer.hdrEnabled)|\(renderer.hdrPeak)|\(renderer.fogDensity)|\(renderer.highRayQuality)|\(renderer.lightGain)|\(renderer.bloomStrength)|\(renderer.hdrSpriteBoost)"
     }
     @objc func runBenchmark() {
         guard benchmark == nil else { return }
@@ -79,6 +79,7 @@ extension App {
         if item.action == #selector(selectOPL(_:)) { item.state=MusicPlayer.preferredBackend == "opl" ? .on : .off }
         if item.action == #selector(selectAppleMIDI(_:)) { item.state=MusicPlayer.preferredBackend == "apple" ? .on : .off }
         if benchmark != nil { return item.action == #selector(cancelBenchmark) || item.action == #selector(NSApplication.terminate(_:)) }
+        if item.action == #selector(selectHUDSize(_:)) { item.state=renderer.hudSizePercent==item.tag ? .on:.off }
         if item.action == #selector(toggleMetalFX) {
             item.state=view.metalFXEnabled ? .on:.off
             return benchmark == nil && MTLFXSpatialScalerDescriptor.supportsDevice(renderer.device)

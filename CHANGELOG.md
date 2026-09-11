@@ -4,6 +4,15 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.9.0 refinement — Adjustable HUD status bar (build 122)
+
+- Add remembered 25/50/75/100% status-bar sizes under Options → HUD and
+  View → HUD Status Bar Size, including fullscreen use. 100% restores the original.
+- Keep health, armor, ammunition, face and KEX background artwork aligned and
+  centered at the bottom. Smaller bars give height back to the world viewport,
+  independently of world resolution, upscaling and effects.
+- Remain on the unreleased 0.9.0 resolution feature release.
+
 ## 0.9.0 — World resolution and bundled KEX campaigns (build 120)
 
 - Keep weapon, HUD, menus and intermissions at native display resolution while

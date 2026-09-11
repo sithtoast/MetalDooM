@@ -3,6 +3,28 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.9.0 refinement, build 122 — Adjustable HUD status bar
+
+- `AO_RESOLUTION=1` passes with Metal API validation on the M5 Pro. All four
+  status-bar sizes produce the expected geometry, reclaim world height, preserve
+  exact resized HUD pixels across native/MetalFX/supersampled world scales, and
+  restore the original pixels at 100%. The preference writes and invalid-value
+  fallback are checked. Compact HDR HUD equality, HDR/SDR changes, effects,
+  weapon invisibility and resize also pass. Evidence: `build/hud-scale-validation`
+  and `build/hud-scale-validation.log`. Timing output is not a performance claim.
+- Build 122 is signed and its plist is valid. Native CUA confirms the running
+  version/build, Options → HUD control, native View menu, 50% KEX bar in fullscreen,
+  return to windowed presentation, and the persisted choice on preview restart.
+  Original 320-wide art is covered by GPU tests; the native preview uses the wide
+  KEX STBAR in No Rest for the Living.
+- The first validation launch caught preference initialization before Renderer
+  existed (build 121). Build 122 initializes the renderer first and passes startup.
+- A separate `build/hud-size-preview/MetalDooM.app` was used; the previous game
+  instance was preserved. Preview is left paused with 50% HUD size. The underlying
+  setting is shared by normal launches. Other displays/GPUs remain untested.
+- This is a refinement of the unreleased 0.9.0 resolution feature milestone;
+  semantic version stays 0.9.0 and historical changelog entries are retained.
+
 ## 0.9.0, build 120 — World resolution and bundled KEX profiles
 
 - Final local app build 120, version 0.9.0; bundle signature and plist validated.
