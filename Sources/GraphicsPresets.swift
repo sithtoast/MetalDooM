@@ -8,10 +8,10 @@ struct EffectsPreset: Codable, Equatable {
     var switches: Set<SceneEffect> { Set(effects.compactMap(SceneEffect.init(rawValue:))) }
     static let names=["Classic", "Enhanced", "Atmospheric", "HDR Showcase"]
     static let builtins: [Self] = {
-        let enhanced: Set<SceneEffect>=[.torches,.projectiles,.muzzleFlash,.shadows,.emissive,.bloom,.spriteLighting]
-        return [Self(),Self(effects:Set(enhanced.map(\.rawValue)),ao:true,strength:0.5,radius:32),
-                Self(effects:Set(SceneEffect.allCases.map(\.rawValue)),ao:true),
-                Self(effects:Set(SceneEffect.allCases.map(\.rawValue)),ao:true,hdr:true)]
+        let enhanced: Set<SceneEffect>=[.torches,.projectiles,.muzzleFlash,.shadows,.emissive,.bloom,.spriteLighting,.softShadows,.textureFiltering]
+        return [Self(),Self(effects:Set(enhanced.map(\.rawValue)),ao:true,strength:0.25,radius:16),
+                Self(effects:Set(SceneEffect.allCases.map(\.rawValue)),ao:true,strength:0.25,radius:32,density:0.001),
+                Self(effects:Set(SceneEffect.allCases.map(\.rawValue)),ao:true,hdr:true,strength:0.25,radius:32,density:0.001)]
     }()
     init(renderer:Renderer) {
         effects=Set(renderer.sceneEffects.map(\.rawValue));ao=renderer.ambientOcclusionEnabled
@@ -19,8 +19,8 @@ struct EffectsPreset: Codable, Equatable {
         strength=renderer.aoSettings.strength;radius=renderer.aoSettings.radius
         density=renderer.fogDensity;peak=renderer.hdrPeak
     }
-    init(effects:Set<Int>=[],ao:Bool=false,hdr:Bool=false,strength:Float=0.5,radius:Float=48) {
-        self.effects=effects;self.ao=ao;self.hdr=hdr;self.strength=strength;self.radius=radius
+    init(effects:Set<Int>=[],ao:Bool=false,hdr:Bool=false,strength:Float=0.5,radius:Float=48,density:Float=0.003) {
+        self.effects=effects;self.ao=ao;self.hdr=hdr;self.strength=strength;self.radius=radius;self.density=density
     }
 }
 

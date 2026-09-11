@@ -4,6 +4,25 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.8.0 · Build 104 — Calmer Enhanced and Showcase presets
+
+- Reduce the grainy, over-contrasted appearance of the first HDR/effects presets.
+  Add optional Smooth World Textures with mipmaps and anisotropic filtering for
+  walls/floors/ceilings; retain exact nearest-sampled cutouts, sprites and HUD.
+- Blend added illumination in linear color space with restrained energy. Reduce
+  bloom from 30% to 12% and reserve it for brighter highlights. HDR peak is now a
+  brightness ceiling, without an extra contrast multiplier at standard white;
+  remove the blanket 1.5× HDR boost on fullbright world sprites.
+- Use 16 AO rays and eight soft-shadow samples. Enhanced selects 25%/16-unit AO,
+  soft shadows and world filtering. Atmospheric/Showcase select 25%/32-unit AO and
+  Light Haze. Volumetrics use 32 fixed midpoints instead of 12 pixel-random samples.
+- Preserve Classic, independent toggles, saved custom choices and normal HUD
+  colors. Reselect built-in presets to apply their revised settings.
+- Validate native Ultimate Doom/Doom II GPU regressions, filtered checker/alpha
+  probes, HDR highlight contrast, preset restoration and final build 104 visuals.
+  Smoother sampling costs additional GPU time; crowded-combat performance and
+  the user's exact reported viewpoint remain unverified.
+
 ## 0.8.0 · Build 102 — HDR, volumetric lighting and presets
 
 - Add optional HDR/EDR output with a floating-point scene, extended highlights,

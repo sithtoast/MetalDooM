@@ -17,7 +17,7 @@ last for the session, including toggles and map changes. Both settings appear
 in diagnostics and benchmark identity. Changing settings does not rebuild the
 ray mesh. Zero strength produces the same pixels as classic rendering.
 
-The experiment shades nearby wall/floor/ceiling intersections using eight fixed,
+The experiment shades nearby wall/floor/ceiling intersections using sixteen fixed,
 cosine-weighted hemisphere rays per world fragment. Distance-weighted occlusion
 reduces existing sector/distance lighting by up to the selected strength. It
 adds no light sources and leaves power-up fullbright/inverse rendering, skies,
@@ -117,7 +117,7 @@ separate Emissive Surface Lighting switch. Animated materials retain their
 family while sampling the current engine texture frame.
 
 Bloom copies only the world viewport, extracts highlights at quarter resolution,
-runs a separable nine-tap blur and adds a restrained 30% glow before the weapon,
+runs a separable nine-tap blur and adds a restrained 12% glow before the weapon,
 damage tint and HUD. In SDR this is LDR bloom; in HDR the same pass preserves extended highlights before display mapping. Skies and fullbright
 world sprites can bloom too. Invisibility uses the existing world snapshot and
 the weapon is drawn afterward. Fixed-colormap power-ups bypass bloom and added
@@ -157,7 +157,7 @@ Four more independent View → More Metal Effects switches start off each launch
   These 256-unit-radius sources always test world occlusion, independently of
   Gameplay Light Shadows. Moving sectors/material changes invalidate the source
   cache; sector-light flicker alone does not. Map/save loads rebuild it.
-- **Soft Shadows** uses four fixed disk samples instead of the hard-shadow ray
+- **Soft Shadows** uses eight fixed disk samples instead of the hard-shadow ray
   when a source has shadows enabled. Test/gameplay source radius is six units;
   emissive patches use twelve. Samples on emissive sources stay parallel to the
   emitting plane. Hard shadows return exactly when switched off. This small
@@ -257,7 +257,7 @@ existing test/gameplay/surface sources. It does not create a sun or extra light
 sources. **View → Volumetric Density** offers Light Haze, Atmospheric, Dense and
 Thick (0.001, 0.003, 0.006 and 0.01 inverse Doom units). Default: Atmospheric.
 
-The compute pass marches twelve fixed-jitter samples at quarter width/height,
+The compute pass marches 32 fixed midpoint samples at quarter width/height,
 selecting four nearest lights from the existing bounded source list. Marches stop
 at raster depth or 768 units. Each source retains finite falloff and one-sided
 surface emission; enabled shadows trace the same alpha-tested world. Volumetric
@@ -266,7 +266,7 @@ resolve weights four neighbors by depth to avoid bleeding over foreground edges.
 Compositing is additive, before bloom and the weapons/HUD. Power-up fixed colormaps
 bypass it, and paused frames have no temporal noise. Sprites bound the viewing
 ray through raster depth but still do not cast light shadows. Four-source selection
-can pop, twelve steps can show grain, and this is lit haze rather than a full
+can pop, finite steps can show bands, and this is lit haze rather than a full
 participating-media simulation with multiple scattering or dense fog extinction.
 
 **View → HDR Display Output** swaps the complete render pipeline set to RGBA16Float
@@ -274,8 +274,9 @@ and enables CAMetalLayer EDR with extended linear sRGB. The intermediate scene
 preserves Doom's existing palette/distance lighting in an extended range rather
 than replacing its look with physically based materials. The final pass decodes
 the sRGB transfer function, preserves SDR midtones, and maps over-range highlights
-through a hue-preserving shoulder. Normal-world fullbright sprites gain 1.5× in
-this optional path; fullbright power-ups, weapons and HUD remain standard white.
+through a hue-preserving shoulder. Peak limits no longer multiply near-white contrast. Fullbright sprites, power-ups,
+weapons and HUD remain at standard white; only actual light/emission energy adds
+extended highlights.
 Bloom can consume over-range light/emission values before this mapping.
 
 Peak controls request up to 2×, 4× (default) or 8× standard white, constrained by
@@ -288,10 +289,10 @@ The app uses Apple's [custom EDR tone-mapping setup](https://developer.apple.com
 **Graphics Presets** change and remember render scale/frame cap only: Performance
 50%/120, Balanced 75%/120, Native 100%/120 and Quiet 75%/60. **Effects Presets** do
 not change resolution, frame rate or gameplay. Classic disables all effects;
-Enhanced uses AO at 50%/32 units plus torch/projectile/muzzle lights, gameplay
-shadows, emissive surfaces, bloom and sprite reception. Atmospheric enables all
-eleven scene switches with AO at 50%/48 units. HDR Showcase adds HDR output to
-Atmospheric. Built-ins leave the moving test light off. Manual overrides remove
+Enhanced uses AO at 25%/16 units plus torch/projectile/muzzle lights, gameplay
+shadows, emissive surfaces, bloom, sprite reception, soft shadows and world filtering.
+Atmospheric enables all twelve scene switches with AO at 25%/32 units and Light
+Haze density. HDR Showcase adds HDR output to Atmospheric. Built-ins leave the moving test light off. Manual overrides remove
 the built-in checkmark; Save Current as Custom stores one full effects setup,
 including test lighting, AO, density and HDR controls. Apply Saved Custom restores
 it after relaunch. Launch effects remain Classic; graphics preferences persist.
@@ -302,3 +303,29 @@ benchmark identity and benchmark locking. Tests in HDRVolumeValidation.swift use
 real half-float GPU readback, including an opaque-partition scattering probe,
 SDR HUD color equivalence, synthetic 1×/2×/4×/8× headroom, live display output,
 resize, save/load and repeated format switching.
+
+
+### Preset polish — build 104
+
+The initial Enhanced preset already used SDR. Its harsh texture contrast and
+aliasing were therefore not purely HDR artifacts. Showcase also combined noisy
+12-step fog and an extra HDR peak-dependent contrast multiplier. Build 104 removes
+that multiplier and the blanket fullbright-sprite gain, reduces bloom, and blends
+added direct light in linear space at half the former source energy scale while
+preserving the original sector/distance base exactly when no light is present.
+The overall renderer remains palette-based rather than a full PBR material system.
+
+**Smooth World Textures** is enabled by the enhanced presets and can be toggled
+independently. Static and animated world textures have GPU-generated mipmaps;
+the filtered sampler uses trilinear filtering and up to 4× anisotropy. Mask alpha
+always comes from the original nearest texel, matching shadow rays. Filtered
+colors are unpremultiplied to avoid black cutout fringes. Sprites, skies, weapons
+and HUD retain their existing sampling, and fixed-colormap power-ups bypass
+filtering. Turning filtering off restores original world texels exactly.
+
+AO now uses sixteen fixed hemisphere rays, soft shadows eight disk rays, and
+volumetrics 32 fixed midpoint samples. There is no per-pixel fog jitter pattern.
+Built-in AO strength is reduced to 25%; Enhanced uses a 16-unit radius,
+Atmospheric/Showcase 32 units and 0.001 haze density. These are visual-quality
+choices with additional GPU cost, not a performance improvement. Existing saved
+custom sets are preserved; reselect a built-in or resave custom to adopt changes.

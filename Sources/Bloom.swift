@@ -74,7 +74,7 @@ final class Bloom {
             uint2 q=min(p*4+uint2(x,y),uint2(source.get_width()-1,source.get_height()-1));
             float3 c=source.read(q).rgb;
             float brightness=max(c.r,max(c.g,c.b));
-            sum+=c*smoothstep(0.65,1.0,brightness);
+            sum+=c*smoothstep(0.8,1.2,brightness);
         }
         target.write(float4(sum/16,1),p);
     }
@@ -95,7 +95,7 @@ final class Bloom {
     }
     fragment float4 bloomFragment(float4 position [[position]],texture2d<float> glow [[texture(0)]],constant float2 &size [[buffer(0)]]) {
         constexpr sampler s(coord::normalized,address::clamp_to_edge,filter::linear);
-        return float4(glow.sample(s,position.xy/size).rgb*0.3,0);
+        return float4(glow.sample(s,position.xy/size).rgb*0.12,0);
     }
     """
 }

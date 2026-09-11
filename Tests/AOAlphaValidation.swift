@@ -4,6 +4,7 @@ func validateAlphaRays(device: MTLDevice, queue: MTLCommandQueue) throws {
     let prefix="""
     #include <metal_stdlib>
     using namespace metal;
+    \(WorldSampling.shader)
     struct Out { float4 position [[position]]; float2 uv; float light; float distance; float fullbright; float3 world; };
     vertex Out worldVertex(uint id [[vertex_id]]) { Out o={};o.position=float4(0,0,0,1);return o; }
     float3 powerColor(float3 rgb,float4 power) { return rgb; }

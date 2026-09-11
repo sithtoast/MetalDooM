@@ -81,18 +81,18 @@ extension App {
         HDR output: \(renderer.hdrEnabled ? "On (RGBA16Float, linear sRGB EDR)":"Off")
         HDR peak request: \(renderer.hdrPeak)x standard white
         Display EDR headroom: current \(window.screen?.maximumExtendedDynamicRangeColorComponentValue ?? 1)x, potential \(window.screen?.maximumPotentialExtendedDynamicRangeColorComponentValue ?? 1)x
-        Volumetric density: \(renderer.fogDensity); quarter resolution, 12 steps, 4 nearest lights
+        Volumetric density: \(renderer.fogDensity); quarter resolution, 32 steps, 4 nearest lights
         Fullscreen: \(window.styleMask.contains(.fullScreen))
         Frame limit: \(view.preferredFramesPerSecond) FPS
         Recent renderer FPS: \(fps) (not a benchmark)
         Music backend: \(MusicPlayer.preferredBackend == "opl" ? "Classic OPL" : "Apple MIDI")
-        Ray-traced AO: \(renderer.ambientOcclusionEnabled ? "On (8 rays, alpha-tested world)" : "Off")
+        Ray-traced AO: \(renderer.ambientOcclusionEnabled ? "On (16 rays, alpha-tested world)" : "Off")
         AO strength: \(Int(renderer.aoSettings.strength*100))%
         AO radius: \(Int(renderer.aoSettings.radius)) Doom units
         Moving test light: \(renderer.dynamicLightEnabled ? "On (amber, radius 256, intensity 2, 8-second orbit)":"Off")
         Additional effects: \(SceneEffect.allCases.map { "\($0.title)=\(renderer.sceneEffects.contains($0) ? "On":"Off")" }.joined(separator:", "))
         World light budget: 16 total, up to 4 emissive patches; sprite reception optional; world-only shadow casters
-        Soft shadows: 4 fixed samples when selected; particles: maximum 128
+        Soft shadows: 8 fixed samples when selected; particles: maximum 128
         Test light shadows: \(renderer.dynamicLightShadows ? "On (alpha-tested world)":"Off")
         Shared ray occluder triangles: \(renderer.ambientOcclusion?.triangleCount ?? 0)
         Ray tracing in render shaders: \(renderer.ambientOcclusionSupported)

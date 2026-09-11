@@ -64,10 +64,11 @@ final class HDROutput {
         float3 encoded=max(scene.read(uint2(p.xy)).rgb,0.0);
         float3 linear=select(encoded/12.92,pow((encoded+0.055)/1.055,float3(2.4)),encoded>0.04045);
         float brightness=max(linear.r,max(linear.g,linear.b));
-        // Preserve SDR midtones; a hue-preserving shoulder fits highlights to live headroom.
+        // Unit slope at standard white avoids amplifying fine texture contrast.
+        // Peak is a ceiling, not an exposure multiplier.
         if (brightness>1.0) {
             float room=settings.x-1.0;
-            float mapped=1.0+room*(1.0-exp(-(brightness-1.0)*settings.y/max(room,0.001)));
+            float mapped=1.0+room*(1.0-exp(-(brightness-1.0)/max(room,0.001)));
             linear*=mapped/brightness;
         }
         return float4(linear,1);

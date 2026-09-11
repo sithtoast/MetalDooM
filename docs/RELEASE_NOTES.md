@@ -15,6 +15,12 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.8.0
 
+Build 104 refines Enhanced and Showcase: optional smooth world textures reduce
+aliasing, linear-light blending and restrained bloom reduce harsh brightness,
+HDR no longer exaggerates highlight contrast, and lighter haze uses steadier
+sampling. AO and soft shadows use more samples. Classic remains unchanged;
+reselect a built-in preset to adopt its new settings.
+
 - Add **HDR Display Output** for extended highlights on compatible displays.
   Lights, flames, emissive surfaces and bloom retain brightness beyond standard
   white; HUD and weapon artwork stay at standard white. Peak choices of 2×, 4×
@@ -39,7 +45,7 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 - Fixed phantom imps caused by drawing invisible teleport destinations.
 - Shorter About credits and separate player, developer and testing guides.
 
-Local experimental build: **102**, version **0.8.0**. GPU checks cover the existing
+Local experimental build: **104**, version **0.8.0**. GPU checks cover the existing
 AO/lighting regressions plus fog sources, density, wall occlusion, HUD isolation,
 linear EDR mapping, live headroom, preset restoration, resize and HDR/SDR switches.
 Native controls and HDR Showcase were inspected on the M5 Pro. Haze is a bounded

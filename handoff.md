@@ -12,7 +12,7 @@ The active experiment is on `codex/metal-experiments`; check Git status/log befo
 continuing. The user selected **ray-traced ambient occlusion**. It is implemented
 as a per-session View menu option, with classic rendering still the default.
 
-Current version: **0.8.0**, successful local app **build 102**. `Info.plist` owns
+Current version: **0.8.0**, successful local app **build 104**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
 This is an experimental branch, not a published release. No push was requested.
 
@@ -34,7 +34,7 @@ and correct grille handling; both are now implemented. View offers strength
 0–100% and radius 16–96 units, defaulting to 50%/48 units. AO starts disabled each
 launch, while choices persist through toggles and map changes within a session.
 
-`AmbientOcclusion.swift` uses eight hemisphere rays against world triangles.
+`AmbientOcclusion.swift` uses sixteen hemisphere rays against world triangles.
 Masked hits interpolate UVs and check the current animated texture's texel alpha;
 holes let rays continue. Position/topology changes rebuild the structure, UV-only
 changes replace attributes, and mask changes replace material mappings. All
@@ -128,6 +128,25 @@ Final GPU evidence lives in `build/hdr-volume-final` and
 `build/advanced-preview.wad`; generated fixtures remain private and ignored.
 Screenshots cannot prove physical HDR luminance. Test float readback measured
 headroom and enforces it; no system brightness changes or pushes were requested.
+
+## Latest refinement — grain and unnatural brightness, build 104
+
+The user reported Enhanced and Showcase looked grainy/unnatural. Enhanced is SDR,
+so HDR was not the sole contributor. Both presets now enable optional Smooth
+World Textures (trilinear mipmaps, 4× anisotropy, nearest binary alpha, crisp
+sprites/sky/weapon/HUD). Direct lights add restrained linear-space energy;
+bloom is reduced to 12%, and HDR removes the near-white contrast multiplier and
+blanket fullbright-sprite boost. AO uses 16 rays at gentler preset strengths,
+soft shadows use eight samples, fog uses 32 fixed midpoints and Light Haze in
+Atmospheric/Showcase. Custom saves keep previous settings; reselect a built-in.
+
+GPU evidence: `build/preset-polish` (Ultimate Doom), `build/preset-polish-doom2`
+(including minification/alpha and HDR contrast probes), `build/preset-polish-final`
+(final Ultimate Doom/ceiling run). Native build 104 Enhanced and HDR Showcase were
+compared with build 102 in the same torch fixture. The old comparison preview was
+closed; `build/polish-preview/MetalDooM.app` is left open with the revised Showcase.
+The user's exact viewpoint was not supplied. The smoother sampling costs more GPU
+time; avoid claiming a sustained FPS improvement. Still on release version 0.8.0.
 
 ## Current behavior and important boundaries
 

@@ -2,12 +2,29 @@
 // Part of the native GPU harness. SDR tests above retain their byte-exact contract.
 do {
 let renderer=subject.renderer!
+try validateWorldSampling(device:renderer.device,queue:renderer.queue)
 try renderer.applyEffectsPreset(EffectsPreset(),view:subject.view)
 _ = try renderer.load(wad:subject.wad!,map:subject.wad!.maps.contains("E1M1") ? "E1M1":"MAP01")
 MD_TestMonsters(0);MD_TestLightSource(0)
 try renderer.validationSynchronizeEngine()
 for _ in 0..<3 { _=frame() }
 let classic=frame()
+try renderer.setSceneEffect(.textureFiltering,enabled:true)
+let filtered=frame()
+validationRequire(filtered != classic,"World filtering did not change the scene")
+validationRequire(filtered[hudStart...]==classic[hudStart...],"Filtering changed HUD pixels")
+validationRequire(frame()==filtered,"Filtering is unstable while paused")
+try png(filtered,"polish-filtered-world")
+try renderer.setSceneEffect(.textureFiltering,enabled:false)
+validationRequire(frame()==classic,"Filtering failed exact Classic restoration")
+try renderer.applyEffectsPreset(EffectsPreset.builtins[1],view:subject.view)
+for _ in 0..<3 { _=frame() }
+try png(frame(),"polish-enhanced")
+try renderer.applyEffectsPreset(EffectsPreset.builtins[2],view:subject.view)
+for _ in 0..<3 { _=frame() }
+try png(frame(),"polish-atmospheric")
+try renderer.applyEffectsPreset(EffectsPreset(),view:subject.view)
+for _ in 0..<3 { _=frame() }
 try renderer.setSceneEffect(.volumetrics,enabled:true)
 validationRequire(frame()==classic,"Volumetrics invented a light source")
 try renderer.setDynamicLight(true)
@@ -92,7 +109,7 @@ let outputMapper=try HDROutput(device:renderer.device)
 let d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba16Float,width:8,height:1,mipmapped:false)
 d.storageMode = .shared;d.usage = [.shaderRead,.renderTarget]
 let source=renderer.device.makeTexture(descriptor:d)!,target=renderer.device.makeTexture(descriptor:d)!
-let inputs:[Float]=[0,0.02,0.25,0.5,0.75,1,1.5,4]
+let inputs:[Float]=[0,0.02,0.25,0.5,0.75,1,1.01,4]
 var pixels=inputs.flatMap { [Float16($0),Float16($0),Float16($0),Float16(1)] }
 pixels.withUnsafeBytes { source.replace(region:MTLRegionMake2D(0,0,8,1),mipmapLevel:0,withBytes:$0.baseAddress!,bytesPerRow:64) }
 for headroom:Float in [1,2,4,8] {
@@ -105,7 +122,10 @@ for headroom:Float in [1,2,4,8] {
     validationRequire(values.allSatisfy { $0.isFinite && $0>=0 && $0<=headroom },"EDR exceeded live headroom")
     validationRequire(abs(values[3]-0.21404)<0.001 && values[5]==1,"SDR transfer or standard white changed")
     validationRequire(zip(values,values.dropFirst()).allSatisfy { $0 <= $1 },"EDR mapping not monotonic")
-    if headroom>1 { validationRequire(values[6]>1 && values[7]>values[6],"HDR highlights clipped to SDR") }
+    if headroom>1 {
+        validationRequire(values[6]>1 && values[7]>values[6],"HDR highlights clipped to SDR")
+        validationRequire(values[6]<1.03,"HDR peak amplifies fine highlight contrast")
+    }
 }
 print("PASS: linear EDR transfer, unclipped highlights, monotonic shoulder and 1x/2x/4x/8x headroom limits")
 

@@ -8,7 +8,7 @@ private struct VolumeUniforms {
     var settings: SIMD4<Float> // density, light count, world width, world height
 }
 
-/// Twelve samples at quarter resolution, four lights, alpha-tested world shadows.
+/// Thirty-two midpoint samples at quarter resolution, four lights, alpha-tested world shadows.
 /// Raster depth bounds the march, so fog stops at walls and ordinary sprites.
 final class VolumetricLighting {
     private let device: MTLDevice
@@ -93,12 +93,11 @@ final class VolumetricLighting {
         if (p.x>=target.get_width() || p.y>=target.get_height()) return;
         uint2 pixel=min(p*4+2,uint2(u.settings.zw)-1);
         float3 delta=volumeEndpoint(float2(pixel),depth.read(pixel),u)-u.eye.xyz;
-        float distance=min(length(delta),768.0), step=distance/12.0;
+        float distance=min(length(delta),768.0), step=distance/32.0;
         float3 direction=normalize(delta), sum=0;
-        uint seed=p.x*1973u+p.y*9277u+89173u;seed=(seed^(seed>>13))*1274126177u;
-        float jitter=(float(seed&1023u)+0.5)/1024.0;
-        for (uint k=0;k<12;k++) {
-            float t=(float(k)+jitter)*step;
+        // Midpoints replace pixel-random offsets: no screen-space grain pattern.
+        for (uint k=0;k<32;k++) {
+            float t=(float(k)+0.5)*step;
             float3 point=u.eye.xyz+direction*t;
             for (uint i=0;i<uint(u.settings.y);i++) {
                 DynamicLight light=lights[i];float3 offset=light.positionRadius.xyz-point;

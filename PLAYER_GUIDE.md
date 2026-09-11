@@ -174,6 +174,7 @@ Light/shadow choices last for the session and survive map/save loads.
 - **Sprite Lighting**: monsters and pickups receive existing colored lights.
 - **Emissive Surface Lighting**: lamp, liquid and computer surfaces illuminate nearby geometry.
 - **Soft Shadows**: soften the edges of enabled world shadows.
+- **Smooth World Textures**: reduce distant texture shimmer and soften wall/floor texels; sprites and HUD stay crisp.
 - **Embers & Projectile Trails**: drifting torch embers and sparks behind moving projectiles.
 
 All start off and can be combined with AO and the test light. The new lights
@@ -341,3 +342,10 @@ are targets, not guaranteed performance with every effect enabled.
 
 The previous Show Tab Bar and Show All Tabs items were automatic macOS window
 commands. MetalDooM doesn't use window tabs, so those commands are now disabled.
+
+
+Build 104 refines Enhanced and HDR Showcase with gentler AO, softer shadows,
+reduced bloom and smoother world textures. Showcase uses lighter, steadier haze.
+HDR peak now limits brightness without exaggerating near-white texture contrast.
+Reselect the preset after updating; previously saved custom choices are preserved.
+Turn off **Smooth World Textures** if you prefer the original blocky world texels.

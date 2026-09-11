@@ -353,6 +353,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         let shader = """
         #include <metal_stdlib>
         using namespace metal;
+        \(WorldSampling.shader)
         struct Vertex { float4 position; float4 uvLight; };
         struct Out { float4 position [[position]]; float2 uv; float light; float distance; float fullbright; float3 world; };
         vertex Out worldVertex(uint id [[vertex_id]], const device Vertex *v [[buffer(0)]],
@@ -376,7 +377,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         fragment float4 worldFragment(Out in [[stage_in]], bool front [[front_facing]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]], constant float4 &emission [[buffer(11)]]) {
             if (in.fullbright > 0.5 && !front) discard_fragment();
             constexpr sampler s(coord::normalized, address::repeat, filter::nearest);
-            float4 c = tex.sample(s, in.uv / float2(tex.get_width(),tex.get_height()));
+            float4 c = sampleWorld(tex,in.uv,power);
             if (c.a < 0.5) discard_fragment();
             float shade = (power.x>0 || power.y>0) ? 1.0 : in.light * clamp(1.0 - in.distance / 3200.0, 0.3, 1.0);
             return float4(powerColor(emissiveColor(c.rgb,c.rgb*shade,emission,power),power), 1.0);
@@ -386,7 +387,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             float4 c = tex.sample(s,in.uv / float2(tex.get_width(),tex.get_height()));
             if (c.a < 0.5) discard_fragment();
             float shade = (in.fullbright > 0.5 || power.x>0 || power.y>0) ? 1.0 : in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
-            return float4(powerColor(c.rgb*shade*(power.w>0 && in.fullbright>0.5 && power.x==0 && power.y==0 ? 1.5:1.0),power),1.0);
+            return float4(powerColor(c.rgb*shade,power),1.0);
         }
         fragment float4 fuzzFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]],
                 texture2d<float, access::read> scene [[texture(1)]], constant float4 &power [[buffer(2)]]) {
@@ -472,7 +473,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             let pixels = source ?? Art.fallback
             emissionColors[material]=source == nil ? .zero:SurfaceLightCollector.color(material:material,pixels:pixels)
             if stride(from:3,to:pixels.rgba.count,by:4).allSatisfy({ pixels.rgba[$0] >= 128 }) { opaque.insert(material) }
-            let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba8Unorm,width:pixels.width,height:pixels.height,mipmapped:false)
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba8Unorm,width:pixels.width,height:pixels.height,mipmapped:true)
             descriptor.usage = .shaderRead; descriptor.storageMode = .shared
             guard let texture = device.makeTexture(descriptor:descriptor) else {
                 throw PortError("Cannot allocate Metal map resources.")
@@ -519,6 +520,12 @@ final class Renderer: NSObject, MTKViewDelegate {
             try cacheMaterial(key); animationIDs[key]=frame.index
             if key.flat { flats[frame.index]=cached[key] } else { walls[frame.index]=cached[key] }
         }
+        guard let mipCommand=queue.makeCommandBuffer(), let mipEncoder=mipCommand.makeBlitCommandEncoder() else {
+            throw PortError("Cannot prepare world texture mipmaps.")
+        }
+        for texture in cached.values { mipEncoder.generateMipmaps(for:texture) }
+        mipEncoder.endEncoding();mipCommand.commit();mipCommand.waitUntilCompleted()
+        guard mipCommand.status == .completed else { throw PortError("World texture mipmap generation failed.") }
         // Conservatively alpha-test animated walls if any animation frame is masked.
         let maskedWallAnimation=animationIDs.contains { !$0.key.flat && !opaque.contains($0.key) }
         if maskedWallAnimation { for key in animationIDs.keys where !key.flat { opaque.remove(key) } }
@@ -671,7 +678,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         // A BVH build may already be encoded. Submit it even if the render
         // encoder fails, so the next frame never consumes an unbuilt structure.
         guard var encoder = command.makeRenderCommandEncoder(descriptor:pass) else { command.commit(); return }
-        var power=SIMD4<Float>(hud.fixedColorMap==32 ? 1:0,hud.fixedColorMap==1 ? 1:0,Float(hud.tick),hdrEnabled ? 1:0)
+        var power=SIMD4<Float>(hud.fixedColorMap==32 ? 1:0,hud.fixedColorMap==1 ? 1:0,Float(hud.tick),sceneEffects.contains(.textureFiltering) ? 1:0)
         var noPower=SIMD4<Float>.zero
         encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
         encoder.setRenderPipelineState(pipeline); encoder.setDepthStencilState(depth); encoder.setCullMode(.none); encoder.setFrontFacing(.counterClockwise)

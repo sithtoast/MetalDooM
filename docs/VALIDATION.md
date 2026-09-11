@@ -3,6 +3,31 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.8.0, build 104 — Preset grain and brightness refinement
+
+- Native build 104 succeeds. Enhanced and HDR Showcase were visually compared
+  against build 102 in the same generated original-geometry E1M1 torch scene.
+  Floors/walls are smoother, lighting is more restrained, and Showcase has less
+  washout. The user did not supply their exact new problem viewpoint.
+- Native GPU suites pass on Ultimate Doom and Doom II with Metal API validation:
+  original AO/alpha/light/sprite/particle regressions, power-up overrides, HUD
+  preservation, toggles, presets, resize, save/load, map changes and shutdown.
+  Outputs: `build/preset-polish`, `build/preset-polish-doom2` and
+  `build/preset-polish-final` (final Ultimate Doom/ceiling coverage).
+- A production-sampler GPU probe minifies a black/white checker: filtered color
+  converges to its mean within 0.01 while Classic stays strictly nearest 0/1.
+  The same probe verifies exact nearest alpha for a masked checker, no black
+  fringes, and unchanged power-up sampling. Real world filtering changes visible
+  pixels, preserves HUD bytes, remains stable, and restores Classic exactly.
+- The EDR mapping test adds a near-white 1.01 input: output remains below 1.03
+  even with an 8× peak request, preventing the former exaggerated contrast slope.
+  Existing linear transfer, over-range output, headroom, HUD color and HDR/SDR
+  switching tests pass. Production volumetric rays remain blocked by a partition.
+- Ray budgets increase to 16 AO, eight soft-shadow samples and 32 haze steps.
+  These are quality improvements with GPU cost, not performance gains. Timing
+  samples include validation/readback and other live previews; they do not prove
+  sustained performance. Other hardware/displays remain untested.
+
 ## 0.8.0, build 102 — HDR, volumetric lighting and presets
 
 - Build 102 succeeds and its native window identifies **MetalDooM 0.8.0 (build 102)**.

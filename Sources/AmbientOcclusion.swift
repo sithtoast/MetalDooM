@@ -138,12 +138,12 @@ final class AmbientOcclusion {
             float3 sampleNormal=dot(light.facing.xyz,light.facing.xyz)>0.5 ? light.facing.xyz:direction;
             float3 tangent=normalize(cross(sampleNormal,abs(sampleNormal.y)<0.9 ? float3(0,1,0):float3(1,0,0)));
             float3 bitangent=cross(sampleNormal,tangent);
-            uint samples=light.options.y>0 ? 4:1;
+            uint samples=light.options.y>0 ? 8:1;
             visibility=0;
             for (uint i=0;i<samples;i++) {
                 float3 target=light.positionRadius.xyz;
                 if (samples>1) {
-                    float r=sqrt((float(i)+0.5)/4.0)*light.options.y, angle=float(i)*2.39996323;
+                    float r=sqrt((float(i)+0.5)/8.0)*light.options.y, angle=float(i)*2.39996323;
                     target+=tangent*(r*cos(angle))+bitangent*(r*sin(angle));
                 }
                 ray shadow;
@@ -167,13 +167,14 @@ final class AmbientOcclusion {
         float4 c=tex.sample(s,in.uv/float2(tex.get_width(),tex.get_height()));
         if (c.a<0.5) discard_fragment();
         bool fullbright=in.fullbright>0.5 || power.x>0 || power.y>0;
-        float3 illumination=float3(fullbright ? 1.0:in.light*clamp(1.0-in.distance/3200.0,0.3,1.0));
+        float shade=fullbright ? 1.0:in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
+        float3 illumination=float3(shade);
         if (!fullbright) for (uint i=0;i<min(lightCount,16u);i++) {
             float3 delta=lights[i].positionRadius.xyz-in.world;
             // Isotropic reception avoids billboard-facing brightness changes.
             if (length(delta)>0.2) illumination+=directLight(in.world,normalize(delta),lights[i],world,vertices,materials,alpha);
         }
-        return float4(powerColor(c.rgb*illumination*(power.w>0 && in.fullbright>0.5 && power.x==0 && power.y==0 ? 1.5:1.0),power),1);
+        return float4(powerColor(litPalette(c.rgb,shade,illumination-float3(shade)),power),1);
     }
     fragment float4 aoFragment(Out in [[stage_in]], bool front [[front_facing]],
             texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]],
@@ -184,7 +185,7 @@ final class AmbientOcclusion {
             constant float4 &emission [[buffer(11)]]) {
         if (in.fullbright > 0.5 && !front) discard_fragment();
         constexpr sampler s(coord::normalized, address::repeat, filter::nearest);
-        float4 c=tex.sample(s,in.uv/float2(tex.get_width(),tex.get_height()));
+        float4 c=sampleWorld(tex,in.uv,power);
         if (c.a < 0.5) discard_fragment();
         // Derivatives recover each flat surface normal without changing the
         // classic vertex layout. Orient it toward the visible side of the plane.
@@ -197,8 +198,8 @@ final class AmbientOcclusion {
             float occlusion=0;
             // Fixed cosine-weighted hemisphere directions: stable while paused
             // or moving, without temporal history, noise or a denoising pass.
-            for (uint i=0;i<8;i++) {
-                float r=sqrt((float(i)+0.5)/8.0), angle=float(i)*2.39996323;
+            for (uint i=0;i<16;i++) {
+                float r=sqrt((float(i)+0.5)/16.0), angle=float(i)*2.39996323;
                 ray query;
                 query.origin=in.world+n*0.15;
                 query.direction=tangent*(r*cos(angle))+bitangent*(r*sin(angle))+n*sqrt(1-r*r);
@@ -206,13 +207,13 @@ final class AmbientOcclusion {
                 float distance=aoHitDistance(query,world,vertices,materials,alpha);
                 occlusion+=1.0-smoothstep(0.0,settings.x,distance);
             }
-            shade*=1.0-settings.y*(occlusion/8.0);
+            shade*=1.0-settings.y*(occlusion/16.0);
         }
         float3 illumination=float3(shade);
         if (power.x==0 && power.y==0)
             for (uint i=0;i<min(lightCount,16u);i++)
                 illumination+=directLight(in.world,n,lights[i],world,vertices,materials,alpha);
-        return float4(powerColor(emissiveColor(c.rgb,c.rgb*illumination,emission,power),power),1);
+        return float4(powerColor(emissiveColor(c.rgb,litPalette(c.rgb,shade,illumination-float3(shade)),emission,power),power),1);
     }
     """
 }
