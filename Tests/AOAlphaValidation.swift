@@ -15,13 +15,27 @@ func validateAlphaRays(device: MTLDevice, queue: MTLCommandQueue) throws {
             const device uchar *alpha [[buffer(3)]], device float4 *distances [[buffer(4)]], uint id [[thread_position_in_grid]]) {
         ray r;r.origin=float3(float(id)+0.5,1.5,2);r.direction=float3(0,0,-1);r.min_distance=0.05;r.max_distance=8;
         float hit=aoHitDistance(r,world,vertices,materials,alpha);
-        DynamicLight light={float4(float(id)+0.5,1.5,-1,8),float4(1,0.35,0.08,1),float4(1,0,0,0)};
+        DynamicLight light={float4(float(id)+0.5,1.5,-1,8),float4(1,0.35,0.08,1),float4(1,0,0,0),float4(0)};
         float shadowed=directLight(r.origin,r.direction,light,world,vertices,materials,alpha).r;
         light.options.x=0;
         float unshadowed=directLight(r.origin,r.direction,light,world,vertices,materials,alpha).r;
         light.options.x=1;light.positionRadius.z=-3;
         float behindWall=directLight(r.origin,r.direction,light,world,vertices,materials,alpha).r;
         distances[id]=float4(hit,shadowed,unshadowed,behindWall);
+    }
+    kernel void softProbe(primitive_acceleration_structure world [[buffer(0)]],
+            const device AOVertex *vertices [[buffer(1)]], const device uint4 *materials [[buffer(2)]],
+            const device uchar *alpha [[buffer(3)]], device float4 *output [[buffer(4)]], uint id [[thread_position_in_grid]]) {
+        float3 surface=float3(float(id)+0.5,1.5,2),normal=float3(0,0,-1);
+        DynamicLight light={float4(float(id)+0.5,1.5,-1,8),float4(1,0.35,0.08,1),float4(1,2,0,0),float4(0)};
+        float soft=directLight(surface,normal,light,world,vertices,materials,alpha).r;
+        light.options.x=0;
+        float unshadowed=directLight(surface,normal,light,world,vertices,materials,alpha).r;
+        light.facing=float4(0,0,1,0);
+        float front=directLight(surface,normal,light,world,vertices,materials,alpha).r;
+        light.facing.z=-1;
+        float back=directLight(surface,normal,light,world,vertices,materials,alpha).r;
+        output[id]=float4(soft,unshadowed,front,back);
     }
     """
     let ao=try AmbientOcclusion(device:device,shader:prefix,format:.bgra8Unorm)
@@ -70,6 +84,26 @@ func validateAlphaRays(device: MTLDevice, queue: MTLCommandQueue) throws {
     expect(try probe(uv:-3),[4,2,4,2])
     validationRequire(ao.buildCount==built,"UV-only change rebuilt geometry")
     expect(try probe(wall:false),[2,8,2,8])
+    let softPipeline=try device.makeComputePipelineState(function:library.makeFunction(name:"softProbe")!)
+    func softResults() -> [SIMD4<Float>] {
+        let command=queue.makeCommandBuffer()!, encoder=command.makeComputeCommandEncoder()!
+        let output=device.makeBuffer(length:64,options:.storageModeShared)!
+        encoder.setComputePipelineState(softPipeline);encoder.setAccelerationStructure(ao.structure!,bufferIndex:0)
+        encoder.setBuffer(ao.vertices!,offset:0,index:1);encoder.setBuffer(ao.materials!,offset:0,index:2)
+        encoder.setBuffer(mask,offset:0,index:3);encoder.setBuffer(output,offset:0,index:4)
+        encoder.dispatchThreads(MTLSize(width:4,height:1,depth:1),threadsPerThreadgroup:MTLSize(width:4,height:1,depth:1))
+        encoder.endEncoding();command.commit();command.waitUntilCompleted()
+        validationRequire(command.status == .completed,"Soft-shadow GPU probe failed")
+        return Array(UnsafeBufferPointer(start:output.contents().assumingMemoryBound(to:SIMD4<Float>.self),count:4))
+    }
+    let soft=softResults()
+    validationRequire(soft==softResults(),"Soft shadow samples must be deterministic")
+    validationRequire(soft.contains { $0.x>0 && $0.x<$0.y },"Soft shadow must produce partial visibility at masked edges")
+    for result in soft {
+        validationRequire(result.x>=0 && result.x<=result.y,"Soft shadow exceeds unshadowed energy")
+        validationRequire(abs(result.z-result.y)<0.0001 && result.w==0,"Surface emission must illuminate only its front side")
+    }
+    print("PASS: deterministic soft-shadow penumbra, bounded energy and one-sided surface emission")
     print("PASS: analytic direct light falloff, grille shadows, finite light distance, backing-wall shadows and shadow bypass")
     print("PASS: alpha bars hit, holes reveal the wall or open sky, 127/128 cutoff and negative UV wrapping match raster rules; animation/UV updates avoid BVH rebuilds")
 }

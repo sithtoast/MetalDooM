@@ -22,6 +22,8 @@ source=source[:start]+'    func show(_ error: Error) { validationFail(String(des
 extension Renderer {
     func validationLightPhase(_ tics:Int32) { hud.levelTics=tics }
     var validationMapName: String? { map?.name }
+    var validationSelectedLights: [DynamicLightUniforms] { sceneLights() }
+    var validationSurfaceLights: [DynamicLightUniforms] { rebuildSurfaceLights();return surfaceLights }
     func validationCamera(_ x:Float,_ y:Float,_ z:Float,_ angle:Float,_ tilt:Float) {
         position=SIMD2(x,y);eyeZ=z;yaw=angle;pitch=tilt
     }
@@ -32,7 +34,7 @@ extension Renderer {
     }
 }
 """)
-(output/'main.swift').write_text(source+'\n'+(root/'Tests/AOAlphaValidation.swift').read_text()+'\n'+(root/'Tests/AmbientOcclusionValidation.swift').read_text().replace('// Exercise map replacement', (root/'Tests/SceneEffectsValidation.swift').read_text()+'\n// Exercise map replacement'))
+(output/'main.swift').write_text(source+'\n'+(root/'Tests/AOAlphaValidation.swift').read_text()+'\n'+(root/'Tests/AmbientOcclusionValidation.swift').read_text().replace('// Exercise map replacement', (root/'Tests/SceneEffectsValidation.swift').read_text()+'\n'+(root/'Tests/AdvancedEffectsValidation.swift').read_text()+'\n// Exercise map replacement'))
 PY
 SOURCES=()
 for source in "$PROJECT_DIR"/Sources/*.swift; do

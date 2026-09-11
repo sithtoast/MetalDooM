@@ -12,7 +12,7 @@ The active experiment is on `codex/metal-experiments`; check Git status/log befo
 continuing. The user selected **ray-traced ambient occlusion**. It is implemented
 as a per-session View menu option, with classic rendering still the default.
 
-Current version: **0.6.0**, successful local app **build 96**. `Info.plist` owns
+Current version: **0.7.0**, successful local app **build 100**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
 This is an experimental branch, not a published release. No push was requested.
 
@@ -69,8 +69,8 @@ View → Moving Test Light (Experimental) enables an amber camera-relative light
 Test Light Shadows compares masked world shadows with unshadowed lighting. It is
 independent of AO, shares its pipeline/mesh, starts off, and uses the level clock
 for an eight-second orbit. Doors/grilles participate; sky and billboard sprites
-still do not cast shadows. Light does not affect sprites, weapon, HUD or power-up
-fullbright rendering. See docs/METAL_EXPERIMENTS.md for details and boundaries.
+still do not cast shadows. Sprite reception is now optional (0.7.0); weapon, HUD and power-up
+fullbright rendering retain their original paths. See docs/METAL_EXPERIMENTS.md for details and boundaries.
 
 Build 94's GPU validation covers analytical falloff/blockers, finite shadow rays,
 animated masks, independent effects, paused/moving light, original-room shadows,
@@ -89,6 +89,24 @@ captures, level stats and diagnostics. A separate build 96 preview remains open 
 fixture adds three torches to original pillar-room geometry. Native controls and
 combined torch/shadow/emission/bloom/AO were inspected. See docs/VALIDATION.md for
 performance limits and evidence. No push was requested.
+
+The approved next sequence is complete in 0.7.0 build 100: Sprite Lighting,
+Emissive Surface Lighting, Soft Shadows and Embers & Projectile Trails, all
+independently toggleable and off at launch. Sprites receive the shared lights but
+do not cast shadows. Surface lights use one-sided, subdivided 128-unit patches,
+with up to four reserved within the total 16-light budget. They always use world
+occlusion and are independent of self-emission. Soft shadows use four fixed
+samples; particles use a 128-particle cap, current velocity and level time, with
+no simulation/save history. Fullbright/fuzz/weapon/HUD paths remain separate.
+
+Final GPU results are in `build/advanced-effects-build100` (Ultimate Doom),
+`build/advanced-effects-final` (full ceiling regression, build 99) and
+`build/advanced-effects-doom2-final` (Doom II, build 99). Build 100 only refines
+ember origins relative to flame tips. Native build 100 is open in
+`build/advanced-final/MetalDooM.app` using `build/advanced-preview.wad`; the latter
+adds torches, a medikit and barrel to original E1M1 geometry. New controls,
+sprite reception/soft shadows and final ember placement were inspected. See
+`docs/VALIDATION.md` for exact coverage and performance limits. Nothing pushed.
 
 ## Current behavior and important boundaries
 

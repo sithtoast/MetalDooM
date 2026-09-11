@@ -23,7 +23,7 @@ struct AOGeometry {
 
 /// Resources are immutable after submission, including animated alpha mappings.
 final class AmbientOcclusion {
-    let pipeline: MTLRenderPipelineState
+    let pipeline, spritePipeline: MTLRenderPipelineState
     private(set) var structure: MTLAccelerationStructure?
     private(set) var vertices: MTLBuffer?
     private(set) var materials: MTLBuffer?
@@ -46,6 +46,8 @@ final class AmbientOcclusion {
         descriptor.colorAttachments[0].pixelFormat = format
         descriptor.depthAttachmentPixelFormat = .depth32Float
         pipeline = try device.makeRenderPipelineState(descriptor:descriptor)
+        descriptor.fragmentFunction=library.makeFunction(name:"litSpriteFragment")
+        spritePipeline=try device.makeRenderPipelineState(descriptor:descriptor)
     }
 
     func prepare(geometry batches: [AOGeometry], device: MTLDevice, command: MTLCommandBuffer) throws {
@@ -99,7 +101,7 @@ final class AmbientOcclusion {
     #include <metal_raytracing>
     using namespace raytracing;
     struct AOVertex { float4 position; float4 uv; };
-    struct DynamicLight { float4 positionRadius; float4 colorIntensity; float4 options; };
+    struct DynamicLight { float4 positionRadius; float4 colorIntensity; float4 options; float4 facing; };
     float aoHitDistance(ray r, primitive_acceleration_structure world,
             const device AOVertex *vertices, const device uint4 *materials, const device uchar *alpha) {
         intersection_params params;
@@ -127,16 +129,51 @@ final class AmbientOcclusion {
         if (light.colorIntensity.w<=0 || distance>=radius || distance<=0.2) return float3(0);
         float cosine=max(0.0,dot(normal,offset/distance));
         if (cosine<=0) return float3(0);
+        if (dot(light.facing.xyz,light.facing.xyz)>0.5)
+            cosine*=max(0.0,dot(light.facing.xyz,-offset/distance));
+        if (cosine<=0) return float3(0);
+        float visibility=1;
         if (light.options.x>0) {
-            ray shadow;
-            shadow.origin=surface+normal*0.15;
-            float3 toLight=light.positionRadius.xyz-shadow.origin;
-            shadow.max_distance=length(toLight);shadow.min_distance=0.05;
-            shadow.direction=toLight/shadow.max_distance;
-            if (aoHitDistance(shadow,world,vertices,materials,alpha)<shadow.max_distance) return float3(0);
+            float3 direction=offset/distance;
+            float3 sampleNormal=dot(light.facing.xyz,light.facing.xyz)>0.5 ? light.facing.xyz:direction;
+            float3 tangent=normalize(cross(sampleNormal,abs(sampleNormal.y)<0.9 ? float3(0,1,0):float3(1,0,0)));
+            float3 bitangent=cross(sampleNormal,tangent);
+            uint samples=light.options.y>0 ? 4:1;
+            visibility=0;
+            for (uint i=0;i<samples;i++) {
+                float3 target=light.positionRadius.xyz;
+                if (samples>1) {
+                    float r=sqrt((float(i)+0.5)/4.0)*light.options.y, angle=float(i)*2.39996323;
+                    target+=tangent*(r*cos(angle))+bitangent*(r*sin(angle));
+                }
+                ray shadow;
+                shadow.origin=surface+normal*0.15;
+                float3 toLight=target-shadow.origin;
+                shadow.max_distance=length(toLight);shadow.min_distance=0.05;
+                shadow.direction=toLight/shadow.max_distance;
+                visibility+=aoHitDistance(shadow,world,vertices,materials,alpha)>=shadow.max_distance ? 1.0:0.0;
+            }
+            visibility/=float(samples);
         }
         float falloff=1.0-distance/radius;
-        return light.colorIntensity.rgb*(light.colorIntensity.w*cosine*falloff*falloff);
+        return light.colorIntensity.rgb*(light.colorIntensity.w*cosine*falloff*falloff*visibility);
+    }
+    fragment float4 litSpriteFragment(Out in [[stage_in]],texture2d<float> tex [[texture(0)]],
+            constant float4 &power [[buffer(2)]], primitive_acceleration_structure world [[buffer(4)]],
+            const device AOVertex *vertices [[buffer(5)]], const device uint4 *materials [[buffer(6)]],
+            const device uchar *alpha [[buffer(7)]], constant DynamicLight *lights [[buffer(9)]],
+            constant uint &lightCount [[buffer(10)]]) {
+        constexpr sampler s(coord::normalized,address::clamp_to_edge,filter::nearest);
+        float4 c=tex.sample(s,in.uv/float2(tex.get_width(),tex.get_height()));
+        if (c.a<0.5) discard_fragment();
+        bool fullbright=in.fullbright>0.5 || power.x>0 || power.y>0;
+        float3 illumination=float3(fullbright ? 1.0:in.light*clamp(1.0-in.distance/3200.0,0.3,1.0));
+        if (!fullbright) for (uint i=0;i<min(lightCount,16u);i++) {
+            float3 delta=lights[i].positionRadius.xyz-in.world;
+            // Isotropic reception avoids billboard-facing brightness changes.
+            if (length(delta)>0.2) illumination+=directLight(in.world,normalize(delta),lights[i],world,vertices,materials,alpha);
+        }
+        return float4(powerColor(c.rgb*illumination,power),1);
     }
     fragment float4 aoFragment(Out in [[stage_in]], bool front [[front_facing]],
             texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]],

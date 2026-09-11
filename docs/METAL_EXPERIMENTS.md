@@ -66,9 +66,9 @@ benchmark identity, and are locked during a benchmark.
 
 Direct light is added after AO darkens ambient sector lighting. It affects world
 surfaces only: sprites/weapon/HUD/sky and fixed-colormap power-ups retain their
-existing paths. Billboard sprites neither receive nor cast light/shadows. The original 0.5.0 experiment had no other light sources or bloom; 0.6.0 adds
-the independent options below. HDR, indirect illumination and soft shadows remain
-unimplemented.
+existing paths unless Sprite Lighting is selected (0.7.0). Billboard sprites
+do not cast shadows. The original 0.5.0 experiment had no other light sources or bloom; 0.6.0 adds
+the independent options below. HDR and multi-bounce indirect illumination remain unimplemented.
 
 The existing GPU script now also checks analytic light attenuation, opaque and
 masked blockers, geometry beyond the light, shadow bypass, independent toggles,
@@ -87,7 +87,7 @@ the E1M1 pillar/stairs and disables monsters; geometry/art remain original.
 
 ## Gameplay lights, emission and bloom — 0.6.0
 
-**View → More Metal Effects** has six independent, session-local switches, all off
+**View → More Metal Effects** includes these original six session-local switches, all off
 at launch. A shadow switch can be selected before enabling a light category.
 
 | Switch | Visible behavior |
@@ -107,12 +107,13 @@ within 1024 units (engine order breaks equal-distance ties). Decorations have a
 224-unit radius, projectiles 176, muzzle flashes 192. Distant/budgeted-out sources
 can pop in; no screen-tiled light culling is implemented yet.
 
-Dynamic lights illuminate world triangles only; billboard sprites neither receive
-nor cast these lights/shadows. The three new light categories require ray tracing
+Dynamic lights illuminate world triangles, with optional sprite reception in 0.7.0;
+billboard sprites do not cast shadows. The three new light categories require ray tracing
 in render shaders, even with their shadows off. Emission and bloom work without
 ray tracing. Emission uses material names and color thresholds, not authored masks;
 custom replacement textures can be misclassified, and unknown families stay classic.
-Emission does not illuminate neighboring surfaces. Animated materials retain their
+Self-emission alone does not illuminate neighboring surfaces; 0.7.0 adds a
+separate Emissive Surface Lighting switch. Animated materials retain their
 family while sampling the current engine texture frame.
 
 Bloom copies only the world viewport, extracts highlights at quarter resolution,
@@ -136,6 +137,60 @@ python3 Tests/make_surface_fixture.py /path/to/DOOM.WAD build/effects-preview.wa
 ```
 
 Open that local fixture and enable the switches. Keep the generated WAD private.
+
+## Connected lighting and particles — 0.7.0
+
+Four more independent View → More Metal Effects switches start off each launch:
+
+- **Sprite Lighting** uses the same bounded sources and world shadow rays on
+  monsters/pickups. Isotropic reception avoids shading tied to billboard rotation.
+  Alpha-cutout edges remain exact; original fullbright frames and power-up colormaps
+  bypass additional lighting. Fuzz/invisibility, weapon and HUD use their original
+  paths. Sprites still do not cast shadows or receive AO.
+- **Emissive Surface Lighting** averages eligible bright texels of known material
+  families and builds one-sided light patches from actual world triangles.
+  Large triangles are subdivided toward 128-unit edges (at most eight recursive
+  splits), then grouped into 128-unit cells on each material/plane. Representatives
+  stay on actual triangles and are offset four units into the emitting side.
+  The nearest four patches reserve slots in the existing 16-light budget; the
+  test light and muzzle flash retain priority among remaining actor sources.
+  These 256-unit-radius sources always test world occlusion, independently of
+  Gameplay Light Shadows. Moving sectors/material changes invalidate the source
+  cache; sector-light flicker alone does not. Map/save loads rebuild it.
+- **Soft Shadows** uses four fixed disk samples instead of the hard-shadow ray
+  when a source has shadows enabled. Test/gameplay source radius is six units;
+  emissive patches use twelve. Samples on emissive sources stay parallel to the
+  emitting plane. Hard shadows return exactly when switched off. This small
+  sample count can show steps in penumbrae; no temporal filtering is used.
+- **Embers & Projectile Trails** draws at most 128 small additive, depth-tested
+  particles from nearby torch/projectile snapshots, independently of their light
+  switches. Embers rise; projectile sparks trail along copied engine velocity.
+  Trails approximate the previous four tics using current velocity and disappear
+  with their source. There is no simulation history, collision or lingering impact
+  smoke; saves need no extra particle state. The level clock controls animation,
+  with no animation while paused. Fixed-colormap power-ups bypass particles.
+
+The world shadow mesh and source buffers are shared. Enabling sprite reception
+alone creates no lights; soft shadows alone create no sources. Sprite/surface
+lighting requires ray tracing in render shaders. Particles need ordinary Metal.
+Particles are drawn before bloom and the weapon/HUD. All new switches appear in
+reports and benchmark identity, lock during a benchmark, and survive map/save
+loads within the session. Bounded source selection can pop as the camera moves;
+this is approximate direct surface emission, not multi-bounce GI.
+
+GPU checks include analytical partial shadow visibility and one-sided emission,
+real monster reception, original nukage/LITE5 rooms, independent source switches,
+real rocket velocity/trails, budgets, exact restoration, power-ups, resize and
+save/load. Additional images are `advanced-*.png`. For native inspection:
+
+```sh
+python3 Tests/make_surface_fixture.py /path/to/DOOM.WAD build/advanced-preview.wad advanced
+python3 Tests/make_surface_fixture.py /path/to/DOOM.WAD build/emission-preview.wad emission
+```
+
+The first adds torches, a medikit and barrel to original pillar-room geometry;
+the second relocates the player to the original zigzag/nukage room. Keep generated
+WADs private.
 
 ## Comparing and measuring
 

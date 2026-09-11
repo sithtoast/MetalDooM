@@ -4,6 +4,28 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.7.0 · Build 100 — Connected lighting and particles
+
+- Add separate Sprite Lighting, Emissive Surface Lighting, Soft Shadows and
+  Embers & Projectile Trails switches under View → More Metal Effects. All
+  start off and remain independent of existing AO, light and bloom controls.
+- Let monsters and pickups receive colored lights and world occlusion while
+  preserving fullbright frames, invisibility, weapons and the HUD. Sprites
+  remain billboards and do not cast shadows.
+- Light neighboring geometry from one-sided lamp, computer and liquid surface
+  patches. Subdivide large surfaces for local coverage, update moving geometry,
+  and reserve up to four patches within the shared 16-light budget.
+- Soften enabled shadows with four fixed samples. Draw up to 128 torch embers
+  and projectile sparks from authoritative game time and velocity; pause cleanly
+  and restore without extra save data. Embers rise from torch flames.
+- Pass native Ultimate Doom/Doom II GPU comparisons, analytic penumbra/emission
+  tests, real monster reception and rocket trails, independent toggles, budgets,
+  power-ups, resize, save/load, map transitions and shutdown. Preserve the 48
+  ceiling captures, level-stat tests and diagnostics; inspect native build 100.
+- Surface illumination uses bounded point approximations, soft shadows can show
+  sampling steps, and trails approximate recent motion without particle collision
+  or lingering impact smoke. Other GPUs and sustained crowded combat remain untested.
+
 ## 0.6.0 · Build 96 — Independent scene effects
 
 - Add View → More Metal Effects with separate torch/lamp lighting, projectile

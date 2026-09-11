@@ -1,4 +1,4 @@
-# MetalDooM 0.6.0 — Apple Silicon preview
+# MetalDooM 0.7.0 — Apple Silicon preview
 
 A native Metal source port for classic Doom, powered by Chocolate Doom.
 Requires Apple Silicon and macOS 14 or later. This is an early preview.
@@ -13,18 +13,20 @@ and confirm. See INSTALL.md inside the ZIP.
 Supply your own Doom/Ultimate Doom, Doom II, TNT or Plutonia IWAD. Standard SIGIL
 Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
-## New in 0.6.0
+## New in 0.7.0
 
-- **View → More Metal Effects** adds independent torch/lamp, projectile and muzzle
-  lights, gameplay light shadows, emissive surfaces and bloom. All start off.
-- Torch flicker and weapon flashes follow game time. Nearby colored lights use
-  the shared world ray mesh with a 16-light budget; AO/test-light controls remain
-  separate. Decorative lamps and bright liquid/computer pixels can self-illuminate.
-- Restrained bloom softens bright world highlights before drawing the weapon/HUD.
-  Settings survive map/save loads within the session and appear in diagnostics.
-- This is an experimental branch preview, not a published release. Light receivers
-  and shadow casters are world surfaces; billboard sprites do not receive or cast
-  dynamic lighting/shadows. Bloom is LDR, not HDR or indirect surface lighting.
+- Add independent **Sprite Lighting**, **Emissive Surface Lighting**, **Soft
+  Shadows** and **Embers & Projectile Trails** switches under View → More Metal
+  Effects. All start off and combine with the existing lighting, AO and bloom.
+- Monsters and pickups receive existing colored lights with world occlusion;
+  original fullbright frames, invisibility, the weapon and HUD keep their paths.
+- Selected lamp/computer/liquid materials illuminate nearby surfaces through
+  bounded, one-sided source patches. Self-emission remains a separate switch.
+- Four fixed shadow samples soften edges without temporal noise. Torch embers and
+  projectile sparks follow game time and freeze while paused.
+- Keep a 16-light budget (up to four emissive patches) and 128-particle budget.
+  Sprites remain billboards and do not cast shadows. Surface lighting and trails
+  are approximations; crowded combat and other GPUs still need broader testing.
 
 ## Included in this preview
 
@@ -38,9 +40,10 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 - Fixed phantom imps caused by drawing invisible teleport destinations.
 - Shorter About credits and separate player, developer and testing guides.
 
-Local experimental build: **96**, version **0.6.0**. GPU checks cover analytic
-wall/grille shadows, real light sources and flash timing, independent/combined
-toggles, HUD/classic restoration, resize, power-ups, the ceiling regression, doors,
+Local experimental build: **100**, version **0.7.0**. GPU checks cover analytic
+wall/grille/soft shadows, one-sided surface emission, sprite reception, real light
+sources, flash timing and rocket trails, independent/combined toggles, HUD/classic
+restoration, resize, power-ups, the ceiling regression, doors,
 native save/load, map replacement and shutdown.
 Native controls and lighting were inspected on the M5 Pro; other GPUs and sustained
 frame-rate comparisons remain untested. Details are in docs/VALIDATION.md. GitHub

@@ -141,3 +141,9 @@ gameplay shadows, emissive surfaces and bloom. Compare each at a paused viewpoin
 then combine them with AO. Check weapon/HUD clarity, real firing, colored torches,
 resize, invisibility and fixed-colormap power-ups. The GPU regression covers these
 paths on Ultimate Doom and Doom II; see the current validation entry for results.
+
+The 0.7.0 additions are Sprite Lighting, Emissive Surface Lighting, Soft Shadows,
+and Embers & Projectile Trails. Test sprite reception with an existing light,
+surface illumination with self-emission off, shadow softness with shadows on,
+and particles with all light sources switched off. Watch large liquids, monsters
+near colored torches, moving rockets, pause/resume and map/save transitions.

@@ -86,7 +86,8 @@ extension App {
         AO radius: \(Int(renderer.aoSettings.radius)) Doom units
         Moving test light: \(renderer.dynamicLightEnabled ? "On (amber, radius 256, intensity 2, 8-second orbit)":"Off")
         Additional effects: \(SceneEffect.allCases.map { "\($0.title)=\(renderer.sceneEffects.contains($0) ? "On":"Off")" }.joined(separator:", "))
-        World light budget: 16 nearest sources including muzzle/test light; world receivers and world shadows only
+        World light budget: 16 total, up to 4 emissive patches; sprite reception optional; world-only shadow casters
+        Soft shadows: 4 fixed samples when selected; particles: maximum 128
         Test light shadows: \(renderer.dynamicLightShadows ? "On (alpha-tested world)":"Off")
         Shared ray occluder triangles: \(renderer.ambientOcclusion?.triangleCount ?? 0)
         Ray tracing in render shaders: \(renderer.ambientOcclusionSupported)

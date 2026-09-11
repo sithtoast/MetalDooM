@@ -6,6 +6,7 @@ struct DynamicLightUniforms {
     var positionRadius: SIMD4<Float> = .zero
     var colorIntensity: SIMD4<Float> = .zero
     var options: SIMD4<Float> = .zero
+    var facing: SIMD4<Float> = .zero // xyz: one-sided emitter normal; zero for point lights
 
     static func moving(eye: SIMD3<Float>, yaw: Float, tics: Int32, shadows: Bool) -> Self {
         let phase=Float(tics % 280)/280 * 2 * Float.pi
@@ -20,6 +21,7 @@ struct DynamicLightUniforms {
 /// Session-local switches: none changes the simulation or save format.
 enum SceneEffect: Int, CaseIterable {
     case torches, projectiles, muzzleFlash, shadows, emissive, bloom
+    case spriteLighting, surfaceLighting, softShadows, particles
     var title: String {
         switch self {
         case .torches: return "Torch & Lamp Lights"
@@ -28,9 +30,13 @@ enum SceneEffect: Int, CaseIterable {
         case .shadows: return "Gameplay Light Shadows"
         case .emissive: return "Emissive Surfaces"
         case .bloom: return "Bloom"
+        case .spriteLighting: return "Sprite Lighting"
+        case .surfaceLighting: return "Emissive Surface Lighting"
+        case .softShadows: return "Soft Shadows"
+        case .particles: return "Embers & Projectile Trails"
         }
     }
-    var needsRays: Bool { self == .torches || self == .projectiles || self == .muzzleFlash }
+    var needsRays: Bool { self == .torches || self == .projectiles || self == .muzzleFlash || self == .spriteLighting || self == .surfaceLighting }
 }
 
 extension DynamicLightUniforms {

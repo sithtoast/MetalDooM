@@ -33,7 +33,7 @@ generation. The first hosted run must pass before treating CI as validated.
 - Pushes to `main`, pull requests and the manual Actions button build the app and
   run checks that do not require game WADs. The Actions run offers a development
   app ZIP, matching source ZIP and checksums. These builds are ad-hoc signed.
-- Pushing a tag exactly matching `Info.plist`, such as `v0.6.0`, imports your
+- Pushing a tag exactly matching `Info.plist`, such as `v0.7.0`, imports your
   Developer ID, signs and packages the app, and publishes a GitHub prerelease.
 - No run submits anything to Apple for notarization. Tagged releases clearly say
   they are signed but unnotarized. Game WADs are never required or uploaded.
@@ -104,8 +104,8 @@ After the main build is green and the three secrets are configured:
 
 ```bash
 cd /Users/wmh/Dev/MetalDooM
-git tag -a v0.6.0 -m "MetalDooM 0.6.0 preview"
-git push origin v0.6.0
+git tag -a v0.7.0 -m "MetalDooM 0.7.0 preview"
+git push origin v0.7.0
 ```
 
 The tag marks the source revision being released. Its version must exactly match
@@ -128,7 +128,7 @@ This reserves a separate practical range for CI; revisit the scheme before local
 builds approach 10000. A rerun retains the same build number. Workflow run and
 attempt IDs in GitHub identify retries. The matching source archive retains the
 committed local counter; CI supplies its override through METALDOOM_CI_BUILD_NUMBER.
-The app version (for example 0.6.0) is separate from both counters.
+The app version (for example 0.7.0) is separate from both counters.
 
 ## If a run fails
 

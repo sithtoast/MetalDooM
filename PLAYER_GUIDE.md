@@ -157,12 +157,13 @@ game time, so Escape pauses it. It can be used with or without ray-traced AO.
 Both effects start off at launch and require Metal ray tracing in render shaders.
 
 Walls, floors, ceilings and grille bars block the light; transparent grille pixels
-let it through. Sprites, the weapon and HUD keep their original lighting. This
+let it through. Sprite light reception has its own switch; the weapon and HUD
+keep their original lighting. This
 test light has no visible orb; the additional effects below are independent.
 It follows your position and can become occluded when its orbit crosses a wall.
 Light/shadow choices last for the session and survive map/save loads.
 
-**View → More Metal Effects** adds six separate switches:
+**View → More Metal Effects** offers independent switches:
 
 - **Torch & Lamp Lights**: colored illumination from torches, candles, lamps and burning barrels.
 - **Projectile Lights**: moving illumination from rockets, plasma, BFG shots and monster fireballs.
@@ -170,12 +171,19 @@ Light/shadow choices last for the session and survive map/save loads.
 - **Gameplay Light Shadows**: world shadows for those three light categories.
 - **Emissive Surfaces**: glowing lamp, liquid, fire and colored computer-panel pixels.
 - **Bloom**: a subtle halo around bright world highlights.
+- **Sprite Lighting**: monsters and pickups receive existing colored lights.
+- **Emissive Surface Lighting**: lamp, liquid and computer surfaces illuminate nearby geometry.
+- **Soft Shadows**: soften the edges of enabled world shadows.
+- **Embers & Projectile Trails**: drifting torch embers and sparks behind moving projectiles.
 
-All six start off and can be combined with AO and the test light. The new lights
-require ray tracing; emission and bloom do not. Up to 16 nearby lights illuminate
-world surfaces. Sprites do not receive/cast their lighting or shadows. Bloom is
-applied before the weapon/HUD, keeping them crisp. Emission makes textures glow
-but does not light neighboring surfaces. Choices last until you quit.
+All start off and can be combined with AO and the test light. The new lights
+require ray tracing; self-emission, bloom and particles do not. Up to 16 nearby lights illuminate
+world surfaces and optionally sprites. Sprites do not cast shadows. Bloom is
+applied before the weapon/HUD, keeping them crisp. Emissive Surfaces controls the
+visible glow; Emissive Surface Lighting separately controls illumination of
+neighboring surfaces.
+Soft Shadows needs an enabled shadow-casting source. Particles work independently
+of lighting and follow game time. Choices last until you quit.
 
 ## Developer console
 

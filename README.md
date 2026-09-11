@@ -3,10 +3,11 @@
 Classic Doom on Apple Silicon, with native Metal rendering and gameplay powered
 by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
-**Version 0.6.0 · experimental source preview · not notarized.**
+**Version 0.7.0 · experimental source preview · not notarized.**
 
 This branch adds independently switchable AO, test/torch/projectile/muzzle
-lighting, world shadows, emissive surfaces and bloom. Find the new switches in
+lighting, sprite light reception, hard/soft world shadows, emissive surface
+lighting, bloom, embers and projectile trails. Find the new switches in
 **View → More Metal Effects**. All effects start off. Local builds are ad-hoc signed; release packages
 use the separate signing workflow. See [Metal experiments](docs/METAL_EXPERIMENTS.md).
 

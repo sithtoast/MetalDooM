@@ -474,7 +474,8 @@ int MD_CopyThings(MD_Thing *output, int capacity, float cameraX, float cameraY) 
                 (float)object->floorz/FRACUNIT,
                 lump, frame->flip[rotation], (object->frame & FF_FULLBRIGHT) != 0,
                 mobjinfo[object->type].doomednum, !!(object->flags & MF_SHADOW),
-                lightKind, (float)object->z/FRACUNIT+lightHeight
+                lightKind, (float)object->z/FRACUNIT+lightHeight,
+                (float)object->momx/FRACUNIT, (float)object->momy/FRACUNIT, (float)object->momz/FRACUNIT
             };
         }
         ++count;

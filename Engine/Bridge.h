@@ -10,7 +10,7 @@ typedef struct { float floor, ceiling, light; } MD_Sector;
 typedef struct {
     float x, y, z, light, floorZ;
     int lump, flip, fullbright, doomedType, shadow, lightKind;
-    float lightZ;
+    float lightZ, velocityX, velocityY, velocityZ;
 } MD_Thing;
 typedef struct {
     int health, armor, readyAmmo, readyWeapon;

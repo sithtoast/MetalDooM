@@ -98,6 +98,34 @@ final class Renderer: NSObject, MTKViewDelegate {
     func setDynamicLightShadows(_ enabled: Bool) { dynamicLightShadows=enabled }
     private(set) var sceneEffects=Set<SceneEffect>()
     private var bloom: Bloom?
+    private var particles: ParticleRenderer?
+    private var surfaceColors:[MaterialKey:SIMD4<Float>]=[:]
+    private var surfaceLights:[DynamicLightUniforms]=[]
+    private var surfaceLightsDirty=true
+    private func rebuildSurfaceLights() {
+        guard surfaceLightsDirty, let map else { return }
+        var collector=SurfaceLightCollector()
+        for batch in batches {
+            guard let color=surfaceColors[batch.material], color.w>0 else { continue }
+            let vertices=batch.vertices.contents().bindMemory(to:WorldVertex.self,capacity:batch.count)
+            for i in stride(from:0,to:batch.count,by:3) {
+                let triangle=[vertices[i],vertices[i+1],vertices[i+2]]
+                let a=SIMD3(triangle[0].position.x,triangle[0].position.y,triangle[0].position.z)
+                let b=SIMD3(triangle[1].position.x,triangle[1].position.y,triangle[1].position.z)
+                let c=SIMD3(triangle[2].position.x,triangle[2].position.y,triangle[2].position.z)
+                let cross=simd_cross(b-a,c-a)
+                guard simd_length_squared(cross)>0.0001 else { continue }
+                var normal=simd_normalize(cross)
+                if batch.material.flat {
+                    let center=(a+b+c)/3
+                    let sector=map.sectors[map.sector(at:SIMD2(center.x,-center.z))]
+                    normal=SIMD3(0,abs(center.y-sector.floor)<abs(center.y-sector.ceiling) ? 1:-1,0)
+                }
+                collector.add(triangle,material:batch.material,color:color,normal:normal)
+            }
+        }
+        surfaceLights=collector.lights();surfaceLightsDirty=false
+    }
     private var lightThings:[MD_Thing]=[]
     var sceneEffectsKey: String { SceneEffect.allCases.map { sceneEffects.contains($0) ? "1":"0" }.joined() }
     func setSceneEffect(_ effect: SceneEffect, enabled: Bool) throws {
@@ -110,6 +138,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         if effect == .bloom {
             bloom=enabled ? try Bloom(device:device,format:worldFormat):nil
         }
+        if effect == .particles { particles=enabled ? try ParticleRenderer(device:device,format:worldFormat):nil }
         sceneEffects=next
         if !ambientOcclusionEnabled && !dynamicLightEnabled && !next.contains(where: { $0.needsRays }) { ambientOcclusion=nil }
     }
@@ -124,7 +153,23 @@ final class Renderer: NSObject, MTKViewDelegate {
             lights += DynamicLightUniforms.gameplay(things:lightThings,hud:hud,
                 eye:SIMD3(position.x,eyeZ,-position.y),effects:sceneEffects)
         }
+        if sceneEffects.contains(.surfaceLighting) {
+            rebuildSurfaceLights()
+            let eye=SIMD3(position.x,eyeZ,-position.y)
+            var candidates:[(Int,DynamicLightUniforms,Float)]=[]
+            for (index,light) in surfaceLights.enumerated() {
+                let point=SIMD3<Float>(light.positionRadius.x,light.positionRadius.y,light.positionRadius.z)
+                let distance=simd_length_squared(point-eye)
+                if distance<1_048_576 { candidates.append((index,light,distance)) }
+            }
+            candidates.sort { $0.2==$1.2 ? $0.0<$1.0:$0.2<$1.2 }
+            let nearest=candidates.prefix(4).map { $0.1 }
+            lights=Array(lights.prefix(DynamicLightUniforms.limit-nearest.count))+nearest
+        }
         lights=Array(lights.prefix(DynamicLightUniforms.limit))
+        if sceneEffects.contains(.softShadows) {
+            for i in lights.indices { lights[i].options.y=lights[i].facing == .zero ? 6:12 }
+        }
         // Keep decoration emitters inside their actual sector, including low ceilings.
         if let map {
             for i in lights.indices {
@@ -396,6 +441,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             }
         }
         var cached: [MaterialKey:MTLTexture] = [:], missing: [String] = []
+        var emissionColors:[MaterialKey:SIMD4<Float>]=[:]
         var opaque = Set<MaterialKey>()
         var alphaBytes:[UInt8]=[255], alphaInfo:[ObjectIdentifier:SIMD4<UInt32>]=[:]
         func cacheMaterial(_ material: MaterialKey) throws {
@@ -403,6 +449,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             let source = try art.image(material)
             if source == nil { missing.append(material.name) }
             let pixels = source ?? Art.fallback
+            emissionColors[material]=source == nil ? .zero:SurfaceLightCollector.color(material:material,pixels:pixels)
             if stride(from:3,to:pixels.rgba.count,by:4).allSatisfy({ pixels.rgba[$0] >= 128 }) { opaque.insert(material) }
             let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba8Unorm,width:pixels.width,height:pixels.height,mipmapped:false)
             descriptor.usage = .shaderRead; descriptor.storageMode = .shared
@@ -463,6 +510,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         guard let alphaBuffer=device.makeBuffer(bytes:alphaBytes,length:alphaBytes.count,options:.storageModeShared) else { throw PortError("Cannot allocate AO alpha masks.") }
         aoAlphaBuffer=alphaBuffer;aoAlphaInfo=alphaInfo
         opaqueMaterials=opaque;aoGeometryDirty=true
+        surfaceColors=emissionColors;surfaceLights=[];surfaceLightsDirty=true
         self.map = map; self.wad = wad; textures = cached; batches = loaded; sky = loadedSky; sprites = loadedSprites; pitch = 0
         music?.update(active:false); music=loadedMusic; music?.enabled=musicEnabled; music?.volume=musicVolume
         sound = loadedSound; sound?.volume=effectsVolume; sound?.drain()
@@ -515,7 +563,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private func syncGeometry() throws {
         guard var map, lastGeometryTick != currentPlayer.tick else { return }
         lastGeometryTick = currentPlayer.tick
-        var changed = false
+        var changed = false, surfacesChanged = false
         func name<T>(_ tuple: T) -> String {
             var value = tuple
             return withUnsafePointer(to:&value) { $0.withMemoryRebound(to:CChar.self,capacity:9) { String(cString:$0).uppercased() } }
@@ -525,11 +573,13 @@ final class Renderer: NSObject, MTKViewDelegate {
             let upper = name(state.upper), lower = name(state.lower), middle = name(state.middle)
             if old.x != state.x || old.y != state.y || old.upper != upper || old.lower != lower || old.middle != middle {
                 map.sides[index] = Side(sector:old.sector,x:state.x,y:state.y,upper:upper,lower:lower,middle:middle); changed = true
+                surfacesChanged = surfacesChanged || old.upper != upper || old.lower != lower || old.middle != middle
             }
         }
         for index in map.sectors.indices {
             let state = MD_GetSector(Int32(index)), old = map.sectors[index]
             if state.floor != old.floor || state.ceiling != old.ceiling || state.light != old.light {
+                surfacesChanged = surfacesChanged || state.floor != old.floor || state.ceiling != old.ceiling
                 map.sectors[index] = Sector(floor:state.floor,ceiling:state.ceiling,light:state.light,floorTexture:old.floorTexture,ceilingTexture:old.ceilingTexture)
                 changed = true
             }
@@ -537,7 +587,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         if changed {
             let geometry = try Geometry(map:map,textureHeights:textureHeights)
             batches = try makeBatches(geometry,textures:textures)
-            aoGeometryDirty=true
+            aoGeometryDirty=true;surfaceLightsDirty = surfaceLightsDirty || surfacesChanged
             try uploadSkyGeometry(geometry)
             self.map = map
         }
@@ -558,7 +608,8 @@ final class Renderer: NSObject, MTKViewDelegate {
                 DispatchQueue.main.async { [weak self] in
                     self?.disableRayEffects()
                     self?.bloom=nil;self?.sceneEffects.remove(.bloom)
-                    self?.onWarning?("Metal command error (ray-traced effects and bloom disabled): \(error)")
+                    self?.particles=nil;self?.sceneEffects.remove(.particles)
+                    self?.onWarning?("Metal command error (ray-traced effects, bloom and particles disabled): \(error)")
                 }
             }
             let gpuTime=max(0,buffer.gpuEndTime-buffer.gpuStartTime)
@@ -635,7 +686,8 @@ final class Renderer: NSObject, MTKViewDelegate {
                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:batch.count)
             }
             if let sprites, engineReady {
-                encoder.setRenderPipelineState(spritePipeline)
+                encoder.setRenderPipelineState(sceneEffects.contains(.spriteLighting) && ambientOcclusion?.structure != nil
+                    ? ambientOcclusion!.spritePipeline:spritePipeline)
                 do { try sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw) }
                 catch { engineReady = false; DispatchQueue.main.async { [weak self] in self?.onError?(error) } }
                 if sprites.hasFuzz || hud.invisibility>128 || (hud.invisibility&8) != 0 {
@@ -656,6 +708,13 @@ final class Renderer: NSObject, MTKViewDelegate {
                         encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
                         encoder.setFragmentTexture(snapshot,index:1);encoder.setRenderPipelineState(fuzzPipeline);encoder.setDepthStencilState(fuzzDepth)
                         try? sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw,fuzz:true)
+                    }
+                }
+                if let particles, power.x==0 && power.y==0 {
+                    do { try particles.draw(encoder:encoder,camera:position,eye:eye,yaw:yaw,pitch:pitch,tics:hud.levelTics,matrix:uniform.matrix) }
+                    catch {
+                        self.particles=nil;sceneEffects.remove(.particles)
+                        DispatchQueue.main.async { [weak self] in self?.onWarning?("Particles disabled: \(error)") }
                     }
                 }
                 // Complete world effects before either weapon pass and the HUD.

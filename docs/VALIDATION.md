@@ -3,6 +3,48 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.7.0, build 100 — Sprite/surface lighting, soft shadows and particles
+
+- Native GPU suites pass for Ultimate Doom E1M1 and Doom II MAP01 with Metal API
+  validation. Original AO, hard-shadow and alpha/grille tests remain intact.
+  The analytic soft-shadow probe produces partial visibility at masked edges,
+  never exceeds unshadowed energy, stays deterministic, and verifies one-sided
+  emitters illuminate the front side only.
+- Real engine-spawned imp frames receive the test light when Sprite Lighting is
+  on, while enabling reception without a light source leaves classic pixels
+  unchanged. Switching it off restores world-only lighting; HUD bytes stay exact.
+- Independent surface lighting changes 260,738 world pixels in original E1M1's
+  nukage room at (2848,-2960), eye 17, facing south with pitch 0.2; the LITE5
+  doorway at (800,504), eye 137 in MAP01 changes 436,988 pixels. Self-emission
+  is off for these comparisons. Large triangles are subdivided before grouping
+  sources, and source representatives remain on actual triangles.
+- Soft-shadow toggles preserve paused pixels and reuse the world mesh. Particles
+  work with light categories off, change with game time, restore exact pixels
+  when disabled and obey the 128-particle cap. A real rocket firing sequence
+  supplies copied velocity and verifies sparks trail behind the projectile.
+- All ten scene switches combine with AO/test lighting, survive native save/load,
+  lock during benchmarks and retain checked state. Fixed-colormap power-ups
+  override the added effects, invisibility/fuzz works with bloom, odd-size resize
+  and return is stable, map replacement rebuilds the shared mesh, and shutdown
+  succeeds after queued GPU frames. Level-stat/secret/save and diagnostics tests pass.
+- Full final geometry/shader coverage in build 99 includes all 48 original ceiling
+  captures and twelve room/light-phase comparisons. Outputs:
+  `build/advanced-effects-final`, `build/advanced-effects-doom2-final`.
+  Build 100 changes only torch ember origins relative to their flame tips; its
+  Ultimate Doom suite is `build/advanced-effects-build100`.
+- Native identity verified as **0.7.0 build 100**. New menu switches, green/blue
+  light reception on pickups/props, gameplay soft shadows, surface-light controls
+  and animated embers were inspected across builds 99/100. Final flame-tip ember
+  placement was checked with lighting off. The weapon, HUD and time/par/counters
+  remain crisp. A separate build 100 preview remains open; commercial WAD data
+  and generated fixture files are ignored and must not be committed.
+- Build 99 sampled full-command all-effect means of 3.57 ms (E1M1) and 7.66 ms
+  (MAP01), 1280×800, eight warm-up and 32 measured frames. These validation/readback
+  runs shared the GPU with other desktop work and are not isolated effect costs,
+  sustained FPS, or worst-case light/particle benchmarks. Other GPUs, long campaign
+  sessions and crowded combat remain untested. Four-sample shadows can show bands;
+  bounded source selection can pop, and trails approximate four tics of motion.
+
 ## 0.6.0, build 96 — Gameplay lights, emission and bloom
 
 - Final Ultimate Doom run: `AO_CEILING=1`, output `build/scene-effects-final`.
