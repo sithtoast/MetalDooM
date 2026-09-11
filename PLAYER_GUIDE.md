@@ -32,7 +32,7 @@ with both backends. No instrument banks or game music are bundled.
 | Escape | Pause/open menu; back from submenus; resume from main menu |
 | R | Restart map with fresh starting inventory |
 | Return / Enter | Intermission: skip counting, show destination, then skip the four-second map display |
-| Command-Shift-E | Toggle Classic / Enhanced effects |
+| Command-Shift-E | Toggle Classic / Medium effects |
 | Command-O | Open or switch IWAD and optional add-ons |
 | Command-S / Command-L | Save Game… / Load Game… |
 | Command-Shift-S / Command-Shift-L | Quick Save / Quick Load for this WAD |
@@ -323,7 +323,26 @@ remain future milestones.
 
 ## Graphics presets, HDR and volumetric lighting
 
-Start with **View → Effects Presets → HDR Showcase** on a compatible HDR display.
+Open **Esc → Options → Effects** to browse presets in-game. Arrow keys or mouse
+hover change the description; Enter or a click applies the highlighted preset.
+The page names the current setup, including Custom, and explains unavailable
+choices. Esc returns to Options. Resolution, frame cap and saved custom setups
+are preserved. Presets are also available under **View → Effects Presets**.
+
+| Preset | Appearance |
+| --- | --- |
+| Classic | Original lighting and textures; all added effects and HDR off. |
+| Medium | Subtle AO, dynamic lights, soft shadows, emissive glow, bloom, sprite lighting and smooth world textures. |
+| High | Medium plus surface lighting, particles, light volumetric haze and a wider AO radius. |
+| Medium HDR | High's effects with restrained HDR highlights, capped at up to 4× standard white. |
+| Ludicrous | All effects, High ray quality, stronger AO/lights/bloom, denser haze and up to 8× HDR highlights. Highest GPU cost. |
+
+Build 114 renames Enhanced to Medium, Atmospheric to High and HDR Showcase to
+Medium HDR without changing their settings. Medium HDR describes the restrained
+HDR presentation; it includes High's effects. HDR presets require a compatible
+display. All presets except Ludicrous use Balanced ray quality.
+
+Start with **View → Effects Presets → Medium HDR** on a compatible HDR display.
 It enables the lighting effects, bloom, ambient occlusion and illuminated haze.
 **HDR Highlight Peak** requests up to 2×, 4× or 8× standard white; actual brightness
 adapts to the display's available headroom. The HUD and weapon stay at normal
@@ -332,8 +351,8 @@ original presentation. Screenshots may not reproduce the screen's HDR brightness
 
 **Volumetric Lighting** is a separate switch under **More Metal Effects**. It
 needs light sources such as torch, projectile, surface or test lights; select
-**Volumetric Density** to adjust the haze. Try Atmospheric for all effects in SDR,
-or Enhanced for fewer effects. Every individual switch remains available.
+**Volumetric Density** to adjust the haze. Try High for all effects in SDR,
+or Medium for fewer effects. Every individual switch remains available.
 
 **Save Current as Custom** remembers one effects setup; **Apply Saved Custom**
 restores it. Effects start in Classic on each launch. Graphics presets separately
@@ -364,21 +383,21 @@ windows stop rendering until visible again.
 setup: all twelve effects, High ray quality (16 AO / 8 soft-shadow / 32 haze
 samples), 50% AO at 48 units, Atmospheric haze, 200% added-light strength, 30% bloom,
 1.5× fullbright world-sprite boost and an HDR ceiling of 8× standard white.
-Expect a higher GPU cost than Showcase; it keeps your resolution and frame cap.
+Expect a higher GPU cost than Medium HDR; it keeps your resolution and frame cap.
 The actual highlight brightness still follows the display's live HDR headroom.
 
 **Added Light Strength**, **Bloom Strength** and **HDR Fullbright Sprite Boost**
 are separate View controls. The sprite boost only operates in HDR and leaves
 weapon/HUD artwork and fixed-colormap power-ups at their normal brightness.
-The existing effect switches still work independently. Select Showcase to return
+The existing effect switches still work independently. Select Medium HDR to return
 to restrained settings, or Save Current as Custom to keep your own combination.
 Ludicrous keeps smooth textures, steady sampling and the visibility optimizations.
 
 
-Press **⌘⇧E (Command-Shift-E)**, or choose **View → Toggle Classic / Enhanced**,
-to compare the original rendering with Enhanced in place. Any active effects
-setup (including HDR Showcase or Ludicrous) switches to Classic first; the next
-press selects Enhanced. A brief message names the selected preset. Use Save
+Press **⌘⇧E (Command-Shift-E)**, or choose **View → Toggle Classic / Medium**,
+to compare the original rendering with Medium in place. Any active effects
+setup (including Medium HDR or Ludicrous) switches to Classic first; the next
+press selects Medium. A brief message names the selected preset. Use Save
 Current as Custom before comparing if you want to restore a manually tuned setup.
 The shortcut leaves resolution, frame cap, saved custom presets and game progress
 unchanged. It is disabled while benchmarking and does not activate the E/Use key.

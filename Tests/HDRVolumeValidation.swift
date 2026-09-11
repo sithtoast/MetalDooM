@@ -146,7 +146,7 @@ defer {
     else { UserDefaults.standard.removeObject(forKey:"customEffectsPreset.v1") }
 }
 try renderer.applyEffectsPreset(EffectsPreset.builtins[3],view:subject.view)
-validationRequire(subject.effectsPresetName=="HDR Showcase")
+validationRequire(subject.effectsPresetName=="Medium HDR")
 validationRequire((subject.view.layer as? CAMetalLayer)?.wantsExtendedDynamicRangeContent == true)
 for _ in 0..<3 { _=hdrFrame() }
 let hdr=hdrFrame()
@@ -166,7 +166,7 @@ print("HDR live display: current headroom \(headroom)x, potential \(subject.wind
 // Native key-equivalent dispatch exercises the actual menu shortcut, not only the action.
 guard let appMenu=NSApp.mainMenu,
       let shortcutMenu=appMenu.items.compactMap(\.submenu).first(where: { $0.title=="View" }),
-      let shortcutItem=shortcutMenu.items.first(where: { $0.action == #selector(App.toggleClassicEnhanced) }) else {
+      let shortcutItem=shortcutMenu.items.first(where: { $0.action == #selector(App.toggleClassicMedium) }) else {
     validationFail("Missing native preset shortcut menu")
 }
 validationRequire(shortcutItem.keyEquivalent=="e" && shortcutItem.keyEquivalentModifierMask==[.command,.shift],"Wrong preset shortcut")
@@ -174,7 +174,7 @@ let shortcut=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[.comma
     windowNumber:subject.window.windowNumber,context:nil,characters:"E",charactersIgnoringModifiers:"e",isARepeat:false,keyCode:14)!
 let untouchedCustom=UserDefaults.standard.data(forKey:"customEffectsPreset.v1")
 let shortcutScale=subject.view.renderScale,shortcutFPS=subject.view.preferredFramesPerSecond
-for expected in ["Classic","Enhanced","Classic","Enhanced"] {
+for expected in ["Classic","Medium","Classic","Medium"] {
     validationRequire(appMenu.performKeyEquivalent(with:shortcut),"Preset shortcut was not handled")
     validationRequire(subject.effectsPresetName==expected && renderer.pickupMessage=="Effects: \(expected)","Shortcut or preset notice failed")
     validationRequire(subject.view.renderScale==shortcutScale && subject.view.preferredFramesPerSecond==shortcutFPS,"Shortcut changed graphics settings")
@@ -185,11 +185,56 @@ subject.view.keyDown(with:shortcut)
 validationRequire(!subject.view.useQueued && !subject.view.keys.contains(14),"Command shortcut leaked into gameplay Use")
 subject.benchmark=BenchmarkRun(context:"preset shortcut",settings:subject.benchmarkSettings)
 validationRequire(!subject.validateMenuItem(shortcutItem),"Preset shortcut enabled during benchmark")
-subject.toggleClassicEnhanced()
-validationRequire(subject.effectsPresetName=="Enhanced","Shortcut action bypassed benchmark lock")
+subject.toggleClassicMedium()
+validationRequire(subject.effectsPresetName=="Medium","Shortcut action bypassed benchmark lock")
 subject.benchmark=nil
 validationRequire(UserDefaults.standard.data(forKey:"customEffectsPreset.v1")==untouchedCustom,"Shortcut overwrote saved custom preset")
-print("PASS: Classic/Enhanced native key equivalent, repeated switching, notice, graphics/custom preservation, gameplay input isolation and benchmark lock")
+print("PASS: Classic/Medium native key equivalent, repeated switching, notice, graphics/custom preservation, gameplay input isolation and benchmark lock")
+// Navigate the actual pause menu. Highlighting explains a preset without applying it.
+subject.openGameMenu()
+func menuButtons(_ view:NSView) -> [NSButton] {
+    view.subviews.flatMap { child in (child as? NSButton).map { [$0] } ?? menuButtons(child) }
+}
+func menuCanvas(_ view:NSView) -> ClassicMenuCanvas? {
+    if let canvas=view as? ClassicMenuCanvas { return canvas }
+    return view.subviews.compactMap(menuCanvas).first
+}
+func pressMenuButton(_ title:String) {
+    guard let menu=subject.gameMenu, let button=menuButtons(menu).first(where: { $0.title==title }) else { validationFail("Missing in-game row: \(title)") }
+    button.performClick(nil)
+}
+pressMenuButton("Options");pressMenuButton("Effects")
+guard let gameMenu=subject.gameMenu, let effectsCanvas=menuCanvas(gameMenu) else { validationFail("Missing in-game effects canvas") }
+validationRequire(gameMenu.page=="Effects" && effectsCanvas.items.dropLast().map(\.title)==EffectsPreset.names,"In-game names or route differ")
+func effectsKey(_ code:UInt16) -> NSEvent {
+    NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:0,windowNumber:subject.window.windowNumber,
+        context:nil,characters:"",charactersIgnoringModifiers:"",isARepeat:false,keyCode:code)!
+}
+validationRequire(effectsCanvas.selected==1,"Active preset not initially selected")
+_ = gameMenu.handleKey(effectsKey(125))
+validationRequire(subject.effectsPresetName=="Medium" && effectsCanvas.selected==2,"Highlight applied preset early")
+validationRequire(effectsCanvas.labels.contains(where: { $0.0==EffectsPreset.descriptions[2][0] }),"Description did not follow keyboard selection")
+validationRequire(menuButtons(gameMenu).first(where: { $0.title=="High" })?.accessibilityHelp()==EffectsPreset.descriptions[2].joined(separator:" "),"Missing accessible preset explanation")
+_ = gameMenu.handleKey(effectsKey(36))
+validationRequire(subject.effectsPresetName=="High" && effectsCanvas.items[2].value?()=="ACTIVE","Enter did not apply High")
+pressMenuButton("Medium HDR")
+validationRequire(subject.effectsPresetName=="Medium HDR" && renderer.hdrEnabled && renderer.paused,"In-game HDR switch failed or unpaused game")
+subject.benchmark=BenchmarkRun(context:"in-game presets",settings:subject.benchmarkSettings)
+pressMenuButton("Classic")
+validationRequire(subject.effectsPresetName=="Medium HDR" && effectsCanvas.labels.contains(where: { $0.0=="Wait for the benchmark to finish." }),"In-game preset bypassed benchmark lock or hid reason")
+subject.benchmark=nil
+pressMenuButton("Classic")
+validationRequire(subject.effectsPresetName=="Classic" && !renderer.hdrEnabled,"In-game Classic did not leave HDR")
+validationRequire(subject.view.renderScale==shortcutScale && subject.view.preferredFramesPerSecond==shortcutFPS && UserDefaults.standard.data(forKey:"customEffectsPreset.v1")==untouchedCustom,"In-game presets changed graphics or saved custom")
+renderer.setLightGain(2);effectsCanvas.onRefresh?()
+validationRequire(effectsCanvas.labels.contains(where: { $0.0=="CURRENT: Custom" }),"Manual override left stale in-game status")
+pressMenuButton("Classic")
+_ = gameMenu.handleKey(effectsKey(53))
+validationRequire(gameMenu.page=="Options","Effects Escape did not return to Options")
+subject.closeGameMenu();renderer.paused=true
+for _ in 0..<3 { _=frame() }
+print("PASS: in-game effects route, names, highlight descriptions/accessibility, explicit keyboard/mouse apply, paused HDR/SDR switching, benchmark lock, graphics/custom preservation and Back")
+
 // Exercise the real menu routing: Ludicrous must not steal Saved Custom's tag.
 let effectsMenu=NSMenu(title:"Validation graphics");subject.addGraphicsMenus(to:effectsMenu)
 let presetsMenu=effectsMenu.items.first { $0.title=="Effects Presets" }!.submenu!
@@ -231,7 +276,7 @@ validationRequire(boost != noBoost && boost[hudStart...]==noBoost[hudStart...],"
 renderer.setLightGain(.nan);renderer.setBloomStrength(.infinity)
 validationRequire(renderer.lightGain==1 && renderer.bloomStrength==0.12,"Invalid strengths escaped sanitization")
 try renderer.applyEffectsPreset(EffectsPreset.builtins[3],view:subject.view)
-validationRequire(subject.effectsPresetName=="HDR Showcase" && !renderer.hdrSpriteBoost && renderer.lightGain==1 && renderer.bloomStrength==0.12,"Showcase did not reset Ludicrous intensities")
+validationRequire(subject.effectsPresetName=="Medium HDR" && !renderer.hdrSpriteBoost && renderer.lightGain==1 && renderer.bloomStrength==0.12,"Medium HDR did not reset Ludicrous intensities")
 renderer.setLightGain(2);renderer.setBloomStrength(0.3);renderer.setHDRSpriteBoost(true)
 renderer.setHDRPeak(8);renderer.setFogDensity(0.006)
 validationRequire(subject.effectsPresetName=="Custom","Manual adjustments leave stale preset checkmark")
@@ -293,5 +338,5 @@ pumpEvents(0.1);subject.view.drawableSize=visibleSize
 for _ in 0..<3 { _=frame() }
 print("PASS: Ludicrous menu routing, restored intensity pixels, HUD/EDR bounds, legacy and custom intensity restoration")
 print("PASS: ray quality stability/restoration/HUD/mesh reuse, legacy custom presets, and minimized-window GPU suppression")
-print("PASS: volumetric sources/density/toggles/HUD/pause, HDR showcase/custom presets, live EDR output, resize, save/load, repeated HDR/SDR switching, graphics preset persistence/checkmarks, and disabled window tabs")
+print("PASS: volumetric sources/density/toggles/HUD/pause, Medium HDR/custom presets, live EDR output, resize, save/load, repeated HDR/SDR switching, graphics preset persistence/checkmarks, and disabled window tabs")
 }

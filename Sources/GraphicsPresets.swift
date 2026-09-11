@@ -10,7 +10,15 @@ struct EffectsPreset: Codable, Equatable {
     var ao=false, testLight=false, testShadows=true, hdr=false
     var strength: Float=0.5, radius: Float=48, density: Float=0.003, peak: Float=4
     var switches: Set<SceneEffect> { Set(effects.compactMap(SceneEffect.init(rawValue:))) }
-    static let names=["Classic", "Enhanced", "Atmospheric", "HDR Showcase", "Ludicrous"]
+    static let names=["Classic", "Medium", "High", "Medium HDR", "Ludicrous"]
+    // Short lines fit the original Doom menu's pixel font at its smallest size.
+    static let descriptions: [[String]] = [
+        ["Original lighting and textures.", "No added effects or HDR.", "Lowest GPU cost."],
+        ["Lights, soft shadows and subtle AO.", "Glow, bloom and smoother textures.", "Balanced rays; standard range."],
+        ["Medium plus surface lights,", "particles and light haze.", "More GPU work; standard range."],
+        ["High effects with HDR highlights.", "Restrained bloom; up to 4x white.", "Requires an HDR display."],
+        ["Stronger AO, lights and bloom.", "Denser haze; high ray quality.", "HDR up to 8x white. Highest cost."]
+    ]
     static let builtins: [Self] = {
         let enhanced: Set<SceneEffect>=[.torches,.projectiles,.muzzleFlash,.shadows,.emissive,.bloom,.spriteLighting,.softShadows,.textureFiltering]
         var ludicrous=Self(effects:Set(SceneEffect.allCases.map(\.rawValue)),ao:true,hdr:true,strength:0.5,radius:48,density:0.003)
@@ -54,7 +62,7 @@ extension App {
             let item=NSMenuItem(title:title,action:nil,keyEquivalent:"")
             let child=NSMenu(title:title);item.submenu=child;menu.addItem(item);return child
         }
-        let toggle=menu.addItem(withTitle:"Toggle Classic / Enhanced",action:#selector(toggleClassicEnhanced),keyEquivalent:"e")
+        let toggle=menu.addItem(withTitle:"Toggle Classic / Medium",action:#selector(toggleClassicMedium),keyEquivalent:"e")
         toggle.target=self;toggle.keyEquivalentModifierMask=[.command,.shift]
         let graphics=submenu("Graphics Presets")
         for (i,title) in ["Performance — 50%, 120 FPS","Balanced — 75%, 120 FPS","Native — 100%, 120 FPS","Quiet — 75%, 60 FPS"].enumerated() {
@@ -103,15 +111,26 @@ extension App {
         guard let preset else { return }
         applyEffectsPreset(preset)
     }
-    private func applyEffectsPreset(_ preset:EffectsPreset) {
+    func effectsPresetUnavailableReason(_ preset:EffectsPreset) -> String? {
+        if shuttingDown { return "Game is closing." }
+        if benchmark != nil { return "Wait for the benchmark to finish." }
+        if preset.hdr && !hdrDisplayAvailable { return "Requires an HDR display." }
+        if (preset.ao || preset.testLight || preset.switches.contains(where: { $0.needsRays })) && !renderer.ambientOcclusionSupported {
+            return "Requires Metal ray tracing."
+        }
+        return nil
+    }
+    func applyEffectsPreset(_ preset:EffectsPreset) {
+        guard effectsPresetUnavailableReason(preset) == nil else { gameMenu?.refreshEffects(); return }
         do {
             try renderer.applyEffectsPreset(preset,view:view)
             sessionLog.append("Effects preset: \(effectsPresetName)")
             renderer.notice="Effects: \(effectsPresetName)";renderer.noticeUntil=CACurrentMediaTime()+2
+            gameMenu?.refreshEffects()
         }
         catch { show(error) }
     }
-    @objc func toggleClassicEnhanced() {
+    @objc func toggleClassicMedium() {
         guard !shuttingDown, benchmark == nil, effectsActive || renderer.ambientOcclusionSupported else { return }
         if let event=NSApp.currentEvent, event.type == .keyDown, event.isARepeat { return }
         applyEffectsPreset(EffectsPreset.builtins[effectsActive ? 0:1])

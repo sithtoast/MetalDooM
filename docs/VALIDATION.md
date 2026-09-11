@@ -3,6 +3,29 @@
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 
+## 0.8.0, build 114 — In-game effects presets
+
+- Build and signed bundle report 0.8.0 / 114; `codesign --verify --deep --strict`
+  and Info.plist lint pass. `scripts/test-classic-menu.sh` passes existing sound,
+  keyboard, disabled-row navigation, editing and scaled hit-target checks.
+- `build/presets-114-validation/results.txt` passes the Ultimate Doom Metal API
+  validation suite. Added actual pause-menu routing, names, keyboard highlight
+  without application, changing descriptions/accessibility help, explicit Enter
+  and mouse-button application, paused HDR/SDR transitions, benchmark guard and
+  explanation, preserved graphics/custom data, live Custom status and Escape back.
+  Existing AO/shadow/HDR bounds, HUD isolation, save/load, mesh replacement and
+  shutdown checks pass. Build 113 also passed before the live status refinement.
+- CUA verifies the running build-114 title and Options/Effects layout in E1M1.
+  Confirm all five labels and readable descriptions, Classic remaining active
+  while Medium is highlighted, Enter applying Medium, click applying Medium HDR,
+  and View → HDR Fullbright Sprite Boost changing the current label to Custom.
+  Command-Shift-E restores Classic; Escape returns to Options. The paused native
+  preview is left on Options in Classic. Screenshots do not establish HDR luminance.
+- Preset settings are unchanged: Enhanced → Medium, Atmospheric → High,
+  HDR Showcase → Medium HDR. Medium HDR keeps High's effects, not Medium's set.
+  The in-game scope is the five built-ins; individual effect controls and saved
+  custom actions remain in View. No new controlled performance comparison.
+
 ## 0.8.0, build 112 — Classic/Enhanced shortcut
 
 - Build 112 succeeds at semantic version 0.8.0. Native shortcut preview uses the

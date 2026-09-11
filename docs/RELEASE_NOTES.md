@@ -15,6 +15,13 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.8.0
 
+Build 114 adds **Esc → Options → Effects** with descriptions that follow the
+highlighted preset, explicit Enter/click application and current setup status.
+The presets are now **Classic, Medium, High, Medium HDR and Ludicrous**; these
+names preserve the existing settings, and ⌘⇧E now reads Classic / Medium.
+Medium HDR retains High's effects with restrained HDR highlights. Unavailable
+choices explain their requirements. Resolution, frame cap and custom data stay set.
+
 Build 112 adds **⌘⇧E** to toggle Classic/Enhanced in place, with a brief preset
 message. Other active effects switch to Classic first. Resolution, frame cap and
 saved custom setups are preserved; the shortcut is disabled during benchmarks.

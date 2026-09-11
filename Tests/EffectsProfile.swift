@@ -21,16 +21,16 @@ func profile(_ label:String,_ preset:EffectsPreset) throws {
 }
 print("PROFILE: fixed camera, paused simulation, API validation \(ProcessInfo.processInfo.environment["MTL_DEBUG_LAYER"] ?? "default"), GPU duration excludes display pacing")
 try profile("Classic",EffectsPreset())
-try profile("Enhanced",EffectsPreset.builtins[1])
-try profile("Showcase",EffectsPreset.builtins[3])
+try profile("Medium",EffectsPreset.builtins[1])
+try profile("Medium HDR",EffectsPreset.builtins[3])
 var preset=EffectsPreset.builtins[3];preset.ao=false
-try profile("Showcase without AO",preset)
+try profile("Medium HDR without AO",preset)
 preset=EffectsPreset.builtins[3];preset.effects.remove(SceneEffect.softShadows.rawValue)
-try profile("Showcase without soft shadows",preset)
+try profile("Medium HDR without soft shadows",preset)
 preset=EffectsPreset.builtins[3];preset.effects.remove(SceneEffect.volumetrics.rawValue)
-try profile("Showcase without volumetrics",preset)
+try profile("Medium HDR without volumetrics",preset)
 preset=EffectsPreset.builtins[3];preset.highRayQuality=true
-try profile("Showcase High",preset)
+try profile("Medium HDR High",preset)
 try profile("Ludicrous",EffectsPreset.builtins[4])
 subject.applicationWillTerminate(Notification(name:NSApplication.willTerminateNotification))
 subject.window.performClose(nil)

@@ -17,6 +17,7 @@ final class ClassicMenuCanvas: NSView {
         var meter: (() -> Float)? = nil
         var slot = false
         var textScale: CGFloat = 1
+        var help: String? = nil
     }
     struct Editing { let index: Int; var text: String; let commit: (String) -> Void }
     var editing: Editing?
@@ -25,7 +26,9 @@ final class ClassicMenuCanvas: NSView {
     var onSound: (String) -> Void = { _ in }
     var artwork: [(String,CGFloat,CGFloat)] = []
     var items: [Item] = []
-    var selected = 0 { didSet { needsDisplay=true } }
+    var selected = 0 { didSet { needsDisplay=true; onSelectionChanged?(selected) } }
+    var onSelectionChanged: ((Int) -> Void)?
+    var onRefresh: (() -> Void)?
     var onBack: (() -> Void)?
     var patchOrigin: (String) -> CGPoint = { _ in .zero }
     var image: (String) -> NSImage? = { _ in nil }
@@ -39,7 +42,7 @@ final class ClassicMenuCanvas: NSView {
         super.viewDidMoveToWindow(); timer?.invalidate(); timer=nil
         if window != nil {
             timer=Timer.scheduledTimer(withTimeInterval:8.0/35.0,repeats:true) { [weak self] _ in
-                guard let self else { return }; self.skull ^= 1; self.needsDisplay=true
+                guard let self else { return }; self.skull ^= 1; self.onRefresh?(); self.needsDisplay=true
             }
         }
     }
@@ -48,6 +51,7 @@ final class ClassicMenuCanvas: NSView {
         for button in buttons { button.removeFromSuperview() }; buttons=[]
         for (index,item) in items.enumerated() {
             let button=MenuHitButton(title:item.title,target:self,action:#selector(activate(_:)))
+            button.setAccessibilityHelp(item.help)
             button.tag=index; button.isEnabled=item.enabled; button.isBordered=false
             button.setAccessibilityLabel(item.slot ? "Slot \(index+1): \(item.title)" : item.title); addSubview(button); buttons.append(button)
         }

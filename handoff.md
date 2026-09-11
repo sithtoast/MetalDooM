@@ -1,4 +1,4 @@
-# MetalDooM handoff — 2026-09-10
+# MetalDooM handoff — 2026-09-11
 
 ## Where to resume
 
@@ -12,7 +12,7 @@ The active experiment is on `codex/metal-experiments`; check Git status/log befo
 continuing. The user selected **ray-traced ambient occlusion**. It is implemented
 as a per-session View menu option, with classic rendering still the default.
 
-Current version: **0.8.0**, successful local app **build 112**. `Info.plist` owns
+Current version: **0.8.0**, successful local app **build 114**. `Info.plist` owns
 the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
 This is an experimental branch, not a published release. No push was requested.
 
@@ -26,6 +26,21 @@ the old tip `1730d4c` locally. Main and remotes were not modified. Build 93 pass
 the level-stats/secret/save tests and the AO/48-view ceiling GPU suite, and its
 native window was checked with live counters/par time and AO together. The
 separate validation instance was closed afterward.
+
+## Latest refinement — in-game effects presets (build 114)
+
+Esc → Options → Effects now offers Classic, Medium, High, Medium HDR and Ludicrous
+with highlight descriptions, current preset/Custom status, Enter/click application
+and Escape back. Unavailable choices remain readable; the shared apply guard
+preserves benchmark/display/ray capability restrictions. The native shortcut is
+now labelled Classic / Medium (same ⌘⇧E). Graphics settings/custom data are preserved.
+Enhanced → Medium, Atmospheric → High and HDR Showcase → Medium HDR are label-only
+changes: Medium HDR still includes High's effects with restrained 4× HDR output.
+This remains a refinement of 0.8.0. Heretic/Hexen support was discussed, not added.
+The final Ultimate Doom Metal suite and classic-menu tests pass. Native CUA checks
+confirm build 114, readable descriptions, Enter/click application, live Custom
+status, shortcut and Back. Preview remains paused on Options in Classic.
+See `docs/VALIDATION.md` and `build/presets-114-validation/results.txt`.
 
 ## Latest refinement — preset shortcut (build 112)
 

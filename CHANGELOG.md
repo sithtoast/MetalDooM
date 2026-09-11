@@ -4,6 +4,21 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.8.0 · Build 114 — In-game effects presets
+
+- Add Esc → Options → Effects with descriptions for highlighted choices, an
+  independent current-preset/Custom indicator, Enter/click application and Back.
+  Expose descriptions as accessibility help; keep unavailable choices readable
+  and explain HDR display, ray capability or benchmark restrictions.
+- Rename Enhanced, Atmospheric and HDR Showcase to Medium, High and Medium HDR.
+  Preserve every preset's settings and saved custom data. Medium HDR retains
+  High's effects with restrained HDR highlights. Label ⌘⇧E Classic / Medium.
+- Preserve resolution/frame cap and paused gameplay while switching effects.
+  Keep the current-status label synchronized with manual View-menu adjustments.
+- Validate native 0.8.0 build 114 layout and keyboard/mouse behavior, classic-menu
+  tests, and the Ultimate Doom Metal suite including paused HDR/SDR transitions,
+  description/accessibility checks, Custom refresh and benchmark locking.
+
 ## 0.8.0 · Build 112 — Classic/Enhanced comparison shortcut
 
 - Add Command-Shift-E and View → Toggle Classic / Enhanced. Active effects

@@ -86,9 +86,9 @@ extension App {
             let preset=EffectsPreset.builtins.indices.contains(item.tag) ? EffectsPreset.builtins[item.tag]:savedEffectsPreset
             guard let preset else { return false }
             item.state=EffectsPreset(renderer:renderer)==preset ? .on:.off
-            return (!preset.hdr || hdrDisplayAvailable) && (!(preset.ao || preset.testLight || preset.switches.contains(where: { $0.needsRays })) || renderer.ambientOcclusionSupported)
+            return effectsPresetUnavailableReason(preset) == nil
         }
-        if item.action == #selector(toggleClassicEnhanced) {
+        if item.action == #selector(toggleClassicMedium) {
             return effectsActive || renderer.ambientOcclusionSupported
         }
         if item.action == #selector(toggleHDR) {

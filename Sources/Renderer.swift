@@ -117,7 +117,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         setLightGain(preset.lightGain ?? 1);setBloomStrength(preset.bloomStrength ?? 0.12)
         setHDRSpriteBoost(preset.hdrSpriteBoost == true)
         worldFormat=format;aoGeometryDirty=true;sceneSnapshot=nil
-        // Classic/Enhanced share the same drawable format: keep their live draw
+        // Classic/Medium share the same drawable format: keep their live draw
         // loop intact. Only HDR/SDR transitions need drawable reconfiguration.
         if view.colorPixelFormat != format {
             view.releaseDrawables();view.colorPixelFormat=format

@@ -289,10 +289,10 @@ The app uses Apple's [custom EDR tone-mapping setup](https://developer.apple.com
 **Graphics Presets** change and remember render scale/frame cap only: Performance
 50%/120, Balanced 75%/120, Native 100%/120 and Quiet 75%/60. **Effects Presets** do
 not change resolution, frame rate or gameplay. Classic disables all effects;
-Enhanced uses AO at 25%/16 units plus torch/projectile/muzzle lights, gameplay
+Medium uses AO at 25%/16 units plus torch/projectile/muzzle lights, gameplay
 shadows, emissive surfaces, bloom, sprite reception, soft shadows and world filtering.
-Atmospheric enables all twelve scene switches with AO at 25%/32 units and Light
-Haze density. HDR Showcase adds HDR output to Atmospheric. Built-ins leave the moving test light off. Manual overrides remove
+High enables all twelve scene switches with AO at 25%/32 units and Light
+Haze density. Medium HDR adds HDR output to High. Built-ins leave the moving test light off. Manual overrides remove
 the built-in checkmark; Save Current as Custom stores one full effects setup,
 including test lighting, AO, density and HDR controls. Apply Saved Custom restores
 it after relaunch. Launch effects remain Classic; graphics preferences persist.
@@ -411,3 +411,18 @@ reconfiguration. HDR/SDR transitions still update the format and colorspace.
 Diagnostics report paused/visible/occluded state and submitted frame counts.
 `AO_LIVE=1 bash scripts/test-ambient-occlusion.sh /path/to/DOOM.WAD` tests automatic
 frame delivery across seven Classic/Enhanced/HDR transitions without forcing draws.
+
+
+### In-game effects presets — build 114
+
+Esc → Options → Effects offers Classic, Medium, High, Medium HDR and Ludicrous.
+Highlight with arrows or mouse hover to read the description; Enter/click applies.
+The current preset or Custom status is shown independently of the highlighted row.
+Unavailable choices remain readable and explain their display/ray support or
+benchmark requirement; application and native menus share the same guard.
+Descriptions are also exposed as accessibility help on each button.
+
+Enhanced, Atmospheric and HDR Showcase were renamed Medium, High and Medium HDR
+respectively, preserving all settings and saved custom data. Medium HDR retains
+High's effects with a restrained 4× HDR ceiling. The comparison shortcut is now
+labelled Classic / Medium and remains ⌘⇧E. This continues the 0.8.0 refinement.
