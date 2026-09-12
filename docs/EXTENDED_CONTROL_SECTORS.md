@@ -66,6 +66,9 @@ in all five rendering modes. Existing real-map, HUD, palette, translucent-wall,
 scroll/save and interpolation checks remain. See VALIDATION.md for final logs.
 
 This covers Boom fake-sector presentation, not arbitrary stacked 3D floors.
-Flat rotation, sky transfers, per-object/weapon blending, fuzz/translucent ordering,
+Build155 adds flat rotation and sky transfers (EXTENDED_SKIES_ROTATION.md).
+Per-object/weapon blending, fuzz/translucent ordering,
 actor/moving-surface interpolation and full campaign playtesting remain. Camera
 interpolation still uses discrete sector presentation at each simulation tick.
+
+MGE5 extends the sector record to140 bytes while retaining all MGE4 fields.

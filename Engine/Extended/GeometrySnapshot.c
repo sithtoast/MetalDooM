@@ -7,6 +7,9 @@
 #include "p_mobj.h"
 #include "r_state.h"
 #include "r_data.h"
+#include "r_sky.h"
+#include "r_plane.h"
+#include "m_array.h"
 #include "w_wad.h"
 #include "i_system.h"
 #include <string.h>
@@ -34,10 +37,21 @@ static void Flat(unsigned char **out, int index)
         I_Error("Invalid geometry flat index");
     Name(out, lumpinfo[firstflat + index].name);
 }
+static void Sky(unsigned char **p,int value) {
+    if(!(value & PL_SKYFLAT)) {for(int i=0;i<7;i++)Word(p,0);return;}
+    unsigned index=(unsigned)value & ~PL_SKYFLAT;
+    if(index>=array_size(levelskies))I_Error("Invalid transferred sky index");
+    const sky_t *sky=R_GetLevelsky(index);const skytex_t *t=&sky->background;
+    if(sky->type!=SkyType_Normal || !sky->side)I_Error("Unsupported layered or procedural transferred sky");
+    Word(p,index+1);Texture(p,t->texture);
+    Word(p,((uint32_t)t->currx<<6)+(uint32_t)sky->side->textureoffset);
+    Word(p,(uint32_t)t->mid+(uint32_t)t->curry+(uint32_t)sky->side->rowoffset);
+    Word(p,t->scalex);Word(p,t->scaley);
+}
 size_t ME_WriteGeometry(void *out, size_t capacity)
 {
     const int counts[] = {numvertexes, numlines, numsides, numsectors, numsegs, numsubsectors, numnodes};
-    const size_t strides[] = {8,24,36,76,16,12,24};
+    const size_t strides[] = {8,24,36,140,16,12,24};
     size_t size = 120;
     for (int i = 0; i < 7; i++) {
         if (counts[i] < 0 || counts[i] > 1000000) I_Error("Excessive geometry count");
@@ -45,8 +59,8 @@ size_t ME_WriteGeometry(void *out, size_t capacity)
     }
     if (!out || capacity < size) return size;
     unsigned char *p = out;
-    memcpy(p,"MGE4",4); p += 4;
-    Word(&p,4); Word(&p,leveltime); Word(&p,gamemap);
+    memcpy(p,"MGE5",4); p += 4;
+    Word(&p,5); Word(&p,leveltime); Word(&p,gamemap);
     Word(&p,players[0].mo->x); Word(&p,players[0].mo->y); Word(&p,players[0].mo->angle);
     for (int i=0;i<7;i++) Word(&p,counts[i]);
     memcpy(p,ME_CurrentSession()->content_sha256,64); p += 64;
@@ -73,6 +87,8 @@ size_t ME_WriteGeometry(void *out, size_t capacity)
         Word(&p,MAX(0,MIN(255,fl))); Word(&p,MAX(0,MIN(255,cl)));
         Word(&p,back.floorheight); Word(&p,back.ceilingheight); Flat(&p,back.ceilingpic);
         fixed_t bottom,top;ME_SectorClip(&sectors[i],&bottom,&top);Word(&p,bottom);Word(&p,top);
+        Word(&p,s->floor_rotation);Word(&p,s->ceiling_rotation);
+        Sky(&p,s->floorsky);Sky(&p,s->ceilingsky);
     }
     for (int i=0;i<numsegs;i++) {
         const seg_t *s=&segs[i];

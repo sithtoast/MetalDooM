@@ -5,23 +5,23 @@
 Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, branch
 **codex/legacy-of-rust**, based on fetched origin/main merge **afd7357**. Preserve
 `/Users/wmh/Dev/MetalDooM` and its release artifacts. Current feature version is
-**0.10.0**, final successful build **152**. This remains the same unreleased Rust
+**0.10.0**, final successful build **155**. This remains the same unreleased Rust
 feature; do not bump the minor version for each refinement.
 
-The explicit Rust preview now has **fake floors and transferred lighting**, **translucent walls and palette effects**, **normal/additive/per-state actor translucency**, **camera/weapon interpolation during Run**, **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
+The explicit Rust preview now has **sky transfers and flat rotation**, **fake floors and transferred lighting**, **translucent walls and palette effects**, **normal/additive/per-state actor translucency**, **camera/weapon interpolation during Run**, **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
 plus death/restart and native completion/Continue,
 plus level MIDI, a minimal HUD, cached geometry, selective Metal updates, Run/Pause and keyboard/mouse controls,
 with one-tic world/actor/weapon/material/audio/UI presentation. Manual buttons show every
 tic too. Keep the ordinary Rust picker guard until full campaign acceptance.
 No speedrun/demo/upload work was requested; that idea remains a future aside.
 
-Read [control sectors](docs/EXTENDED_CONTROL_SECTORS.md), [palette effects](docs/EXTENDED_PALETTES.md), [translucency](docs/EXTENDED_TRANSLUCENCY.md), [interpolation](docs/EXTENDED_INTERPOLATION.md), [scrolling flats](docs/EXTENDED_SCROLLING.md), [save/restore](docs/EXTENDED_SAVES.md), [preview/process contract](docs/EXTENDED_PREVIEW.md),
+Read [skies/rotation](docs/EXTENDED_SKIES_ROTATION.md), [control sectors](docs/EXTENDED_CONTROL_SECTORS.md), [palette effects](docs/EXTENDED_PALETTES.md), [translucency](docs/EXTENDED_TRANSLUCENCY.md), [interpolation](docs/EXTENDED_INTERPOLATION.md), [scrolling flats](docs/EXTENDED_SCROLLING.md), [save/restore](docs/EXTENDED_SAVES.md), [preview/process contract](docs/EXTENDED_PREVIEW.md),
 [campaign presentation](docs/EXTENDED_CAMPAIGN.md), [lifecycle](docs/EXTENDED_LIFECYCLE.md), [HUD/music](docs/EXTENDED_UI.md), [incremental geometry](docs/EXTENDED_MESH.md), [audio](docs/EXTENDED_AUDIO.md), [materials/cache](docs/EXTENDED_MATERIALS.md),
 [sprites](docs/EXTENDED_SPRITES.md), [geometry](docs/EXTENDED_GEOMETRY.md),
 [worker](docs/EXTENDED_ENGINE.md), [validation](docs/VALIDATION.md) and
 [roadmap](docs/LEGACY_OF_RUST.md).
 
-Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/control-sector-preview" bash scripts/build.sh`.
+Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/sky-rotation-release" bash scripts/build.sh`.
 Launch with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
 Only the explicit option packages/signs the helper/dylib and notices. Standard
 builds remain classic. Ordered resources are id24res → Doom II → id1, base index 1;
@@ -48,6 +48,27 @@ diagnostics only. Finite steps allow natural sample tails; explicit pause stops
 voices/mixer. Closing/error cancels future work; termination reaps the child and
 removes scratch. Sound mute stops/skips voices; unmute only plays future starts.
 
+**Build 155 adds sector-local sky transfers and flat rotation.** MGE5/version5
+keeps header120 and non-sector strides; sector stride140 appends floor/ceiling
+rotation at76/80 and28-byte sky records at84/112. Sky records carry stable ID,
+texture, binary-angle offset, midpoint and scales. Empty/conflicting/invalid
+records reject on full/cached decode. Other packets and18 ABI2 exports remain.
+
+Boom271/272 sky direction and live sidedef offsets come from engine sky objects;
+F_SKY1 planes and ceiling-border geometry select separate sky batches. Stable IDs
+keep scrolling out of the texture cache keys. Flat UVs rotate at the world origin
+then apply offsets; fake sectors inherit the appropriate controller rotations.
+See EXTENDED_SKIES_ROTATION.md for exact coordinates and limits. Native projection
+keeps its own perspective; optional software sky stretching and layered/procedural
+transferred skies remain unadapted (the latter reject explicitly).
+
+Current candidate: `build/sky-rotation-release/MetalDooM.app`,0.10.0/build155;
+`build/build155.log`. Native MAP14 is the current paused validation session;
+final checks and running evidence are in VALIDATION.md.
+Preserve build152 and all earlier bundles/saves/paused sessions. Remaining:
+per-object/weapon blending, fuzz/translucent ordering, actor/moving-surface
+interpolation and full campaign/boss playtesting, plus the sky variants above.
+
 **Build 152 adds fake floors and transferred lighting.** Engine-resolved Boom242
 heights and213/261 independent lights feed MGE4/version4. Header120 and all other
 strides remain; sectors grow44→76 bytes: plane lights44/48, back heights52/56,
@@ -60,7 +81,7 @@ rules, above-ceiling/sky cases, flat offsets, relative/absolute transferred ligh
 and averaged actor light are covered. Sprite quads clip in opaque/translucent/fuzz
 passes while retaining UVs. Pure plane-light changes retain wall buffers.
 
-Current candidate: `build/control-sector-preview/MetalDooM.app`,0.10.0/build152;
+Previous candidate: `build/control-sector-preview/MetalDooM.app`,0.10.0/build152;
 `build/build152.log`. Tests and exact native evidence are in docs/VALIDATION.md.
 Read EXTENDED_CONTROL_SECTORS.md before extending this. Preserve build151 and all
 older bundles/saves/paused sessions. Remaining: flat rotation, sky transfers,

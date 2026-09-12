@@ -1,4 +1,4 @@
-# Copied extended geometry — MGE4, build 152
+# Copied extended geometry — MGE5, build 155
 
 The experimental worker now supplies its decoded map to the same `DoomMap` and
 `Geometry` types used by the native renderer. `Sources/ExtendedGeometry.swift`
@@ -25,8 +25,8 @@ resources; its fingerprint accompanies the map.
 
 | Offset | Header field |
 | --- | --- |
-| 0 | Four bytes `MGE4` |
-| 4 | Format version 4 |
+| 0 | Four bytes `MGE5` |
+| 4 | Format version 5 |
 | 8 | Simulation tic |
 | 12 | Map number, 1–32 |
 | 16, 20, 24 | Current player x, y, angle |
@@ -40,7 +40,7 @@ Arrays immediately follow the 120-byte header:
 | Vertices | 8 | x, y (engine simulation coordinates) |
 | Lines | 24 | vertex a, vertex b, flags, front side, back side, blend table ID (0–64) |
 | Sides | 36 | sector, x offset, y offset; upper/lower/middle names |
-| Sectors | 76 | resolved floor/ceiling/light/names/offsets; plane lights; back-view heights/ceiling name; actor clip limits (see EXTENDED_CONTROL_SECTORS.md) |
+| Sectors | 140 | resolved floor/ceiling/light/names/offsets; plane lights; back-view heights/ceiling name; actor clip limits; rotations and sky records (see EXTENDED_CONTROL_SECTORS.md and EXTENDED_SKIES_ROTATION.md) |
 | Segs | 16 | vertex a, vertex b, line, side (0/1) |
 | Subsectors | 12 | seg count, first seg, engine sector |
 | Nodes | 24 | x, y, dx, dy, right child, left child |
@@ -60,7 +60,7 @@ can differ from the original lump, including XNOD's added vertices; the snapshot
 preserves the engine result. Mesh clipping continues to use original directed
 linedefs to avoid seams. Build152 adds camera-resolved transfer heights and
 independent plane lighting; see EXTENDED_CONTROL_SECTORS.md. Static topology and
-unchanged material buffers remain cached. Sky transfers and further rendering
+unchanged material buffers remain cached. Build155 adds sky transfers and flat rotation; further rendering
 features remain separately tracked in the handoff.
 
 ## Evidence

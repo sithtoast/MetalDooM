@@ -1,5 +1,52 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 155: sky transfers and flat rotation
+
+Final candidate: `build/sky-rotation-release/MetalDooM.app`; `build/build155.log`.
+Builds153/154 remain preserved intermediate candidates. The final version stays
+on unreleased0.10.0, ad-hoc signed without notarization, packaging or push.
+
+- `build/sky-rotation-validation.log`: seven real special271/272/2051–2056
+  fixtures; sector-local sky IDs/textures/direction/offsets, scrolling, floor and
+  ceiling quarter-turn UVs, combined offsets, copied-state canaries, fresh restore
+  and35 future tics, stable topology and malformed full/cached sky records.
+- `build/sky-rotation-metal-final-validation.log`: independent ray-projected
+  texture sampling at spawn/tic35:5132 pixels for each sky orientation,5136 for
+  scrolling,5112 each for floor/ceiling/both rotation and5034 for combined offsets.
+  Channel tolerance is one byte for native RGB rounding; near-texel boundaries
+  are excluded. Existing actor/clipping, translucent-wall, palette, seven fake-
+  sector scenes,21 real-map frames, HUD, scrolling/save and interpolation checks
+  also pass under Metal API validation.
+- `build/sky-rotation-control-validation.log`:374,400 pinned Woof reference cases
+  now include inherited control-sector rotations, plus real fake-sector/light,
+  saved-continuation and selective-mesh checks.
+- `build/sky-rotation-geometry-validation.log`: all32 original Doom II and16 Rust
+  map geometry exports/decodes, XNOD references and14 malformed snapshots.
+  Actual transferred sky planes occur on MAP01(79), MAP14(31) and MAP15(16).
+- `build/sky-rotation-mesh-validation.log`, `build/sky-rotation-worker-validation.log`
+  and `build/sky-rotation-save-validation.log`: retained topology/material buffers,
+  exact reference meshes, all-map presentation/protocol and saved-future-state
+  regressions, copied RNG/audio state and save-envelope/atomic-write checks.
+- `build/sky-rotation-classic-metal-validation.log`: native classic/AO/lighting
+  regression. It caught the earlier palette change's missing two-argument
+  powerColor overload and stale AO buffers at plain-sprite/weapon transitions.
+  Both are corrected before the final candidate. The test covers lighting/AO
+  toggles, HUD isolation, geometry updates, saved effects and classic restoration.
+
+Host deep/strict verification passes for the final app, helper and dylib. Source
+Info.plist, bundled version/build, BUILD_NUMBER and the running title agree on
+0.10.0/build155. Exactly eighteen private engine exports remain. Actual MAP14
+launch, Run, Up/Right input, Escape pause, manual turn and stepping were exercised;
+the native world, green transferred sky, raised pistol and HUD were inspected.
+Left paused at tic40, health100, ammo50,645 actors, Music/Sound enabled. Earlier bundles and
+paused sessions remain preserved.
+
+MGE5 retains header120 and non-sector strides, extending sectors to140 bytes.
+MBL3/MUI3/MSP4/MVW5 and the eighteen-export ABI2 remain unchanged. Native sky
+perspective differs from optional software sky stretching; layered/procedural
+transferred skies reject pending their adapters. Full campaign acceptance remains
+separate from these controlled pixel and live preview checks.
+
 ## 2026-09-12 — 0.10.0 build 152: fake floors and transferred lighting
 
 Candidate: `build/control-sector-preview/MetalDooM.app`; `build/build152.log`.

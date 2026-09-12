@@ -71,8 +71,8 @@ import simd
                     for i in 0..<4 { copy[offset+i]=UInt8(truncatingIfNeeded:value >> (8*i)) }
                     return copy
                 }
-                cases += [mutate(4,5),mutate(28,UInt32.max),mutate(28,1_000_001),mutate(12,99)]
-                let bytes=Bytes(data:data),counts=try (0..<7).map{try bytes.i32(28+$0*4)},strides=[8,24,36,76,16,12,24]
+                cases += [mutate(4,6),mutate(28,UInt32.max),mutate(28,1_000_001),mutate(12,99)]
+                let bytes=Bytes(data:data),counts=try (0..<7).map{try bytes.i32(28+$0*4)},strides=[8,24,36,140,16,12,24]
                 let offsets=(0..<7).map { k in 120+(0..<k).reduce(0){$0+counts[$1]*strides[$1]} }
                 cases += [mutate(offsets[1],UInt32.max),mutate(offsets[2],UInt32.max),mutate(offsets[4]+12,2),
                           mutate(offsets[5]+4,UInt32.max),mutate(offsets[5]+8,UInt32.max),

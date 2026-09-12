@@ -66,7 +66,7 @@ little-endian 32-bit values:
 | 92–140 | Lifecycle phase, maps, counters, time, secret-exit flag, palette and fixed colormap; see EXTENDED_LIFECYCLE.md |
 
 MVW5 extends the outer header to 56 bytes, adding UI byte count at offset 52.
-Payload order is optional MGE3, then required MSP4, MMT1, MSA1 and MUI3. All tics
+Payload order is optional MGE5, then required MSP4, MMT1, MSA1 and MUI3. All tics
 must agree; HUD health must agree with the view and ready weapon/ammo with MSP1.
 The Swift decoder also checks sizes, version, reserved bytes, bit ranges, inventory
 values, ammo-type/count agreement, and printable padded music names. Old outer

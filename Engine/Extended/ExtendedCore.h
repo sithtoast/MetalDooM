@@ -51,7 +51,7 @@ ME_API int ME_CopySnapshot(ME_Snapshot *out);
 /* Returns total actors; copies at most capacity entries. */
 ME_API size_t ME_CopyThings(ME_Thing *out, size_t capacity);
 ME_API size_t ME_CopyError(char *out, size_t capacity);
-/* MGE4 geometry snapshot; see docs/EXTENDED_GEOMETRY.md. Returns required
+/* MGE5 geometry snapshot; see docs/EXTENDED_GEOMETRY.md. Returns required
  * bytes, copying only when capacity fits the complete snapshot. NULL queries
  * size. Zero means no ready session/error. Call on the session thread between
  * ticks. This is copied data, not an IPC or save-game contract. */

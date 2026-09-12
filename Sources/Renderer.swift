@@ -106,7 +106,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private func rebuildSurfaceLights() {
         guard surfaceLightsDirty, let map else { return }
         var collector=SurfaceLightCollector()
-        for batch in batches where batch.material.blend==0 {
+        for batch in batches where batch.material.blend==0 && batch.material.sky==0 {
             guard let color=surfaceColors[batch.material], color.w>0 else { continue }
             let vertices=batch.vertices.contents().bindMemory(to:WorldVertex.self,capacity:batch.count)
             for i in stride(from:0,to:batch.count,by:3) {
@@ -294,6 +294,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var extendedPreview = false
     private var previewInterpolation=ExtendedInterpolation()
     private var previewWeaponLabel:String?,previewAmmoLabel:String?
+    private var previewSkies:[Int:SkyTransfer]=[:]
     private var previewTranslations:[MaterialKey:MaterialKey]=[:]
     private var engineReady = false
     private var previousPlayer = MD_Player(), currentPlayer = MD_Player()
@@ -354,6 +355,11 @@ final class Renderer: NSObject, MTKViewDelegate {
                 uint entry=maps[uint(-power.x)*256+paletteIndex(rgb,palette)];
                 return float3(palette[entry*3],palette[entry*3+1],palette[entry*3+2])/255.0;
             }
+            if (power.x > 0) return float3(floor((1.0-dot(rgb,float3(0.299,0.587,0.114)))*31.0)/31.0);
+            return rgb;
+        }
+        // Classic lighting shaders use the original two-argument powerup path.
+        float3 powerColor(float3 rgb, float4 power) {
             if (power.x > 0) return float3(floor((1.0-dot(rgb,float3(0.299,0.587,0.114)))*31.0)/31.0);
             return rgb;
         }
@@ -427,9 +433,20 @@ final class Renderer: NSObject, MTKViewDelegate {
             return float4(tex.sample(s,uv).rgb,1);
         }
         fragment float4 skySurfaceFragment(Out in [[stage_in]], bool front [[front_facing]],
-                    constant float4 &eye [[buffer(0)]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]], constant uchar *palette [[buffer(3)]], constant uchar *maps [[buffer(4)]]) {
+                    constant float4 &eye [[buffer(0)]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]], constant uchar *palette [[buffer(3)]], constant uchar *maps [[buffer(4)]], constant float4 &mapping [[buffer(6)]]) {
             if (in.fullbright > 0.5 && !front) discard_fragment();
-            return float4(powerColor(skyColor(in.world-eye.xyz,tex).rgb,power,palette,maps),1);
+            float3 direction=in.world-eye.xyz;
+            float3 color;
+            if(mapping.z==0) color=skyColor(direction,tex).rgb;
+            else {
+                float angle=atan2(-direction.z,direction.x);
+                float column=floor(fract(angle/(2*M_PI_F)+mapping.x/1024.0)*1024.0)*mapping.z;
+                float slope=direction.y/max(length(direction.xz),0.0001);
+                float2 uv=float2(column/tex.get_width(),(mapping.y-160*slope*mapping.w)/tex.get_height());
+                constexpr sampler s(coord::normalized,address::repeat,filter::nearest);
+                color=tex.sample(s,uv).rgb;
+            }
+            return float4(powerColor(color,power,palette,maps),1);
         }
         struct SkyOut { float4 position [[position]]; float2 uv; };
         vertex SkyOut skyVertex(uint id [[vertex_id]]) {
@@ -623,6 +640,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             }
             transparentWorld=walls.isEmpty ? nil:try TranslucentWorld(walls:walls)
             map=scene.copiedGeometry.map
+            previewSkies=scene.copiedGeometry.map.transferredSkies
         }
         sky=textures[MaterialKey(name:scene.view.sky,flat:false)]
         previewTranslations=scene.view.materials.translations
@@ -685,7 +703,10 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
     }
     private func animatedTexture(_ batch: GPUBatch) -> MTLTexture {
-        if extendedPreview { return textures[previewTranslations[batch.material.unblended] ?? batch.material] ?? batch.texture }
+        if extendedPreview {
+            let base=previewSkies[batch.material.sky].map{MaterialKey(name:$0.name,flat:false)} ?? batch.material.unblended
+            return textures[previewTranslations[base] ?? base] ?? batch.texture
+        }
         guard let index=animatedIDs[batch.material] else { return batch.texture }
         let translated=MD_TranslatedMaterial(index,batch.material.flat ? 1 : 0)
         return (batch.material.flat ? animatedFlats[translated] : animatedWalls[translated]) ?? batch.texture
@@ -848,6 +869,8 @@ final class Renderer: NSObject, MTKViewDelegate {
             var uniform = Uniforms(matrix:perspective(aspect:aspect) * look(eye:eye,forward:forward))
             encoder.setVertexBytes(&uniform,length:MemoryLayout<Uniforms>.stride,index:1)
             if let skyGeometry, let sky {
+                var defaultMapping=SIMD4<Float>.zero
+                encoder.setFragmentBytes(&defaultMapping,length:16,index:6)
                 var skyEye = SIMD4(eye,1)
                 encoder.setRenderPipelineState(skySurfacePipeline)
                 encoder.setVertexBuffer(skyGeometry,offset:0,index:0)
@@ -860,7 +883,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                 // Resolve exact world visibility cheaply before running any per-pixel rays.
                 // Alpha coverage matches the shading pass; this pass never writes color.
                 encoder.setRenderPipelineState(programs.visibility);encoder.setDepthStencilState(depth)
-                for batch in batches where batch.material.blend==0 {
+                for batch in batches where batch.material.blend==0 && batch.material.sky==0 {
                     encoder.setVertexBuffer(batch.vertices,offset:0,index:0);encoder.setFragmentTexture(animatedTexture(batch),index:0)
                     encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:batch.count)
                 }
@@ -882,7 +905,21 @@ final class Renderer: NSObject, MTKViewDelegate {
                 lights.withUnsafeBytes { encoder.setFragmentBytes($0.baseAddress!,length:$0.count,index:9) }
                 encoder.setFragmentBytes(&count,length:MemoryLayout<UInt32>.stride,index:10)
             }
-            for batch in batches where batch.material.blend==0 {
+            if !previewSkies.isEmpty {
+                for batch in batches where batch.material.sky>0 {
+                    guard let sky=previewSkies[batch.material.sky] else {continue}
+                    var mapping=SIMD4(Float(Double(sky.angle)*1024/4294967296),sky.mid,sky.scale.x,sky.scale.y)
+                    var skyEye=SIMD4(eye,1)
+                    encoder.setRenderPipelineState(skySurfacePipeline)
+                    encoder.setFragmentBytes(&skyEye,length:16,index:0)
+                    encoder.setFragmentBytes(&mapping,length:16,index:6)
+                    encoder.setVertexBuffer(batch.vertices,offset:0,index:0)
+                    encoder.setFragmentTexture(animatedTexture(batch),index:0)
+                    encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:batch.count)
+                }
+                encoder.setRenderPipelineState(pipeline)
+            }
+            for batch in batches where batch.material.blend==0 && batch.material.sky==0 {
                 var emission=sceneEffects.contains(.emissive) ? emissionSettings(batch.material):.zero
                 encoder.setFragmentBytes(&emission,length:MemoryLayout<SIMD4<Float>>.stride,index:11)
                 encoder.setVertexBuffer(batch.vertices,offset:0,index:0); encoder.setFragmentTexture(animatedTexture(batch),index:0)
@@ -890,10 +927,12 @@ final class Renderer: NSObject, MTKViewDelegate {
             }
             encoder.setDepthStencilState(depth)
             if let sprites, engineReady || extendedPreview {
-                encoder.setRenderPipelineState(sceneEffects.contains(.spriteLighting) && ambientOcclusion?.structure != nil
-                    ? ambientOcclusion!.spritePipeline:spritePipeline)
+                let litSprites=sceneEffects.contains(.spriteLighting) && ambientOcclusion?.structure != nil
+                if !litSprites {bindColors(encoder)}
+                encoder.setRenderPipelineState(litSprites ? ambientOcclusion!.spritePipeline:spritePipeline)
                 do { try sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw,fullbrightGain:hdrEnabled && hdrSpriteBoost ? 1.5:1) }
                 catch { engineReady = false; DispatchQueue.main.async { [weak self] in self?.onError?(error) } }
+                bindColors(encoder)
                 if sprites.hasTranslucency || transparentWorld != nil {
                     encoder.setRenderPipelineState(programs.translucentSprite)
                     encoder.setDepthStencilState(fuzzDepth)
@@ -1003,6 +1042,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                         encoder=resumed;bindColors(encoder);encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:worldHeight,znear:0,zfar:1))
                     }
                 }
+                bindColors(encoder)
                 // Weapons and HUD stay at standard white in HDR.
                 power.w=0;encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
                 if (hud.invisibility>128 || (hud.invisibility&8) != 0), let snapshot=scaledWorld ? weaponSnapshot:sceneSnapshot {

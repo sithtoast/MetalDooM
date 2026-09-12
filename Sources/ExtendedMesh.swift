@@ -35,7 +35,7 @@ final class ExtendedMesh {
                 let old=map.sectors[i],new=value.sectors[i]
                 if old.floor != new.floor || old.ceiling != new.ceiling || old.light != new.light ||
                    old.floorTexture != new.floorTexture || old.ceilingTexture != new.ceilingTexture ||
-                   old.backFloor != new.backFloor || old.backCeiling != new.backCeiling || old.backCeilingTexture != new.backCeilingTexture {
+                   old.backFloor != new.backFloor || old.backCeiling != new.backCeiling || old.backCeilingTexture != new.backCeilingTexture || old.ceilingSky?.id != new.ceilingSky?.id {
                     dirty.formUnion(sectorLines[i])
                 }
             }
@@ -63,7 +63,7 @@ final class ExtendedMesh {
         }
         let skyKey=MaterialKey(name:"F_SKY1",flat:true)
         let batches=vertices.filter{$0.key != skyKey}.map{Batch(material:$0.key,vertices:$0.value)}.sorted {
-            (($0.material.flat ? "F":"W")+$0.material.name,$0.material.blend) < (($1.material.flat ? "F":"W")+$1.material.name,$1.material.blend)
+            (($0.material.flat ? "F":"W")+$0.material.name,$0.material.blend,$0.material.sky) < (($1.material.flat ? "F":"W")+$1.material.name,$1.material.blend,$1.material.sky)
         }
         return (Geometry(batches:batches,skyVertices:vertices[skyKey] ?? []),changed)
     }

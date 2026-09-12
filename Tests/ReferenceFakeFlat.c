@@ -147,6 +147,7 @@ int main(void) {
    sector_t *s=&pool[i];memset(s,0,sizeof(*s));
    s->heightsec=-1;s->floorlightsec=s->ceilinglightsec=-1;
    s->floorheight=s->interpfloorheight=0;s->ceilingheight=s->interpceilingheight=128*FRACUNIT;
+   s->floor_rotation=i*ANG45;s->ceiling_rotation=i*ANG90;
    s->floorpic=1;s->ceilingpic=2;s->lightlevel=192-i*32;
    s->floor_xoffs=s->interp_floor_xoffs=i*FRACUNIT;s->floor_yoffs=s->interp_floor_yoffs=-i*FRACUNIT;
    s->ceiling_xoffs=s->interp_ceiling_xoffs=2*i*FRACUNIT;s->ceiling_yoffs=s->interp_ceiling_yoffs=-2*i*FRACUNIT;
@@ -165,6 +166,7 @@ int main(void) {
   sector_t *ref=R_FakeFlat(&pool[0],&temp,&rfl,&rcl,back);
   CHECK(out.floorheight==ref->floorheight && out.ceilingheight==ref->ceilingheight);
   CHECK(out.floorpic==ref->floorpic && out.ceilingpic==ref->ceilingpic);
+  CHECK(out.floor_rotation==ref->floor_rotation && out.ceiling_rotation==ref->ceiling_rotation);
   CHECK(out.lightlevel==ref->lightlevel && fl==rfl && cl==rcl);
   CHECK(out.floor_xoffs==ref->interp_floor_xoffs && out.floor_yoffs==ref->interp_floor_yoffs);
   CHECK(out.ceiling_xoffs==ref->interp_ceiling_xoffs && out.ceiling_yoffs==ref->interp_ceiling_yoffs);

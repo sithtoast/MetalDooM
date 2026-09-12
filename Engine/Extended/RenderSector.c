@@ -35,21 +35,24 @@ void ME_RenderSector(const sector_t *sec,int back,sector_t *out,int *fl,int *cl)
         out->floorheight=sec->floorheight;out->ceilingheight=offset(s->floorheight,-1);
     }
     if(underwater && !back) {
+        out->floor_rotation=s->floor_rotation;
         out->floorpic=s->floorpic;out->floor_xoffs=s->floor_xoffs;out->floor_yoffs=s->floor_yoffs;
         if(s->ceilingpic==skyflatnum) {
             out->floorheight=offset(out->ceilingheight,1);out->ceilingpic=out->floorpic;
             out->ceiling_xoffs=out->floor_xoffs;out->ceiling_yoffs=out->floor_yoffs;
         } else {
+            out->ceiling_rotation=s->ceiling_rotation;
             out->ceilingpic=s->ceilingpic;out->ceiling_xoffs=s->ceiling_xoffs;out->ceiling_yoffs=s->ceiling_yoffs;
         }
         out->lightlevel=s->lightlevel;*fl=light(s,0);*cl=light(s,1);
     } else if(phs>=0 && eye>=sectors[phs].ceilingheight && sec->ceilingheight>s->ceilingheight) {
         out->ceilingheight=s->ceilingheight;out->floorheight=offset(s->ceilingheight,1);
+        out->floor_rotation=out->ceiling_rotation=s->ceiling_rotation;
         out->floorpic=out->ceilingpic=s->ceilingpic;
         out->floor_xoffs=out->ceiling_xoffs=s->ceiling_xoffs;
         out->floor_yoffs=out->ceiling_yoffs=s->ceiling_yoffs;
         if(s->floorpic!=skyflatnum) {
-            out->ceilingheight=sec->ceilingheight;out->floorpic=s->floorpic;
+            out->ceilingheight=sec->ceilingheight;out->floorpic=s->floorpic;out->floor_rotation=s->floor_rotation;
             out->floor_xoffs=s->floor_xoffs;out->floor_yoffs=s->floor_yoffs;
         }
         out->lightlevel=s->lightlevel;*fl=light(s,0);*cl=light(s,1);

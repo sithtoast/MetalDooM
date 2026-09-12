@@ -4,6 +4,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ $# != 1 ]]; then echo "Usage: $0 rerelease-directory" >&2; exit 2; fi
 OUT="$PROJECT_DIR/build/extended-metal"
 mkdir -p "$OUT"
+python3 "$PROJECT_DIR/Tests/make_sky_rotation_fixture.py" "$PROJECT_DIR/build/extended/fixtures"
 python3 "$PROJECT_DIR/Tests/make_control_fixture.py" "$PROJECT_DIR/build/extended/fixtures"
 python3 "$PROJECT_DIR/Tests/make_scroll_fixture.py" "$PROJECT_DIR/build/extended/fixtures"
 python3 "$PROJECT_DIR/Tests/make_translucency_fixture.py" "$PROJECT_DIR/build/extended/fixtures"

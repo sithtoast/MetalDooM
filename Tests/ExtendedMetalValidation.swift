@@ -201,6 +201,59 @@ func runMeshMetalValidation() throws {
         print("PASS palette flash/removal, exact fixed-colormap and blend interaction, crossing wall/actor order (\(frontActor) actor-front, \(frontWall) wall-front pixels)")
 
     }
+    for mode in ["sky271","sky272","sky-scroll","floor","ceiling","both","offset-both"] {
+        let fixture=exe.deletingLastPathComponent().appendingPathComponent("fixtures/sky-rotation-\(mode).wad")
+        let selected=[root.appendingPathComponent("doom2.wad"),fixture]
+        let worker=ExtendedWorker();defer{worker.close()}
+        let initial=try worker.start(executable:exe,paths:selected,map:1,base:0,profile:0)
+        let resources=try WAD(previewResources:selected,baseIndex:0,profile:0,identity:worker.identity!)
+        let builder=try ExtendedSceneBuilder(resources:resources),art=try Art(wad:resources)
+        let (window,view,renderer)=try surface(0);defer{view.delegate=nil;window.close()}
+        var state=initial,first:Data?,probes=0
+        for tic in [0,35] {
+            if tic>0 {state=try worker.tick(count:35)}
+            let scene=try builder.prepare(state),sector=scene.copiedGeometry.map.sectors[0]
+            try renderer.loadExtendedPreview(scene);renderer.validationHUDVisible=false
+            try renderer.validationActors(resources:resources,things:[],images:[:],blend:[],tables:state.blendTables!)
+            let pixels=try frame(view,renderer),w=Int(view.drawableSize.width),h=Int(view.drawableSize.height)
+            if tic==0 {first=pixels} else if mode=="sky-scroll" {guard first != pixels else {throw PortError("Transferred sky did not scroll")}}
+            for y in stride(from:12,to:h-12,by:11) {for x in stride(from:12,to:w-12,by:13) {
+                let dx=(2*(Double(x)+0.5)/Double(w)-1)*Double(w)/Double(h)*tan(Double.pi/6)
+                let dy=(1-2*(Double(y)+0.5)/Double(h))*tan(Double.pi/6)
+                if abs(dy)<0.01 {continue}
+                let ceiling=dy>0,height=Double(ceiling ? sector.ceiling:sector.floor)
+                let t=(height-Double(state.eyeZ))/dy,wx=Double(state.x)+t,wy=Double(state.y)-t*dx
+                if t<=0 || wx >= -8 || abs(wy)>240 {continue}
+                let texture:PixelImage,u:Double,v:Double,shade:Double
+                if let sky=ceiling ? sector.ceilingSky:sector.floorSky {
+                    texture=try art.image(MaterialKey(name:sky.name,flat:false))!
+                    let raw=atan2(-dx,1)/(2*Double.pi)*1024+Double(sky.angle)/4194304
+                    let column=raw-floor(raw/1024)*1024
+                    if min(column-floor(column),ceil(column)-column)<0.01 {continue}
+                    u=floor(column)*Double(sky.scale.x)
+                    v=Double(sky.mid)-160*dy/sqrt(1+dx*dx)*Double(sky.scale.y);shade=1
+                } else {
+                    texture=try art.image(MaterialKey(name:ceiling ? sector.ceilingTexture:sector.floorTexture,flat:true))!
+                    let angle=Double(ceiling ? sector.ceilingRotation:sector.floorRotation)*Double.pi/2147483648
+                    let offset=ceiling ? sector.ceilingOffset:sector.floorOffset
+                    u=wx*cos(angle)-wy*sin(angle)+Double(offset.x)
+                    v = -wx*sin(angle)-wy*cos(angle)+Double(offset.y)
+                    shade=Double(max(0.12,(ceiling ? sector.ceilingLight:sector.floorLight) ?? sector.light))*max(0.3,1-t/3200)
+                    if min(u-floor(u),ceil(u)-u)<0.01 {continue}
+                }
+                if min(v-floor(v),ceil(v)-v)<0.01 {continue}
+                func wrap(_ a:Double,_ n:Int)->Int {let i=Int(floor(a));return (i%n+n)%n}
+                let q=(wrap(v,texture.height)*texture.width+wrap(u,texture.width))*4,p=(y*w+x)*4
+                for c in 0..<3 {
+                    let expected=Int((Double(texture.rgba[q+2-c])*shade).rounded())
+                    guard abs(Int(pixels[p+c])-expected)<=1 else {throw PortError("\(mode) projected sky/flat oracle mismatch at \(x),\(y) channel \(c): \(pixels[p+c]) vs \(expected), uv \(u),\(v)")}
+                }
+                probes+=1
+            }}
+        }
+        guard probes>100 else {throw PortError("Insufficient sky/rotation pixel coverage")}
+        print("PASS \(mode): \(probes) independent projected sky/rotated-flat pixels at spawn/tic35, sector-local mapping and scroll")
+    }
     for mode in ["normal","underwater","above","sky-below","sky-above","floorlight","ceilinglight"] {
         let controlPaths=[root.appendingPathComponent("doom2.wad"),exe.deletingLastPathComponent().appendingPathComponent("fixtures/control-\(mode).wad")]
         let worker=ExtendedWorker();defer{worker.close()}

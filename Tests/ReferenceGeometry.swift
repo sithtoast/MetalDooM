@@ -12,7 +12,7 @@ struct ReferenceGeometry {
             WorldVertex(position: SIMD4(p.x, height, -p.y, 1), uvLight: SIMD4(u,v,light,0))
         }
         func wall(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ bottom: Float, _ top: Float,
-                  _ side: Side, _ texture: String, _ light: Float, _ anchor: Float,blend:Int=0) {
+                  _ side: Side, _ texture: String, _ light: Float, _ anchor: Float,blend:Int=0,sky:Int=0) {
             guard top > bottom, texture != "-", !texture.isEmpty else { return }
             let length = simd_length(b-a), u = side.x
             let one = vertex(a,bottom,u,anchor-bottom+side.y,light)
@@ -22,7 +22,7 @@ struct ReferenceGeometry {
             // w marks directional walls; the fragment shader rejects the far side.
             var vertices = [one,two,three,one,three,four]
             for i in vertices.indices { vertices[i].uvLight.w = 1 }
-            groups[MaterialKey(name:texture,flat:texture == "F_SKY1",blend:blend), default:[]] += vertices
+            groups[MaterialKey(name:texture,flat:texture == "F_SKY1",blend:blend,sky:sky), default:[]] += vertices
         }
         for line in map.lines {
             for isBack in [false,true] {
@@ -39,7 +39,7 @@ struct ReferenceGeometry {
                     wall(a,b,sector.floor,sector.ceiling,side,side.middle,light,
                          bottomPegged ? sector.floor+height(side.middle) : sector.ceiling)
                     if sector.ceilingTexture == "F_SKY1" {
-                        wall(a,b,sector.ceiling,32768,side,"F_SKY1",1,0)
+                        wall(a,b,sector.ceiling,32768,side,"F_SKY1",1,0,sky:sector.ceilingSky?.id ?? 0)
                     }
                 } else {
                     let other = map.sectors[map.sides[otherIndex].sector].backView
@@ -47,7 +47,7 @@ struct ReferenceGeometry {
                         wall(a,b,max(sector.floor,other.ceiling),sector.ceiling,side,side.upper,light,
                              topPegged ? sector.ceiling : other.ceiling+height(side.upper))
                     } else {
-                        wall(a,b,other.ceiling,sector.ceiling,side,"F_SKY1",1,0)
+                        wall(a,b,other.ceiling,sector.ceiling,side,"F_SKY1",1,0,sky:sector.ceilingSky?.id ?? 0)
                     }
                     wall(a,b,sector.floor,min(sector.ceiling,other.floor),side,side.lower,light,
                          bottomPegged ? (sector.ceilingTexture == "F_SKY1" && other.ceilingTexture == "F_SKY1" ? other.ceiling : sector.ceiling) : other.floor)
@@ -198,17 +198,20 @@ struct ReferenceGeometry {
             for ceiling in [false,true] {
                 let name = ceiling ? sector.ceilingTexture : sector.floorTexture
                 let height = ceiling ? sector.ceiling : sector.floor
+                let rotation=ceiling ? sector.ceilingRotation:sector.floorRotation
+                let angle=Double(rotation)*Double.pi/2147483648
+                let skyID=name=="F_SKY1" ? (ceiling ? sector.ceilingSky:sector.floorSky)?.id ?? 0:0
                 for points in triangles {
                     let triangle = points.map { p in
-                        vertex(SIMD2<Float>(p),height,Float(p.x)+(ceiling ? sector.ceilingOffset.x:sector.floorOffset.x).truncatingRemainder(dividingBy:64),Float(-p.y)+(ceiling ? sector.ceilingOffset.y:sector.floorOffset.y).truncatingRemainder(dividingBy:64),max(0.12,(ceiling ? sector.ceilingLight:sector.floorLight) ?? sector.light))
+                        vertex(SIMD2<Float>(p),height,Float(p.x*cos(angle)-p.y*sin(angle))+(ceiling ? sector.ceilingOffset.x:sector.floorOffset.x).truncatingRemainder(dividingBy:64),Float(-p.x*sin(angle)-p.y*cos(angle))+(ceiling ? sector.ceilingOffset.y:sector.floorOffset.y).truncatingRemainder(dividingBy:64),max(0.12,(ceiling ? sector.ceilingLight:sector.floorLight) ?? sector.light))
                     }
-                    groups[MaterialKey(name:name,flat:true),default:[]] += triangle
+                    groups[MaterialKey(name:name,flat:true,sky:skyID),default:[]] += triangle
                 }
             }
         }
         skyVertices = groups.removeValue(forKey:MaterialKey(name:"F_SKY1",flat:true)) ?? []
         batches = groups.map { Batch(material:$0.key,vertices:$0.value) }.sorted {
-            ($0.material.flat ? "F" : "W")+$0.material.name < ($1.material.flat ? "F" : "W")+$1.material.name
+            (($0.material.flat ? "F" : "W")+$0.material.name,$0.material.blend,$0.material.sky) < (($1.material.flat ? "F" : "W")+$1.material.name,$1.material.blend,$1.material.sky)
         }
         triangleCount = batches.reduce(0) { $0+$1.vertices.count/3 }
     }

@@ -41,8 +41,14 @@ final class ExtendedSceneBuilder {
             copied=update;geometry=prepared.0;changedMaterials=prepared.1
         }
         guard let copied, let geometry else { throw PortError("Preview requires initial geometry.") }
+        let skies=copied.map.transferredSkies
         for key in Set(geometry.batches.map(\.material)) {
-            _=try image(key)
+            if key.sky>0 {
+                guard let sky=skies[key.sky] else {throw PortError("Missing sky mapping")}
+                let base=MaterialKey(name:sky.name,flat:false)
+                images[key]=try image(base)
+                if let target=view.materials.translations[base] {_=try image(target)}
+            } else {_=try image(key)}
             if let target=view.materials.translations[key.unblended] { _=try image(target) }
         }
         let sky=try image(MaterialKey(name:view.sky,flat:false))

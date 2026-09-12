@@ -4,6 +4,22 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust sky transfers and flat rotation (build 155)
+
+- Render sector-local transferred skies with engine-selected textures, direction,
+  vertical/angular offsets and scrolling. Retain default skies in untagged areas.
+- Rotate floors and ceilings independently, including combined offsets and
+  inherited control-sector rotations, without changing collision geometry.
+- Preserve sky/rotation state through Save/Load and validate copied sky records.
+  Cache sky textures under stable identities while offsets change.
+- Restore compatibility with the classic optional lighting shaders. Validate
+  independent native sky/flat pixel oracles, fake-sector inheritance, classic
+  lighting and existing geometry, mesh, worker and save regressions.
+- Deliver signed 0.10.0/build155 with updated current documentation and handoff.
+  Builds153/154 are retained as intermediate candidates. Same unreleased feature;
+  no push/package. Layered/procedural skies, software sky-stretch parity and full
+  campaign acceptance remain outside this milestone.
+
 ## 0.10.0 refinement — Rust fake floors and transferred lighting (build 152)
 
 - Render Boom control-sector heights, including deep-water, above-ceiling and

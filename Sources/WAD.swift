@@ -236,10 +236,15 @@ struct WAD {
     }
 }
 
+struct SkyTransfer:Hashable {
+    let id:Int,name:String,angle:UInt32,mid:Float,scale:SIMD2<Float>
+}
 struct Sector: Equatable {
     let floor: Float, ceiling: Float, light: Float
     let floorTexture: String, ceilingTexture: String
     var floorOffset: SIMD2<Float> = .zero, ceilingOffset: SIMD2<Float> = .zero
+    var floorRotation:UInt32=0,ceilingRotation:UInt32=0
+    var floorSky:SkyTransfer?=nil,ceilingSky:SkyTransfer?=nil
     var floorLight:Float?=nil,ceilingLight:Float?=nil
     var backFloor:Float?=nil,backCeiling:Float?=nil,backCeilingTexture:String?=nil
     var spriteClip:SIMD2<Float> = SIMD2(-Float.infinity,Float.infinity)
@@ -341,6 +346,11 @@ struct DoomMap {
         if let sector = leaves[index].sector { return sector }
         let seg = segs[leaves[index].first], line = lines[seg.line]
         return sides[seg.side == 0 ? line.front : line.back].sector
+    }
+    var transferredSkies:[Int:SkyTransfer] {
+        var result:[Int:SkyTransfer]=[:]
+        for sector in sectors {for sky in [sector.floorSky,sector.ceilingSky].compactMap({$0}) {result[sky.id]=sky}}
+        return result
     }
     func sector(at point: SIMD2<Float>) -> Int {
         guard !nodes.isEmpty else { return leafSector(0) }
