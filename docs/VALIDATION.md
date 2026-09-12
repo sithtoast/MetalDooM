@@ -1,5 +1,66 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 157: blending and world interpolation
+
+Final candidate: `build/blend-motion-final/MetalDooM.app`; `build/build157.log`.
+Same unreleased 0.10.0 feature version. Earlier bundles and private saves remain
+preserved; no push, package or notarization was performed.
+
+- `build/blend-motion-metal-final-validation.log`: native Metal API validation passes.
+  Independent lookup oracles cover normal/additive/custom weapons and mixed
+  weapon/flash slot order; 59,258 foreground-fuzz samples and 54,769 crossing
+  fuzz/wall samples verify fresh backgrounds and shared ordering. Both actor
+  enumeration orders, cutouts, opaque occlusion, palette/fixed-map interactions,
+  all prior sky/flat/control-sector checks and 21 real Rust map/reference frames
+  pass. Actual manual-door and lift fixtures render distinct start/mid/end frames;
+  midpoint pixels match manually averaged planes rebuilt by the independent full
+  mesher, including a pickup riding the lift. Pause restores the exact endpoint,
+  and drawing never advances physics. Camera-only movement retains world buffers.
+- `build/blend-motion-classic-metal-validation.log`: classic native AO, lighting,
+  particles, emissive surfaces, bloom, HDR/SDR, resize, save/load, HUD isolation,
+  preset persistence and restoration checks pass.
+- `build/blend-motion-core-validation.log`: private-core probe verifies custom
+  object/respawn tables, generated alpha references, weapon table precedence,
+  fuzz priority and exclusion of uncaptured spawn endpoints. Fresh-worker restore
+  produces identical presentation after 35 future tics. Invalid object/respawn
+  references and malformed endpoint arrays reject before restoring the arena.
+- `build/blend-motion-interpolation-validation.log`: actor/feet and front/back
+  plane/clip midpoints, unbounded clips, discrete fake-flat/jump handling, camera
+  and weapon discontinuities, real short teleports and saved bob continuation pass.
+- `build/blend-motion-copy-validation.log`: normal/custom-bank sprite, material
+  and blend complete-copy canaries pass.
+- `build/blend-motion-worker-validation.log` and
+  `build/blend-motion-protocol-validation.log`: all-map presentation, resource,
+  real weapon, malformed packet/reference and protocol regression checks pass.
+- `build/blend-motion-save-validation.log`: all sixteen Rust maps, real weapon
+  states and 140 future tics remain deterministic after restore. Campaign history,
+  transition saves, malformed keyframes, boundary/canary and envelope checks pass.
+
+The final bundle and running window both report **0.10.0/build157**. Deep/strict
+signature verification passes; the packaged helper library retains exactly18
+private exports. Native process49468/tool session8982 runs the final executable
+with actual Rust MAP14. Run, Up, Right and Escape ended paused at tic6; the manual
+Step1second ended paused at tic41. The inspected screenshot shows the transferred
+green sky, buildings, raised pistol and HUD, health100/ammo50,645actors and
+74,768triangles. Sound and Music remain enabled. Final candidate stays paused;
+launch log: `build/blend-motion-final-app.log`. Earlier processes12011/build155
+and24681/build156 remain running and preserved.
+Build156 remains preserved at `build/blend-motion-preview/MetalDooM.app`, paused
+MAP14 tic39, process24681/tool session3209. It passed the initial native tests;
+final review found a stopping-mover buffer handoff edge case, fixed in157 with
+an added native regression that excludes that mover from the next geometry delta.
+
+
+MSP5 extends actor40 to56 bytes and adds pose-valid flag32; header32 and weapon24
+remain. Weapon records now accept blend IDs. MGE5/MBL3/MUI3/MVW5 and ABI2 remain.
+Object and respawn blend references and presentation endpoints are preserved in
+native saves; engine fingerprints distinguish older private saves. Actor and
+surface interpolation is conservative at discontinuities. Animation/rotation,
+scrolling and sky phases remain discrete. Large-map simultaneous-mover cost,
+full campaign/boss playtesting, layered/procedural skies and software sky-stretch
+parity remain open; this is not full campaign or software-pixel acceptance.
+
+
 ## 2026-09-12 — 0.10.0 build 155: sky transfers and flat rotation
 
 Final candidate: `build/sky-rotation-release/MetalDooM.app`; `build/build155.log`.

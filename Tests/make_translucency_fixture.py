@@ -38,3 +38,5 @@ for i in range(62):limit_patch+=f'Frame {1200+i}\nTranmap = BL{i:05d}\n\n'
 limit_patch+='Thing 500\nID # = 9500\nInitial frame = 1261\nBits = 0\n\nFrame 1261\nSprite number = 0\nDuration = -1\nNext frame = 1261\n\n'
 limit_room=[(label,body[:20] if label=='THINGS' else body) for label,body in room]
 (out/'blend-custom-max.wad').write_bytes(s['wad'](limit_room+[('DEHACKED',limit_patch.encode())]+entries[:62]))
+# Object-only lump is deliberately absent from all state and wall references.
+(out/'blend-object.wad').write_bytes(s['wad'](room+[('DEHACKED',patch.encode()),('OBJECT_B',custom_b)]))

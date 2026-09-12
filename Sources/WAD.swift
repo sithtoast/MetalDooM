@@ -240,7 +240,8 @@ struct SkyTransfer:Hashable {
     let id:Int,name:String,angle:UInt32,mid:Float,scale:SIMD2<Float>
 }
 struct Sector: Equatable {
-    let floor: Float, ceiling: Float, light: Float
+    var floor: Float, ceiling: Float
+    let light: Float
     let floorTexture: String, ceilingTexture: String
     var floorOffset: SIMD2<Float> = .zero, ceilingOffset: SIMD2<Float> = .zero
     var floorRotation:UInt32=0,ceilingRotation:UInt32=0

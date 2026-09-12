@@ -13,6 +13,8 @@
 // GNU General Public License for more details.
 
 #include "am_map.h"
+#include "NativeInternal.h"
+#include "yyjson.h"
 #include "d_player.h"
 #include "d_think.h"
 #include "doomdata.h"
@@ -336,6 +338,7 @@ static void read_mapthing_t(mapthing_t *str, json_t *obj)
     str->angle = JS_GetIntegerValue(obj, "angle");
     str->type = JS_GetIntegerValue(obj, "type");
     str->options = JS_GetIntegerValue(obj, "options");
+    str->tranmap = ME_RestoreBlend(JS_GetIntegerValue(obj,"native_blend"));
 }
 
 static json_mut_t *write_mapthing_t(mapthing_t *str, json_mut_doc_t *doc)
@@ -348,6 +351,7 @@ static json_mut_t *write_mapthing_t(mapthing_t *str, json_mut_doc_t *doc)
     JS_SetInt(doc, obj, "angle", str->angle);
     JS_SetInt(doc, obj, "type", str->type);
     JS_SetInt(doc, obj, "options", str->options);
+    JS_SetInt(doc,obj,"native_blend",ME_SaveBlend(str->tranmap));
 
     return obj;
 }
@@ -450,6 +454,7 @@ static void read_mobj_t(mobj_t *str, thinker_class_t tc, json_t *obj)
     }
     JS_ArrayIteratorFree(args_iter);
 
+    str->tranmap = ME_RestoreBlend(JS_GetIntegerValue(obj,"native_blend"));
     str->tint = JS_GetIntegerValue(obj, "tint");
     str->movedir = JS_GetIntegerValue(obj, "movedir");
     str->movecount = JS_GetIntegerValue(obj, "movecount");
@@ -473,6 +478,8 @@ static void read_mobj_t(mobj_t *str, thinker_class_t tc, json_t *obj)
     str->touching_sectorlist =
         readp_msecnode(JS_GetIntegerValue(obj, "touching_sectorlist"));
     str->interp = JS_GetIntegerValue(obj, "interp");
+    for(int i=0;i<4;i++)str->native_previous[i]=ME_SaveInteger(yyjson_arr_get(JS_GetObject(obj,"native_previous"),i));
+    str->native_previous_tic=JS_GetIntegerValue(obj,"native_previous_tic");
     str->oldx = JS_GetIntegerValue(obj, "oldx");
     str->oldy = JS_GetIntegerValue(obj, "oldy");
     str->oldz = JS_GetIntegerValue(obj, "oldz");
@@ -534,6 +541,7 @@ static json_mut_t *write_mobj_t(mobj_t *str, json_mut_doc_t *doc)
     }
     JS_SetArray(doc, obj, "args", args_arr);
 
+    JS_SetInt(doc,obj,"native_blend",ME_SaveBlend(str->tranmap));
     JS_SetInt(doc, obj, "tint", str->tint);
     JS_SetInt(doc, obj, "movedir", str->movedir);
     JS_SetInt(doc, obj, "movecount", str->movecount);
@@ -557,6 +565,10 @@ static json_mut_t *write_mobj_t(mobj_t *str, json_mut_doc_t *doc)
     JS_SetInt(doc, obj, "touching_sectorlist",
               writep_msecnode(str->touching_sectorlist));
     JS_SetInt(doc, obj, "interp", str->interp);
+    json_mut_t *native_previous=JS_NewArray(doc);
+    for(int i=0;i<4;i++)JS_ArrayAddInt(doc,native_previous,str->native_previous[i]);
+    JS_SetArray(doc,obj,"native_previous",native_previous);
+    JS_SetInt(doc,obj,"native_previous_tic",str->native_previous_tic);
     JS_SetInt(doc, obj, "oldx", str->oldx);
     JS_SetInt(doc, obj, "oldy", str->oldy);
     JS_SetInt(doc, obj, "oldz", str->oldz);
@@ -2587,7 +2599,9 @@ void ME_ValidateKeyframe(json_t *root) {
             if(native_range(data,"info",0,num_mobj_types-1)!=actor)I_Error("Saved actor definition mismatch");
             native_range(data,"state",-1,num_states-1);native_range(data,"subsector",0,numsubsectors-1);
             native_range(data,"player",-1,0);native_range(data,"movedir",0,8);
-            native_array(data,"args",5);
+            native_array(data,"args",5);native_array(data,"native_previous",4);
+            ME_RestoreBlend(JS_GetIntegerValue(data,"native_blend"));
+            ME_RestoreBlend(JS_GetIntegerValue(JS_GetObject(data,"spawnpoint"),"native_blend"));
         }
         if(type==tc_ambient)I_Error("Ambient save state unsupported");
     }

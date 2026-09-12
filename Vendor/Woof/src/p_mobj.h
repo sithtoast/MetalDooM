@@ -400,6 +400,9 @@ typedef struct mobj_s
 
     // [AM] If true, ok to interpolate this tic.
     int                 interp;
+    // Native presentation endpoints captured before the whole world tic.
+    fixed_t native_previous[4];
+    int native_previous_tic;
 
     // [AM] Previous position of mobj before think.
     //      Used to interpolate between positions.

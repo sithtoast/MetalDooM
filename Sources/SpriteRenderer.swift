@@ -20,7 +20,7 @@ final class SpriteRenderer {
     private var hudPatches: [String:GPUPatch] = [:]
     private var things: [MD_Thing] = []
     private var previewWeapons:[MD_WeaponSprite]?
-    private var previewBlend:[Int]=[]
+    private var previewBlend:[Int]=[],previewWeaponBlend:[Int]=[]
     private var previewClips:[SIMD2<Float>]=[]
     private var blendPalette:MTLBuffer?
     private var blendTextures:[MTLTexture]=[]
@@ -63,12 +63,20 @@ final class SpriteRenderer {
             if inSprites && lump.bytes.count > 0 { patches[index] = try upload(art.patch(lump:index)) }
         }
     }
+    func setPreviewActorPositions(_ actors:[ExtendedSprite],fraction:Float,map:DoomMap) {
+        guard actors.count==things.count else {return}
+        for i in things.indices {
+            let value=actors[i].position(fraction:fraction)
+            things[i].x=value.x;things[i].y=value.y;things[i].z=value.z;things[i].floorZ=value.w
+            previewClips[i]=map.sectors[map.sector(at:SIMD2(value.x,value.y))].spriteClip
+        }
+    }
     func setPreviewWeaponPositions(_ positions:[SIMD2<Float>]) {
         guard var weapons=previewWeapons,weapons.count==positions.count else {return}
         for i in weapons.indices {weapons[i].x=positions[i].x;weapons[i].y=positions[i].y}
         previewWeapons=weapons
     }
-    func setPreview(things:[MD_Thing],weapons:[MD_WeaponSprite],images:[Int:PatchImage],blend:[Int]=[],clips:[SIMD2<Float>]=[],tables:ExtendedBlendTables?=nil) throws {
+    func setPreview(things:[MD_Thing],weapons:[MD_WeaponSprite],images:[Int:PatchImage],blend:[Int]=[],weaponBlend:[Int]=[],clips:[SIMD2<Float>]=[],tables:ExtendedBlendTables?=nil) throws {
         guard blend.isEmpty || blend.count==things.count && blend.allSatisfy({(0...64).contains($0)}) else {throw PortError("Invalid sprite blend modes.")}
         if blendTextures.isEmpty,let tables {
             guard let palette=device.makeBuffer(bytes:tables.palette,length:768,options:.storageModeShared) else {throw PortError("Cannot allocate blend palette.")}
@@ -84,7 +92,8 @@ final class SpriteRenderer {
         }
         guard blend.allSatisfy({$0<=blendTextures.count}) else {throw PortError("Missing actor blend tables.")}
         guard clips.isEmpty || clips.count==things.count else {throw PortError("Invalid actor clipping count")}
-        previewBlend=blend;previewClips=clips
+        guard weaponBlend.isEmpty || weaponBlend.count==weapons.count && weaponBlend.allSatisfy({(0...blendTextures.count).contains($0)}) else {throw PortError("Missing weapon blend tables")}
+        previewBlend=blend;previewWeaponBlend=weaponBlend;previewClips=clips
         for (index,image) in images where patches[index] == nil { patches[index]=try upload(image) }
         self.things=things;previewWeapons=weapons
     }
@@ -129,11 +138,11 @@ final class SpriteRenderer {
                     vertex(a,u0,vBottom),vertex(c,u1,vTop),vertex(d,u0,vTop)]
     }
     func transparentActors(yaw:Float)throws->[TransparentPolygon] {
-        try things.indices.filter {!previewBlend.isEmpty && previewBlend[$0]>0 && things[$0].shadow==0}.compactMap {i -> TransparentPolygon? in
+        try things.indices.filter {things[$0].shadow != 0 || !previewBlend.isEmpty && previewBlend[$0]>0}.compactMap {i -> TransparentPolygon? in
             guard let p=patches[Int(things[i].lump)],let indices=p.indices else {throw PortError("Missing translucent actor patch")}
             let v=worldVertices(things[i],patch:p,yaw:yaw,gain:1,clip:previewClips.isEmpty ? nil:previewClips[i])
             guard !v.isEmpty else {return nil}
-            return TransparentPolygon(vertices:[v[0],v[1],v[2],v[5]],material:nil,texture:p.texture,indices:indices,blend:previewBlend[i],wall:false)
+            return TransparentPolygon(vertices:[v[0],v[1],v[2],v[5]],material:nil,texture:p.texture,indices:indices,blend:things[i].shadow != 0 ? -1:previewBlend[i],wall:false)
         }
     }
     func bindBlend(_ index:Int,encoder:MTLRenderCommandEncoder)throws {
@@ -177,7 +186,14 @@ final class SpriteRenderer {
             encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:6)
         }
     }
-    func drawWeapon(encoder: MTLRenderCommandEncoder, width: Double, height: Double, fuzz: Bool=false, overlay: Bool=false) {
+    var weaponBlendModes:[Int] {previewWeaponBlend}
+    func bindWeaponBlend(_ index:Int,encoder:MTLRenderCommandEncoder)throws {
+        try bindBlend(previewWeaponBlend[index],encoder:encoder)
+        guard let frame=previewWeapons?[index],let indices=patches[Int(frame.lump)]?.indices else {throw PortError("Missing weapon palette indices")}
+        encoder.setFragmentTexture(indices,index:3)
+        var kind:UInt32=0;encoder.setFragmentBytes(&kind,length:4,index:5)
+    }
+    func drawWeapon(encoder: MTLRenderCommandEncoder, width: Double, height: Double, fuzz: Bool=false, overlay: Bool=false,slot:Int?=nil) {
         var frames:[MD_WeaponSprite]
         let count:Int
         if let previewWeapons { frames=previewWeapons;count=frames.count }
@@ -194,7 +210,7 @@ final class SpriteRenderer {
         // Fullscreen HUD uses the 200-line canvas and bottom-anchors the weapon.
         // Its scale is independent of the selected HUD percentage.
         let originY: Float = overlay ? Float(height)-168*scale:0
-        for frame in frames.prefix(Int(count)) where (frame.shadow != 0)==fuzz {
+        for (index,frame) in frames.prefix(Int(count)).enumerated() where (frame.shadow != 0)==fuzz && (slot==nil || slot==index) {
             guard let patch = patches[Int(frame.lump)] else { continue }
             let x0 = originX+(frame.x-patch.left)*scale
             let y0 = originY+(frame.y-patch.top-16)*scale

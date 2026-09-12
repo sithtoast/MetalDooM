@@ -63,7 +63,7 @@ typedef struct {
 } ME_View;
 ME_API int ME_CopyView(ME_View *out);
 
-/* MSP4 resolved sprite/weapon values, same whole-buffer semantics as geometry. */
+/* MSP5 resolved sprite/weapon values, same whole-buffer semantics as geometry. */
 ME_API size_t ME_CopyPresentation(void *out, size_t capacity);
 
 /* MMT1 animation translations, same whole-buffer semantics as geometry. */

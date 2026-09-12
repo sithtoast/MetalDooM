@@ -26,6 +26,19 @@ import Foundation
             if ["weapon","frame","jump"].contains(mode) {try check(sample.weapons[0]==SIMD2(frame.weapons[0].x,36),"Weapon discontinuity blended")}
             else {try check(sample.position==frame.position && sample.weapons[0]==SIMD2(frame.weapons[0].x,36),"Discontinuity blended: \(mode)")}
         }
+        var actor=sprite(8,4);actor.previous=SIMD4(0,0,-2,-2)
+        try check(actor.position(fraction:0.5)==SIMD4(4,2,-1,-1),"Actor/feet did not share midpoint")
+        actor.previous=nil;try check(actor.position(fraction:0)==SIMD4(8,4,0,0),"Spawn/teleport interpolated")
+        let a=Sector(floor:0,ceiling:64,light:1,floorTexture:"A",ceilingTexture:"B",backFloor:0,backCeiling:64,spriteClip:SIMD2(0,64))
+        var b=a;b.floor=4;b.ceiling=60;b.backFloor=4;b.backCeiling=60;b.spriteClip=SIMD2(4,60)
+        let middle=ExtendedSurfaceInterpolation.interpolate(a,b,0.5)
+        try check(middle.floor==2 && middle.ceiling==62 && middle.backFloor==2 && middle.backCeiling==62 && middle.spriteClip==SIMD2(2,62),"Plane/wall/clip midpoint mismatch")
+        b.spriteClip=SIMD2(-Float.infinity,60)
+        try check(ExtendedSurfaceInterpolation.interpolate(a,b,0.5)==b,"Fake-flat region transition interpolated")
+        b=a;b.floor=100;try check(ExtendedSurfaceInterpolation.interpolate(a,b,0.5)==b,"Instant surface displacement interpolated")
+        let unbounded=Sector(floor:0,ceiling:64,light:1,floorTexture:"A",ceilingTexture:"B")
+        try check(ExtendedSurfaceInterpolation.interpolate(unbounded,unbounded,0.5)==unbounded,"Unbounded clip produced NaN")
+        print("PASS actor/feet midpoint, spawn snap, front/back planes and clip alignment, fake-flat/jump snaps and unbounded clips")
         print("PASS interpolation midpoint, shortest yaw, weapon/flash alignment, clamping, pause/resume and nine discontinuity cases")
         let root=URL(fileURLWithPath:CommandLine.arguments[1]),exe=URL(fileURLWithPath:CommandLine.arguments[2])
         let paths=["id24res.wad","doom2.wad","id1.wad"].map{root.appendingPathComponent($0)}
@@ -42,7 +55,7 @@ import Foundation
             }
         }
         try check(teleported,"Actual teleport failed to signal camera discontinuity")
-        print("PASS actual short walk-over teleport signals snap in MSP2")
+        print("PASS actual short walk-over teleport signals snap in MSP5")
         let walk=ExtendedWorker();defer{walk.close()}
         _=try walk.start(executable:exe,paths:paths,map:1,base:1)
         _=try walk.tick(count:35)

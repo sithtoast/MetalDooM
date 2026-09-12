@@ -5,10 +5,10 @@
 Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, branch
 **codex/legacy-of-rust**, based on fetched origin/main merge **afd7357**. Preserve
 `/Users/wmh/Dev/MetalDooM` and its release artifacts. Current feature version is
-**0.10.0**, final successful build **155**. This remains the same unreleased Rust
+**0.10.0**, final successful build **157**. This remains the same unreleased Rust
 feature; do not bump the minor version for each refinement.
 
-The explicit Rust preview now has **sky transfers and flat rotation**, **fake floors and transferred lighting**, **translucent walls and palette effects**, **normal/additive/per-state actor translucency**, **camera/weapon interpolation during Run**, **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
+The explicit Rust preview now has **object/weapon blending, unified fuzz/translucent ordering and actor/moving-surface interpolation**, **sky transfers and flat rotation**, **fake floors and transferred lighting**, **translucent walls and palette effects**, **normal/additive/per-state actor translucency**, **camera/weapon interpolation during Run**, **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
 plus death/restart and native completion/Continue,
 plus level MIDI, a minimal HUD, cached geometry, selective Metal updates, Run/Pause and keyboard/mouse controls,
 with one-tic world/actor/weapon/material/audio/UI presentation. Manual buttons show every
@@ -21,7 +21,7 @@ Read [skies/rotation](docs/EXTENDED_SKIES_ROTATION.md), [control sectors](docs/E
 [worker](docs/EXTENDED_ENGINE.md), [validation](docs/VALIDATION.md) and
 [roadmap](docs/LEGACY_OF_RUST.md).
 
-Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/sky-rotation-release" bash scripts/build.sh`.
+Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/blend-motion-final" bash scripts/build.sh`.
 Launch with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
 Only the explicit option packages/signs the helper/dylib and notices. Standard
 builds remain classic. Ordered resources are id24res → Doom II → id1, base index 1;
@@ -62,12 +62,30 @@ See EXTENDED_SKIES_ROTATION.md for exact coordinates and limits. Native projecti
 keeps its own perspective; optional software sky stretching and layered/procedural
 transferred skies remain unadapted (the latter reject explicitly).
 
-Current candidate: `build/sky-rotation-release/MetalDooM.app`,0.10.0/build155;
-`build/build155.log`. Native MAP14 is the current paused validation session;
-final checks and running evidence are in VALIDATION.md.
-Preserve build152 and all earlier bundles/saves/paused sessions. Remaining:
-per-object/weapon blending, fuzz/translucent ordering, actor/moving-surface
-interpolation and full campaign/boss playtesting, plus the sky variants above.
+**Build157 adds object/weapon blending and actor/moving-surface interpolation.**
+MSP5 keeps header32/weapon24, expands actor40→56, adds previous x/y/z/floor-z at
+40/44/48/52 and enables them with flag32. Endpoints are captured before the world
+tic; teleport and spawn-capture markers prevent false sweeps. No identity matching
+is used. Native keyframes preserve endpoints/capture tic and object/respawn blend
+references. The level bank adds object tables after walls; resource tables are
+pinned, generated alpha tables validated. See EXTENDED_TRANSLUCENCY.md.
+
+Fuzz shares the translucent wall/actor BSP, taking a fresh background snapshot
+at its sorted position. Weapon/flash layers apply their own tables in slot order.
+Run blends resolved sector heights before selective re-tessellation, preserving
+wall pegging, openings and actor clipping. Pause restores exact engine endpoints.
+Animation, texture scroll/rotation and sky phases remain discrete; see
+EXTENDED_INTERPOLATION.md for conservative fake-flat/jump snap rules and costs.
+
+Current candidate: `build/blend-motion-final/MetalDooM.app`,0.10.0/build157;
+`build/build157.log`. Actual MAP14 is paused at tic41, health100/ammo50,
+process49468/tool session8982. Running evidence and final checks are in VALIDATION.md.
+Preserve intermediate build156 at build/blend-motion-preview, paused MAP14 tic39,
+process24681/tool session3209. Build157 fixes stopping-mover buffer restoration.
+Preserve build155 and all earlier bundles/saves/paused sessions. Remaining:
+layered/procedural skies, software sky-stretch parity, native visual/performance
+checks and full campaign/boss playtesting. Earlier milestone sections below are
+historical; their then-remaining work is superseded by this section.
 
 **Build 152 adds fake floors and transferred lighting.** Engine-resolved Boom242
 heights and213/261 independent lights feed MGE4/version4. Header120 and all other

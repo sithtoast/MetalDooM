@@ -293,6 +293,10 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var animatedWalls: [Int32:MTLTexture] = [:], animatedFlats: [Int32:MTLTexture] = [:]
     private var extendedPreview = false
     private var previewInterpolation=ExtendedInterpolation()
+    private let previewSurfaces=ExtendedSurfaceInterpolation()
+    private var previewSurfaceMesh:ExtendedMesh?,previewActors:[ExtendedSprite]=[]
+    private var previewSurfaceFraction:Float=1
+
     private var previewWeaponLabel:String?,previewAmmoLabel:String?
     private var previewSkies:[Int:SkyTransfer]=[:]
     private var previewTranslations:[MaterialKey:MaterialKey]=[:]
@@ -624,24 +628,19 @@ final class Renderer: NSObject, MTKViewDelegate {
             extendedColormaps=device.makeBuffer(bytes:colors.colormaps,length:colors.colormaps.count,options:.storageModeShared)
             guard extendedPalette != nil,extendedColormaps != nil else {throw PortError("Cannot allocate palette/colormap resources")}
         }
-        if scene.geometryChanged {
-            let previous=Dictionary(uniqueKeysWithValues:batches.map{($0.material,$0)})
-            batches=try scene.geometry.batches.map { batch in
-                if !scene.changedMaterials.contains(batch.material),let cached=previous[batch.material] { return cached }
-                guard let texture=textures[batch.material],
-                      let buffer=device.makeBuffer(bytes:batch.vertices,length:batch.vertices.count*MemoryLayout<WorldVertex>.stride,options:.storageModeShared) else { throw PortError("Cannot update preview material: \(batch.material.name)") }
-                return GPUBatch(vertices:buffer,texture:texture,material:batch.material,count:batch.vertices.count)
-            }
-            if scene.changedMaterials.contains(MaterialKey(name:"F_SKY1",flat:true)) { try uploadSkyGeometry(scene.geometry) }
-            let walls=scene.geometry.batches.filter{$0.material.blend>0}.flatMap {batch in
-                stride(from:0,to:batch.vertices.count,by:3).map {i in
-                    TransparentPolygon(vertices:Array(batch.vertices[i..<i+3]),material:batch.material,texture:nil,indices:nil,blend:batch.material.blend,wall:true)
-                }
-            }
-            transparentWorld=walls.isEmpty ? nil:try TranslucentWorld(walls:walls)
-            map=scene.copiedGeometry.map
-            previewSkies=scene.copiedGeometry.map.transferredSkies
+        if previewSurfaceMesh==nil {
+            previewSurfaceMesh=try ExtendedMesh(map:scene.copiedGeometry.map,heights:Art(wad:scene.resources).textureHeights())
+            _=try previewSurfaceMesh!.update(scene.copiedGeometry.map,initial:true)
         }
+        // A mover can stop while unrelated geometry changes. Restore every
+        // material changed since the last displayed pose, not only this tic's
+        // worker delta, before accepting the next interpolation endpoints.
+        let synchronized=try previewSurfaceMesh!.update(scene.copiedGeometry.map)
+        if scene.geometryChanged || previewSurfaceFraction != 1 {
+            try uploadExtendedGeometry(scene.geometry,changedMaterials:scene.changedMaterials.union(synchronized.1),map:scene.copiedGeometry.map)
+        }
+        previewSurfaces.accept(scene.copiedGeometry.map);previewSurfaceFraction=1
+        previewActors=scene.view.presentation.actors
         sky=textures[MaterialKey(name:scene.view.sky,flat:false)]
         previewTranslations=scene.view.materials.translations
         position=SIMD2(scene.view.x,scene.view.y);eyeZ=scene.view.eyeZ;yaw=scene.view.angle;pitch=0
@@ -663,7 +662,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             value.fullbright=source.flags&2 != 0 ? 1:0;value.shadow=source.flags&4 != 0 ? 1:0;return value
         }
         try sprites?.setPreview(things:actors,weapons:weapons,images:scene.spritePatches,
-            blend:scene.view.presentation.actors.map(\.blendTable),
+            blend:scene.view.presentation.actors.map(\.blendTable),weaponBlend:scene.view.presentation.weapons.map(\.blendTable),
             clips:scene.view.presentation.actors.map {actor in
                 let map=scene.copiedGeometry.map
                 return map.sectors[map.sector(at:SIMD2(actor.x,actor.y))].spriteClip
@@ -676,6 +675,25 @@ final class Renderer: NSObject, MTKViewDelegate {
         extendedPreview=true;hud.tick=Int32(scene.view.tic)
         hud.invisibility=weapons.contains{$0.shadow != 0} ? 129:0
         hudStyle = .minimal
+    }
+
+    private func uploadExtendedGeometry(_ geometry:Geometry,changedMaterials:Set<MaterialKey>,map value:DoomMap)throws {
+            let previous=Dictionary(uniqueKeysWithValues:batches.map{($0.material,$0)})
+            batches=try geometry.batches.map { batch in
+                if !changedMaterials.contains(batch.material),let cached=previous[batch.material] { return cached }
+                guard let texture=textures[batch.material],
+                      let buffer=device.makeBuffer(bytes:batch.vertices,length:batch.vertices.count*MemoryLayout<WorldVertex>.stride,options:.storageModeShared) else { throw PortError("Cannot update preview material: \(batch.material.name)") }
+                return GPUBatch(vertices:buffer,texture:texture,material:batch.material,count:batch.vertices.count)
+            }
+            if changedMaterials.contains(MaterialKey(name:"F_SKY1",flat:true)) { try uploadSkyGeometry(geometry) }
+            let walls=geometry.batches.filter{$0.material.blend>0}.flatMap {batch in
+                stride(from:0,to:batch.vertices.count,by:3).map {i in
+                    TransparentPolygon(vertices:Array(batch.vertices[i..<i+3]),material:batch.material,texture:nil,indices:nil,blend:batch.material.blend,wall:true)
+                }
+            }
+            transparentWorld=walls.isEmpty ? nil:try TranslucentWorld(walls:walls)
+            map=value
+            previewSkies=value.transferredSkies
     }
 
     func saveGame(to url: URL, title: String? = nil) throws {
@@ -759,6 +777,15 @@ final class Renderer: NSObject, MTKViewDelegate {
         guard extendedPreview,let sample=previewInterpolation.sample(now:now) else {return}
         position=SIMD2(sample.position.x,sample.position.y);eyeZ=sample.position.z;yaw=sample.angle
         sprites?.setPreviewWeaponPositions(sample.weapons)
+        do {
+            if previewSurfaces.moving || previewSurfaceFraction != 1,
+               previewSurfaceFraction != sample.fraction,let value=previewSurfaces.sample(sample.fraction),let mesh=previewSurfaceMesh {
+                let result=try mesh.update(value)
+                try uploadExtendedGeometry(result.0,changedMaterials:result.1,map:value)
+                previewSurfaceFraction=sample.fraction
+            }
+            if let map {sprites?.setPreviewActorPositions(previewActors,fraction:sample.fraction,map:map)}
+        } catch {onError?(error)}
     }
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
     func draw(in mtkView: MTKView) {
@@ -933,32 +960,58 @@ final class Renderer: NSObject, MTKViewDelegate {
                 do { try sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw,fullbrightGain:hdrEnabled && hdrSpriteBoost ? 1.5:1) }
                 catch { engineReady = false; DispatchQueue.main.async { [weak self] in self?.onError?(error) } }
                 bindColors(encoder)
-                if sprites.hasTranslucency || transparentWorld != nil {
-                    encoder.setRenderPipelineState(programs.translucentSprite)
-                    encoder.setDepthStencilState(fuzzDepth)
-                    do {
-                        if let world=transparentWorld {
-                            for polygon in try world.ordered(actors:sprites.transparentActors(yaw:yaw),camera:position,yaw:yaw) {
-                                let key=polygon.material.map{previewTranslations[$0.unblended] ?? $0}
-                                guard let texture=key.flatMap({textures[$0]}) ?? polygon.texture,
-                                      let indices=key.flatMap({previewIndices[$0]}) ?? polygon.indices else {throw PortError("Missing transparent wall material")}
-                                try sprites.bindBlend(polygon.blend,encoder:encoder)
-                                encoder.setFragmentTexture(texture,index:0);encoder.setFragmentTexture(indices,index:3)
-                                var kind:UInt32=polygon.wall ? 1:0;encoder.setFragmentBytes(&kind,length:4,index:5)
-                                let v=polygon.vertices
-                                let triangles=(1..<v.count-1).flatMap{[v[0],v[$0],v[$0+1]]}
-                                for start in stride(from:0,to:triangles.count,by:120) {
-                                    let part=Array(triangles[start..<min(start+120,triangles.count)])
-                                    encoder.setVertexBytes(part,length:part.count*MemoryLayout<WorldVertex>.stride,index:0)
-                                    encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:part.count)
-                                }
-                            }
-                        } else {try sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw,translucent:true)}
+                func snapshotWorld()->Bool {
+                    if sceneSnapshot?.width != Int(width) || sceneSnapshot?.height != Int(height) || sceneSnapshot?.pixelFormat != sceneTarget.pixelFormat {
+                        let d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:sceneTarget.pixelFormat,width:Int(width),height:Int(height),mipmapped:false)
+                        d.storageMode = .private;d.usage = .shaderRead;sceneSnapshot=device.makeTexture(descriptor:d)
                     }
-                    catch {DispatchQueue.main.async { [weak self] in self?.onError?(error) }}
+                    guard let snapshot=sceneSnapshot else {encoder.endEncoding();return false}
+                    encoder.endEncoding()
+                    if let blit=command.makeBlitCommandEncoder() {
+                        blit.copy(from:sceneTarget,sourceSlice:0,sourceLevel:0,sourceOrigin:MTLOrigin(x:0,y:0,z:0),sourceSize:MTLSize(width:Int(width),height:Int(height),depth:1),to:snapshot,destinationSlice:0,destinationLevel:0,destinationOrigin:MTLOrigin(x:0,y:0,z:0));blit.endEncoding()
+                    }
+                    pass.colorAttachments[0].loadAction = .load;pass.depthAttachment.loadAction = .load
+                    guard let resumed=command.makeRenderCommandEncoder(descriptor:pass) else {return false}
+                    encoder=resumed;bindColors(encoder)
+                    encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:worldHeight,znear:0,zfar:1))
+                    encoder.setFrontFacing(.counterClockwise);encoder.setCullMode(.none)
+                    encoder.setVertexBytes(&uniform,length:MemoryLayout<Uniforms>.stride,index:1)
+                    encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
+                    encoder.setFragmentTexture(snapshot,index:1)
+                    return true
+                }
+                if extendedPreview && (sprites.hasTranslucency || sprites.hasFuzz || transparentWorld != nil) {
+                    do {
+                        let world=try transparentWorld ?? TranslucentWorld(walls:[])
+                        for polygon in try world.ordered(actors:sprites.transparentActors(yaw:yaw),camera:position,yaw:yaw) {
+                            let key=polygon.material.map{previewTranslations[$0.unblended] ?? $0}
+                            guard let texture=key.flatMap({textures[$0]}) ?? polygon.texture else {throw PortError("Missing transparent surface material")}
+                            if polygon.blend == -1 {
+                                guard snapshotWorld() else {command.commit();return}
+                                encoder.setRenderPipelineState(fuzzPipeline)
+                            } else {
+                                guard let indices=key.flatMap({previewIndices[$0]}) ?? polygon.indices else {throw PortError("Missing transparent surface indices")}
+                                encoder.setRenderPipelineState(programs.translucentSprite)
+                                try sprites.bindBlend(polygon.blend,encoder:encoder)
+                                encoder.setFragmentTexture(indices,index:3)
+                                var kind:UInt32=polygon.wall ? 1:0;encoder.setFragmentBytes(&kind,length:4,index:5)
+                            }
+                            encoder.setDepthStencilState(fuzzDepth);encoder.setFragmentTexture(texture,index:0)
+                            let v=polygon.vertices
+                            let triangles=(1..<v.count-1).flatMap{[v[0],v[$0],v[$0+1]]}
+                            for start in stride(from:0,to:triangles.count,by:120) {
+                                let part=Array(triangles[start..<min(start+120,triangles.count)])
+                                encoder.setVertexBytes(part,length:part.count*MemoryLayout<WorldVertex>.stride,index:0)
+                                encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:part.count)
+                            }
+                        }
+                    } catch {DispatchQueue.main.async { [weak self] in self?.onError?(error) }}
                     encoder.setDepthStencilState(depth)
                 }
-                if sprites.hasFuzz || hud.invisibility>128 || (hud.invisibility&8) != 0 {
+                if extendedPreview && (hud.invisibility>128 || (hud.invisibility&8) != 0) {
+                    guard snapshotWorld() else {command.commit();return}
+                }
+                if !extendedPreview && (sprites.hasFuzz || hud.invisibility>128 || (hud.invisibility&8) != 0) {
                     if sceneSnapshot?.width != Int(width) || sceneSnapshot?.height != Int(height) {
                         let d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:view.colorPixelFormat,width:Int(width),height:Int(height),mipmapped:false)
                         d.storageMode = .private;d.usage = .shaderRead;sceneSnapshot=device.makeTexture(descriptor:d)
@@ -1049,8 +1102,16 @@ final class Renderer: NSObject, MTKViewDelegate {
                     encoder.setFragmentTexture(snapshot,index:1);encoder.setRenderPipelineState(fuzzPipeline)
                     sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,fuzz:true,overlay:hudStyle == .minimal)
                 }
-                encoder.setRenderPipelineState(spritePipeline)
-                sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,overlay:hudStyle == .minimal)
+                if extendedPreview {
+                    for (slot,blend) in sprites.weaponBlendModes.enumerated() {
+                        encoder.setRenderPipelineState(blend>0 ? programs.translucentSprite:spritePipeline)
+                        if blend>0 {do {try sprites.bindWeaponBlend(slot,encoder:encoder)} catch {onError?(error);continue}}
+                        sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,overlay:hudStyle == .minimal,slot:slot)
+                    }
+                } else {
+                    encoder.setRenderPipelineState(spritePipeline)
+                    sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,overlay:hudStyle == .minimal)
+                }
                 if hud.damageFlash > 0 || hud.bonusFlash > 0 || hud.suitFlash != 0 || hud.berserkFlash>0 {
                     var tint: SIMD4<Float> = max(hud.damageFlash,hud.berserkFlash)>0
                         ? SIMD4(1,0,0,min(0.45,Float(max(hud.damageFlash,hud.berserkFlash))/80))

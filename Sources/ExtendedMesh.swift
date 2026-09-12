@@ -68,3 +68,41 @@ final class ExtendedMesh {
         return (Geometry(batches:batches,skyVertices:vertices[skyKey] ?? []),changed)
     }
 }
+
+/// Interpolate sector values before tessellation: door openings may add/remove
+/// triangles, so interpolating matching vertex indices would connect wrong edges.
+final class ExtendedSurfaceInterpolation {
+    private var previous:DoomMap?,current:DoomMap?
+    private(set) var moving=false
+    private var changed:[Int]=[]
+    func accept(_ map:DoomMap) {
+        previous=current;current=map;changed=[]
+        if let old=previous,old.name==map.name,old.lines==map.lines,old.sectors.count==map.sectors.count {
+            changed=map.sectors.indices.filter { i in
+                let a=old.sectors[i],b=map.sectors[i]
+                return a.floor != b.floor || a.ceiling != b.ceiling || a.backFloor != b.backFloor || a.backCeiling != b.backCeiling || a.spriteClip != b.spriteClip
+            }
+        } else {previous=nil}
+        moving = !changed.isEmpty
+    }
+    static func interpolate(_ a:Sector,_ b:Sector,_ t:Float)->Sector {
+        // Fake-flat region/material changes are discrete. Unbounded clipping
+        // transitions must never produce infinity arithmetic or sweep a room.
+        guard a.floorTexture==b.floorTexture,a.ceilingTexture==b.ceilingTexture,
+              a.backCeilingTexture==b.backCeilingTexture,a.floorSky==b.floorSky,a.ceilingSky==b.ceilingSky,
+              a.spriteClip.x.isFinite==b.spriteClip.x.isFinite,a.spriteClip.y.isFinite==b.spriteClip.y.isFinite,
+              abs(a.floor-b.floor)<64,abs(a.ceiling-b.ceiling)<64 else {return b}
+        func lerp(_ x:Float,_ y:Float)->Float {x==y ? y:x+(y-x)*t}
+        var result=b
+        result.floor=lerp(a.floor,b.floor);result.ceiling=lerp(a.ceiling,b.ceiling)
+        if let x=a.backFloor,let y=b.backFloor {result.backFloor=lerp(x,y)}
+        if let x=a.backCeiling,let y=b.backCeiling {result.backCeiling=lerp(x,y)}
+        result.spriteClip=SIMD2(lerp(a.spriteClip.x,b.spriteClip.x),lerp(a.spriteClip.y,b.spriteClip.y))
+        return result
+    }
+    func sample(_ fraction:Float)->DoomMap? {
+        guard var map=current else {return nil}
+        if fraction<1,let previous {for i in changed {map.sectors[i]=Self.interpolate(previous.sectors[i],map.sectors[i],fraction)}}
+        return map
+    }
+}

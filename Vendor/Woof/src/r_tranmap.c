@@ -276,3 +276,9 @@ void R_InitTranMap(void)
         I_SafeExit(0);
     }
 }
+
+// Native save validation inspects only tables the engine has already generated.
+int ME_NormalBlendAlpha(const byte *table) {
+    for(int i=0;i<100;i++)if(table && normal_tranmap[i]==table)return i;
+    return -1;
+}

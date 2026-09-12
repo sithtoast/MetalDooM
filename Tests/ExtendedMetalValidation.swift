@@ -137,6 +137,31 @@ func runMeshMetalValidation() throws {
         guard try draw([outside],[1])==background else {throw PortError("Translucency draws through room walls")}
         var shadow=near;shadow.shadow=1
         guard try draw([shadow],[2])==draw([shadow],[0]) else {throw PortError("Fuzz did not take precedence over translucency")}
+        // A foreground blend must see fuzz behind it; reversing enumeration
+        // must preserve the same painter order. Also test fuzz in front.
+        var farShadow=far;farShadow.shadow=1
+        let fuzzyBackground=try draw([farShadow],[0])
+        let mixed=try draw([near,farShadow],[1,0]),mixedReverse=try draw([farShadow,near],[0,1])
+        guard mixed==mixedReverse else {throw PortError("Mixed fuzz order depends on actor enumeration")}
+        var mixedOracle=fuzzyBackground
+        for i in nearMask.indices where nearMask[i] {
+            let p=i*4,bg=(Int(fuzzyBackground[p])+Int(fuzzyBackground[p+1])+Int(fuzzyBackground[p+2])+1)/3
+            for c in 0..<3 {mixedOracle[p+c]=UInt8((bg+200)/3)}
+        }
+        guard mixed==mixedOracle else {throw PortError("Foreground translucency did not composite over background fuzz")}
+        let blendedBackground=try draw([far],[1]),frontFuzz=try draw([shadow,far],[0,1])
+        var fuzzProbes=0
+        let fuzzStep=max(1,Float(width)/320)
+        for i in nearMask.indices where nearMask[i] {
+            let x=Float(i%width)+0.5,y=Float(i/width)+0.5
+            let seed=UInt32(floor(x/fuzzStep))+UInt32(floor(y/fuzzStep))*3+UInt32(initial.tic)*7
+            let shift=((seed &* 1103515245 &+ 12345)&0x100) != 0 ? fuzzStep:-fuzzStep
+            let row=Int(max(0,min(Float(height-1),y+shift))),source=(row*width+Int(x))*4
+            for c in 0..<3 {guard abs(Int(frontFuzz[i*4+c])-Int((Float(blendedBackground[source+c])*0.65).rounded()))<=1 else {throw PortError("Foreground fuzz sampled a stale background")}}
+            fuzzProbes+=1
+        }
+        guard fuzzProbes>500 else {throw PortError("No foreground fuzz probes")}
+        print("PASS mixed fuzz/translucency both depth orders, stable enumeration and \(fuzzProbes) snapshot probes")
         print("PASS native fullbright/shaded normal/additive/custom lookup pixels, \(overlap) overlapping pixels sorted both orders, cutouts, \(occluded) opaque actor pixels, wall occlusion and fuzz precedence")
         renderer.validationColors(tables)
         let neutral=try draw([],[])
@@ -197,8 +222,61 @@ func runMeshMetalValidation() throws {
             let differences=zip(transparentBoth,expected).filter{$0 != $1}.count
             throw PortError("Wall/actor BSP differs from per-pixel depth oracle in \(differences) bytes")
         }
+        // The wall crosses the fuzz billboard: each side needs a different
+        // order. Away from cutouts/borders, reproduce that order independently.
+        try renderer.validationWall(nil)
+        let fuzzOnly=try draw([shadow],[0])
+        try renderer.validationWall(polygon)
+        let wallBlend=try draw([],[]),mixedWall=try draw([shadow],[0])
+        var mixedWallProbes=0
+        for i in nearMask.indices where nearMask[i] {
+            let p=i*4,wallVisible=wallOnly[p..<p+4] != background[p..<p+4]
+            guard wallVisible else {continue}
+            let actorNear=opaqueBoth[p..<p+4]==nearOpaque[p..<p+4]
+            let x=Float(i%width)+0.5,y=Float(i/width)+0.5
+            let seed=UInt32(floor(x/fuzzStep))+UInt32(floor(y/fuzzStep))*3+UInt32(initial.tic)*7
+            let shift=((seed &* 1103515245 &+ 12345)&0x100) != 0 ? fuzzStep:-fuzzStep
+            let q=(Int(max(0,min(Float(height-1),y+shift)))*width+Int(x))*4
+            // Avoid sampling across the wall's top/bottom and patch holes.
+            guard wallOnly[q..<q+4] != background[q..<q+4] else {continue}
+            if actorNear {
+                for c in 0..<3 {guard abs(Int(mixedWall[p+c])-Int((Float(wallBlend[q+c])*0.65).rounded()))<=1 else {throw PortError("Fuzz in front of crossing wall used wrong snapshot")}}
+            } else {
+                let bg=(Int(fuzzOnly[p])+Int(fuzzOnly[p+1])+Int(fuzzOnly[p+2])+1)/3
+                let fg=(Int(wallOnly[p])+Int(wallOnly[p+1])+Int(wallOnly[p+2])+1)/3
+                for c in 0..<3 {guard mixedWall[p+c]==UInt8((2*bg+fg)/3) else {throw PortError("Crossing wall did not blend over fuzz")}}
+            }
+            mixedWallProbes+=1
+        }
+        guard mixedWallProbes>500 else {throw PortError("No crossing fuzz/wall probes")}
+        print("PASS \(mixedWallProbes) crossing fuzz/wall order probes")
         try renderer.validationWall(nil)
         print("PASS palette flash/removal, exact fixed-colormap and blend interaction, crossing wall/actor order (\(frontActor) actor-front, \(frontWall) wall-front pixels)")
+
+        // Weapon and muzzle-flash slots composite in their original slot order.
+        var gun=MD_WeaponSprite();gun.x=160;gun.y=80;gun.lump=100;gun.light=1;gun.fullbright=1
+        var flash=gun;flash.lump=200
+        try renderer.validationWeapons([],blend:[],images:images,tables:tables)
+        let weaponBackground=try frame(view,renderer)
+        try renderer.validationWeapons([gun],blend:[0],images:images,tables:tables)
+        let opaqueGun=try frame(view,renderer)
+        let gunMask=stride(from:0,to:opaqueGun.count,by:4).filter {opaqueGun[$0..<$0+4] != weaponBackground[$0..<$0+4]}
+        guard gunMask.count>500 else {throw PortError("No weapon blend probes")}
+        for modes in [[1],[2],[3],[3,1]] {
+            try renderer.validationWeapons(modes.count==1 ? [gun]:[gun,flash],blend:modes,images:images,tables:tables)
+            let actual=try frame(view,renderer)
+            var expected=weaponBackground
+            for p in gunMask {
+                var bg=(Int(weaponBackground[p])+Int(weaponBackground[p+1])+Int(weaponBackground[p+2])+1)/3
+                for (i,mode) in modes.enumerated() {
+                    let fg=i==0 ? 100:200
+                    bg=mode==1 ? (bg+2*fg)/3:mode==2 ? min(255,bg+fg):(2*bg+fg)/3
+                }
+                for c in 0..<3 {expected[p+c]=UInt8(bg)}
+            }
+            guard actual==expected else {throw PortError("Weapon/flash table or slot order differs from oracle modes \(modes), bytes \(zip(actual,expected).filter{$0 != $1}.count)")}
+        }
+        print("PASS normal/additive/custom weapon pixels and custom weapon plus translucent flash slot order")
 
     }
     for mode in ["sky271","sky272","sky-scroll","floor","ceiling","both","offset-both"] {
@@ -369,6 +447,65 @@ func runMeshMetalValidation() throws {
         try other.loadExtendedPreview(restoredBuilder.prepare(restored))
         guard actual == (try frame(otherView,other)) else {throw PortError("Saved scrolling frame did not restore exactly")}
         print("PASS \(kind): \(changed) GPU bytes differ from stationary flats, exact reference/save pixels and retained wall buffers")
+    }
+
+    for mode in ["door","lift"] {
+        let selected=[root.appendingPathComponent("doom2.wad"),exe.deletingLastPathComponent().appendingPathComponent("fixtures/motion-\(mode).wad")]
+        let worker=ExtendedWorker();defer{worker.close()}
+        _=try worker.start(executable:exe,paths:selected,map:1,base:0,profile:0)
+        _=try worker.tick(count:35)
+        let initial=try worker.tick(buttons:2)
+        let resources=try WAD(previewResources:selected,baseIndex:0,profile:0,identity:worker.identity!)
+        let builder=try ExtendedSceneBuilder(resources:resources),initialScene=try builder.prepare(initial)
+        let (window,view,renderer)=try surface(0), (oracleWindow,oracleView,oracle)=try surface(650)
+        defer{view.delegate=nil;oracleView.delegate=nil;window.close();oracleWindow.close()}
+        renderer.validationTime=0;try renderer.loadExtendedPreview(initialScene);renderer.setExtendedPlayback(active:true)
+        let current=try worker.tick(),scene=try builder.prepare(current)
+        let a=initialScene.copiedGeometry.map,b=scene.copiedGeometry.map
+        guard a.sectors[0].floor != b.sectors[0].floor || a.sectors[0].ceiling != b.sectors[0].ceiling else {throw PortError("Motion fixture did not activate \(mode)")}
+        renderer.validationTime=1.0/35;try renderer.loadExtendedPreview(scene)
+        let start=try frame(view,renderer)
+        renderer.validationTime=1.5/35;let middle=try frame(view,renderer)
+        renderer.validationTime=2.0/35;let end=try frame(view,renderer)
+        guard start != middle,middle != end else {throw PortError("No visible surface interpolation for \(mode)")}
+        var manual=b
+        for i in b.sectors.indices {
+            manual.sectors[i].floor=(a.sectors[i].floor+b.sectors[i].floor)/2
+            manual.sectors[i].ceiling=(a.sectors[i].ceiling+b.sectors[i].ceiling)/2
+            manual.sectors[i].backFloor=((a.sectors[i].backFloor ?? a.sectors[i].floor)+(b.sectors[i].backFloor ?? b.sectors[i].floor))/2
+            manual.sectors[i].backCeiling=((a.sectors[i].backCeiling ?? a.sectors[i].ceiling)+(b.sectors[i].backCeiling ?? b.sectors[i].ceiling))/2
+        }
+        try oracle.loadExtendedPreview(scene)
+        try oracle.validationMap(manual,resources:resources)
+        let midpointActors=scene.view.presentation.actors.map {actor -> ExtendedSprite in
+            let old=actor.previous!,pos=(old+SIMD4(actor.x,actor.y,actor.z,actor.floorZ))/2
+            return ExtendedSprite(name:actor.name,x:pos.x,y:pos.y,z:pos.z,floorZ:pos.w,light:actor.light,flags:actor.flags,editor:actor.editor,state:actor.state)
+        }
+        oracle.validationActorEndpoints(midpointActors)
+        guard middle == (try frame(oracleView,oracle)) else {throw PortError("Surface/actor midpoint differs from full independent mesh for \(mode)")}
+        renderer.validationTime=1.5/35;renderer.setExtendedPlayback(active:false)
+        guard end == (try frame(view,renderer)) else {throw PortError("Surface pause failed to restore endpoint")}
+        guard try worker.geometry().tic==current.tic else {throw PortError("Surface interpolation advanced physics")}
+        if mode=="lift" {
+            renderer.setExtendedPlayback(active:true)
+            var latest=scene,time=2.0/35
+            while latest.copiedGeometry.map.sectors[0].floor>0 {
+                time+=1.0/35;renderer.validationTime=time
+                latest=try builder.prepare(worker.tick());try renderer.loadExtendedPreview(latest)
+                renderer.validationTime=time+0.5/35;_=try frame(view,renderer)
+            }
+            // Lift has reached its endpoint, but the last displayed pose was
+            // halfway there. Simulate a geometry reply whose dirty materials
+            // exclude this now-stationary lift (e.g. another scrolling sector).
+            time+=1.0/35;renderer.validationTime=time
+            let stopped=try builder.prepare(worker.tick())
+            try renderer.loadExtendedPreview(stopped.validationUnrelatedDelta())
+            try oracle.loadExtendedPreview(stopped.validationReference())
+            guard try frame(view,renderer)==frame(oracleView,oracle) else {throw PortError("Stopped mover retained an intermediate material buffer")}
+            renderer.setExtendedPlayback(active:false)
+            print("PASS stopped lift restores its last intermediate buffers even when next geometry delta excludes them")
+        }
+        print("PASS actual \(mode) start/mid/end, independent plane/wall/actor midpoint pixels, pause endpoint and unchanged physics")
     }
 
     do {

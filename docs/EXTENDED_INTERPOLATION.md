@@ -1,70 +1,79 @@
-# Rust camera and weapon interpolation — 0.10.0 build 148
+# Rust presentation interpolation — 0.10.0 build 157
 
-Continuous Run now blends camera position, view height, yaw and compatible weapon
-positions between consecutive 35 Hz snapshots. This smooths walking, turning and
-existing engine view/weapon bob on faster displays. Basic bob was already present
-in the copied simulation coordinates; earlier handoff notes incorrectly listed
-it as absent. No new bob physics or client-side sine wave is introduced.
+Continuous Run blends the camera, compatible weapon positions, actors and moving
+sector heights between consecutive 35 Hz snapshots. This smooths walking, turning,
+existing view/weapon bob, projectiles, doors and lifts on faster displays.
 
 ## Timing and boundaries
 
-The renderer blends the previous snapshot toward the current one over 1/35 second
-from receipt, then holds the endpoint. It never extrapolates. This adds up to one
-visual tic of camera/weapon delay; the simulation, input cadence, sound events,
-HUD, sprite animation frames, actors and moving surfaces retain their existing
-per-tic timing. It is not whole-world interpolation or a claim of sustained 35 Hz
-simulation on every map. Slow worker replies still slow the simulation.
+The renderer blends over 1/35 second from receipt, then holds the exact endpoint.
+It never extrapolates or advances the worker. This adds up to one visual tic of
+delay. Input cadence, sound events, HUD, lights, animation/rotation frames and
+scrolling texture phases retain their per-tic timing. Slow worker replies still
+slow the simulation; this is not a sustained frame-rate claim for every map.
 
-Only continuous Run opts in. Manual step buttons show exact snapshots. Pause,
-Escape and focus loss snap to the latest received state and clear blend history.
-Resume does not replay old history. Restarts, Continue and save loads construct
-fresh renderers and begin paused. Saving records engine state, not an intermediate
-rendered pose. A pending reply received after pause remains an exact snapshot.
+Only Run opts in. Manual steps show exact snapshots. Pause, Escape and focus loss
+snap to the latest state and clear history. Resume starts fresh. Restart, Continue
+and Load construct fresh paused renderers. Saves record engine state, never an
+intermediate rendered pose. A pending reply after Pause remains an exact snapshot.
 
-Blending requires consecutive tics in the same live map, no engine teleport flag,
-and receipt gaps no longer than two tic periods. Large unmarked position changes
-also snap (64 horizontal units or 32 vertical). Yaw takes the shortest wrapped
-path. Weapon/flash slots blend together only when weapon identity, layer names,
-flags and bounded coordinates are compatible. Frame changes, appearing/disappearing
-flashes, weapon changes and patched coordinate jumps snap to the new artwork.
+Blending requires consecutive tics in the same live map, no camera teleport flag,
+and receipt gaps no longer than two tic periods. Unmarked camera corrections of
+64 horizontal or 32 vertical units snap. Yaw takes the shortest wrapped path.
+Weapon/flash slots blend together only with compatible weapon identity, layer
+names, flags and bounded coordinates. Artwork and weapon changes remain discrete.
 
-## Wire and resource behavior
+## Actors
 
-MSP2/version 2 replaces MSP1 without changing the 32-byte header or record strides.
-Header word 28 becomes flags: bit 0 means snap camera, set when the player's engine
-interpolation marker is nonpositive. Unknown bits reject. The marker also covers
-short teleports that distance heuristics would miss. It is copied read-only from
-Woof's player/mobj state; the existing teleport routine clears it and player
-thinking sets it for ordinary motion. Existing native structures, MVW5, MGE2,
-MMT1/MSA1/MUI2 and 17 private exports remain unchanged.
+MSP5 keeps the header32 and weapon24 layouts and extends actor40 to actor56.
+Actor offsets40/44/48/52 contain previous x/y/z/floor-z. Flag32 enables those
+endpoints. They are captured on each object before the entire world tic, including
+sector thinkers. This keeps an actor's feet aligned with the lift supporting it.
+The engine's own interpolation marker disables blending on teleports; a capture
+tic check also excludes objects spawned during the current tic.
 
-The renderer changes camera uniforms and weapon quad positions on each draw.
-It does not rebuild geometry, upload textures or issue worker commands. Actor
-interpolation will need stable identities and additional copied state; moving
-surfaces likewise remain separate work. Classic renderer interpolation is unchanged.
-The engine fingerprint changes with MSP2, so older private saves still require
-the preserved matching engine bundle.
+No matching by list position, address or state is needed: each current actor
+carries its own endpoints. Removed actors disappear, new actors snap, and sprite
+artwork changes immediately. The worker never exports a pointer or object ID.
+The native keyframe stores the endpoints and capture tic for deterministic copied
+state after restore. Rendering still begins paused at the restored endpoint.
+
+## Moving surfaces
+
+`ExtendedSurfaceInterpolation` retains consecutive resolved maps with stable
+sector indices. It blends front/back floor and ceiling heights and finite sprite
+clip limits using the same fraction as the camera and actors. The existing
+`ExtendedMesh` rebuilds affected sector and neighboring wall chunks before upload;
+unchanged material buffers and all textures remain cached. Each new snapshot
+first restores materials that differ from the last displayed pose, including
+a mover that stops while another sector changes. Re-tessellating heights
+preserves door openings, lower/upper walls, pegging and clipping when triangle
+counts change. Interpolating arbitrary vertex-array positions would not.
+
+Material/sky changes, finite/unbounded clip transitions and plane jumps of 64
+units or more snap. These guards keep discrete fake-flat region changes from
+sweeping the room or generating infinity arithmetic. Rotation and texture/sky
+scroll phases remain discrete. This is a conservative native interpolation policy,
+not software-renderer pixel parity or interpolation of every ID24 sky variant.
+
+Camera-only and actor-only movement does not rebuild world buffers. Moving
+surfaces do CPU meshing and GPU uploads per displayed intermediate pose; large
+maps with many simultaneous movers still need gameplay performance testing.
+Classic interpolation remains unchanged. MGE5/MBL3/MUI3/MVW5 and the eighteen
+private ABI2 exports remain unchanged; the engine fingerprint changes, so retain
+older bundles for older private saves.
 
 ## Validation
 
 ```sh
 bash scripts/test-extended-interpolation.sh /path/to/rerelease
+bash scripts/test-blend-motion-core.sh /path/to/original-doom2.wad
 bash scripts/test-extended-metal.sh /path/to/rerelease
-bash scripts/test-extended-save-app.sh /path/to/rerelease
 ```
 
-The focused suite checks midpoint coordinates, 359°→1° yaw wrapping, aligned
-weapon/flash motion, endpoint clamping, pause/resume and nine discontinuity cases.
-An original walk-over-teleporter room exercises an actual short teleport and the
-MSP2 flag. Real MAP01 walking verifies existing view/weapon bob, saved phase and
-35 future tics after restore.
-
-The native Metal harness uses a test-only deterministic presentation clock to
-check distinct start/middle/end images, exact paused endpoints, retained world
-buffers and unchanged worker tic. Its existing Rust reference, scrolling and save
-pixel tests remain. The native save harness exercises Run/Pause after repeated
-loads and checks failure/close cleanup. Final bundle evidence is in VALIDATION.md.
-
-Remaining rendering work includes actor/moving-surface interpolation, flat
-rotation, palette/TRANMAP translucency and control-sector/fake-floor/sky effects.
-Full campaign/boss playthrough acceptance and ordinary picker support remain pending.
+Focused tests cover camera/weapon midpoint and discontinuities, actor feet,
+front/back planes, clip bounds and instant changes. Native GPU tests compare
+actual manual-door and lift midpoints to independently built full meshes, including
+a pickup riding the lift, and check paused endpoints and unchanged physics.
+The core probe checks spawn capture suppression and exact future presentation
+through a fresh worker. See VALIDATION.md for final build and runtime evidence.

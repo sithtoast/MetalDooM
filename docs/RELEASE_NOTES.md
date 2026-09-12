@@ -5,7 +5,7 @@ Requires Apple Silicon and macOS 14 or later. This is an early preview.
 
 ## Install
 
-The current local development app is **0.10.0 build 155**, ad-hoc signed and
+The current local development app is **0.10.0 build 157**, ad-hoc signed and
 unnotarized. No new release package was produced. The previous **0.9.0 build 124**
 distribution was separately Developer ID signed, accepted by Apple and stapled.
 GitHub workflow assets remain unnotarized. For unnotarized previews, macOS may
@@ -16,9 +16,14 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.10.0 — Rust development foundations
 
-Final successful local build: **155**.
+Final successful local build: **157**.
 
-Build 155 adds sector-local sky transfers, live sky offsets and independent
+Build 157 completes object/weapon blend-table handling, orders fuzz with
+translucent actors/walls, and interpolates actors, doors and lifts during Run.
+Save/Load preserves object and respawn blend tables. See EXTENDED_TRANSLUCENCY.md
+and EXTENDED_INTERPOLATION.md.
+
+Build 155 added sector-local sky transfers, live sky offsets and independent
 floor/ceiling rotation. See EXTENDED_SKIES_ROTATION.md.
 
 Build 152 adds fake floors, deep-water/above-ceiling views, transferred floor/ceiling

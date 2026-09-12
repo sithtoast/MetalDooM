@@ -5,7 +5,9 @@ by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
 **Version 0.10.0 · experimental source preview · local builds are not notarized.**
 
-Build 155 adds [sky transfers and flat rotation](docs/EXTENDED_SKIES_ROTATION.md).
+Build 157 adds object/weapon blending, shared fuzz/translucent ordering and
+[actor/moving-surface interpolation](docs/EXTENDED_INTERPOLATION.md) during Run.
+Build 155 added [sky transfers and flat rotation](docs/EXTENDED_SKIES_ROTATION.md).
 Build 152 added [fake floors and transferred lighting](docs/EXTENDED_CONTROL_SECTORS.md).
 Build 151 added translucent walls and [palette effects](docs/EXTENDED_PALETTES.md).
 Build 150 added per-state custom blend tables, including state changes and Save/Load.

@@ -1,5 +1,12 @@
 # Rust preview save/restore — 0.10.0 build 145
 
+Build157 preserves object and respawn blend tables as validated resource/alpha
+references, plus actor interpolation endpoints and their capture tic. These are
+engine snapshot values, never an intermediate displayed pose. Fresh renderers
+still start paused after Load. See EXTENDED_TRANSLUCENCY.md and
+EXTENDED_INTERPOLATION.md; older private saves require their preserved matching
+engine bundle.
+
 The explicit Rust preview has Save… and Load… controls. Save pauses a live level
 and writes a `.mdrust` file. Load pauses, validates the file against the current
 resource stack and engine, then restores into a new worker. The restored game

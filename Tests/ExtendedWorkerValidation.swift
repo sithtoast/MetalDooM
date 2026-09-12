@@ -244,7 +244,7 @@ import Foundation
                 return data
             }
             let invalid=[Data(original.prefix(31)),Data(original.dropLast()),original+Data([0]),
-                mutate(4,5),mutate(12,UInt32.max),mutate(16,3),mutate(28,2),mutate(32,0),mutate(32+28,16),mutate(32+28,32)]
+                mutate(4,6),mutate(12,UInt32.max),mutate(16,3),mutate(28,2),mutate(32,0),mutate(32+28,16),mutate(32+28,64),mutate(32+28,12)]
             for data in invalid {
                 var rejected=false
                 do { _=try ExtendedPresentation(data:data) } catch { rejected=true }

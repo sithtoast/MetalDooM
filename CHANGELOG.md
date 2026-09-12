@@ -4,6 +4,23 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust blending and world interpolation (build 157)
+
+- Apply custom object and weapon blend tables with engine precedence, preserving
+  object/respawn tables through fresh-worker Save/Load and weapon/flash slot order.
+- Composite fuzz with translucent actors and walls in one depth order, including
+  split crossing surfaces and fresh background samples for invisible weapons.
+- Smooth actors, doors and lifts during Run, keeping actors' feet, wall pegging,
+  openings and clipping aligned. Teleports, new spawns and discontinuities snap;
+  Pause and manual steps retain exact engine endpoints.
+- Validate native blend/order pixel oracles, actual door/lift midpoints against
+  independent geometry, restored future snapshots and classic rendering checks.
+- Deliver local signed 0.10.0/build157; retain earlier bundles and saves. Same
+  unreleased feature version, with updated contracts, validation and handoff.
+  Full campaign playtesting and remaining sky variants still need acceptance.
+  Build156 is retained as an intermediate candidate; build157 also restores a
+  stopped mover correctly when the next geometry update touches other materials.
+
 ## 0.10.0 refinement — Rust sky transfers and flat rotation (build 155)
 
 - Render sector-local transferred skies with engine-selected textures, direction,

@@ -4,6 +4,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ $# != 1 ]]; then echo "Usage: $0 rerelease-directory" >&2; exit 2; fi
 OUT="$PROJECT_DIR/build/extended-metal"
 mkdir -p "$OUT"
+python3 "$PROJECT_DIR/Tests/make_motion_fixture.py" "$PROJECT_DIR/build/extended/fixtures"
 python3 "$PROJECT_DIR/Tests/make_sky_rotation_fixture.py" "$PROJECT_DIR/build/extended/fixtures"
 python3 "$PROJECT_DIR/Tests/make_control_fixture.py" "$PROJECT_DIR/build/extended/fixtures"
 python3 "$PROJECT_DIR/Tests/make_scroll_fixture.py" "$PROJECT_DIR/build/extended/fixtures"
@@ -21,8 +22,19 @@ renderer='\n'.join('                if validationHUDVisible { '+line.strip()+' }
 (out/'Renderer.swift').write_text(renderer+'''
 extension Renderer {
     func validationActors(resources:WAD,things:[MD_Thing],images:[Int:PatchImage],blend:[Int],tables:ExtendedBlendTables,clips:[SIMD2<Float>]=[],reset:Bool=false) throws {
+        previewActors=[]
         if reset {sprites=try SpriteRenderer(device:device,wad:resources,preload:false)}
         try sprites!.setPreview(things:things,weapons:[],images:images,blend:blend,clips:clips,tables:tables)
+    }
+    func validationWeapons(_ weapons:[MD_WeaponSprite],blend:[Int],images:[Int:PatchImage],tables:ExtendedBlendTables)throws {
+        previewActors=[];previewInterpolation=ExtendedInterpolation()
+        try sprites!.setPreview(things:[],weapons:weapons,images:images,weaponBlend:blend,tables:tables)
+    }
+    func validationActorEndpoints(_ actors:[ExtendedSprite]) {previewActors=actors}
+    func validationMap(_ value:DoomMap,resources:WAD)throws {
+        let reference=try ReferenceGeometry(map:value,textureHeights:Art(wad:resources).textureHeights())
+        let geometry=Geometry(batches:reference.batches,skyVertices:reference.skyVertices)
+        try uploadExtendedGeometry(geometry,changedMaterials:Set(geometry.batches.map(\\.material)+[MaterialKey(name:"F_SKY1",flat:true)]),map:value)
     }
     func validationColors(_ tables:ExtendedBlendTables?=nil,palette:UInt32=0,fixed:Int32=0) {
         if let tables {
@@ -46,6 +58,9 @@ extension Renderer {
 ''')
 (out/'ExtendedScene.swift').write_text((root/'Sources/ExtendedScene.swift').read_text()+'''
 extension ExtendedScene {
+    func validationUnrelatedDelta() -> ExtendedScene {
+        ExtendedScene(view:view,resources:resources,copied:copiedGeometry,geometry:geometry,images:images,sky:sky,indices:spriteIndices,patches:spritePatches,changed:true,changedMaterials:[])
+    }
     func validationReference(stationaryFlats:Bool=false,override:DoomMap?=nil) throws -> ExtendedScene {
         var map=override ?? copiedGeometry.map
         if stationaryFlats {for i in map.sectors.indices {map.sectors[i].floorOffset = .zero;map.sectors[i].ceilingOffset = .zero}}

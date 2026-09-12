@@ -1,4 +1,4 @@
-# Rust actor and wall translucency — 0.10.0 build 151
+# Rust actor, weapon and wall translucency — 0.10.0 build 157
 
 The explicit Rust preview draws ordinary translucent actors, additive glowing
 actors and per-state custom blend tables. Opaque geometry and actors draw first;
@@ -12,7 +12,7 @@ whole-buffer convention: size query, untouched short buffer, complete copy, no
 simulation or random-number changes. MEQ1 operation 8 has an empty request and a
 bounded MBL3 response. Swift requests it after startup/identity validation and
 refreshes it after Restart, Continue and restore before accepting the new view.
-Palettes and colormaps stay resource-owned; the wall-only bank suffix is rebuilt
+Palettes and colormaps stay resource-owned; the wall/object bank suffix is rebuilt
 for each level so campaign traversal cannot accumulate obsolete tables.
 
 | Offset | Bytes | Meaning |
@@ -28,7 +28,7 @@ for each level so campaign traversal cannot accumulate obsolete tables.
 | after colormaps | count × 65536 | Tables in ID order |
 
 IDs 1 and 2 are the engine's normal and additive tables. IDs 3–64 are per-state
-custom state or wall tables. Before level spawn, the worker scans patched states in index
+custom state, wall or object tables. Before level spawn, the worker scans patched states in index
 order, checks each referenced table against its cached WAD lump allocation and
 requires exactly 65536 bytes. Shared pointers receive one ID. All state tables,
 including those first used later, are registered up front. Distinct lumps with
@@ -41,21 +41,24 @@ and more than 62 custom tables fail explicitly. MBL3 is at most 4,456,472
 bytes; malformed headers, sizes, counts and total lengths reject. Previous
 MBL versions reject. Every selected palette, colormap and wall ID must exist.
 
-MSP4/version 4 replaces MSP3 without changing the 32-byte header, 40-byte actor
-records or 24-byte weapon records. Low actor flags remain mirrored 1, fullbright
-2, shadow 4, translucent 8 and additive 16 (requires 8). Bits 8–15 hold a custom
-table ID, either zero or 3–64; a custom ID requires translucent 8 and forbids
-additive 16. Other bits reject. The client also verifies that every referenced
-ID exists in the session's bank, both at startup and on subsequent replies.
-Weapon flags and the camera teleport marker are unchanged.
+MSP5/version5 carries normal/additive/custom flags on actors and weapon layers.
+It adds actor endpoints for interpolation; see EXTENDED_SPRITES.md. Every selected
+actor/weapon/wall ID must exist in the copied bank. Fuzz combined with a blend ID
+is invalid. The camera teleport flag remains at header28.
 
-Per-state tables override object/default translucency, including on opaque or
-fullbright actors. Without a state table, fullbright MF_TRANSLUCENT selects
-additive; other MF_TRANSLUCENT and MIF_GHOST actors select normal. Fuzz wins and
-emits no effective blend ID. Custom per-object tables remain explicitly
-unsupported: that pointer is not serialized by the private keyframe path.
-Per-state tables restore through their patched state indices, preserving IDs and
-copied bytes across fresh workers, state changes and restart.
+Per-state tables override object tables, which override default translucency.
+This applies even to opaque/fullbright states. Without either table, fullbright
+MF_TRANSLUCENT selects additive; other MF_TRANSLUCENT selects normal. MIF_GHOST
+selects normal for world actors only. Fuzz wins and emits no blend ID.
+
+After walls, the level bank registers object and respawn tables in thinker order.
+Lump tables must contain exactly65536 bytes and are pinned for the level; generated
+alpha tables must match one already created by the engine. Native keyframes store
+resource/alpha references for both `mobj.tranmap` and `spawnpoint.tranmap`, never
+pointers or table bytes. Zero means absent, 1/2 mean defaults, positive values3+
+mean lump index+3, and -1 through -100 mean generated alpha0 through99. Restore
+validates these references before replacing the thinker arena. This adapts object
+blending; it does not declare broad UDMF map compatibility.
 
 ## Metal composition and scope
 
@@ -68,10 +71,10 @@ draws. Palette buffers and table/index textures are cached, not rebuilt per fram
 
 This adapts the engine's blend operations to the existing native RGB renderer.
 It does not claim software-renderer pixel parity: native lighting is still RGB,
-and ordering between fuzz and translucent surfaces remains separate work.
+and native fuzz uses its existing screen-row sampling effect.
 Build152 adds fake-floor clipping; see EXTENDED_CONTROL_SECTORS.md. Palette/fixed-colormap support is described in
-[EXTENDED_PALETTES.md](EXTENDED_PALETTES.md). Weapons keep
-their existing opaque/fuzz paths. Classic engine actor rendering is unchanged.
+[EXTENDED_PALETTES.md](EXTENDED_PALETTES.md). Weapons use their selected table with original psprite slot order, so a
+translucent muzzle flash composites over the weapon beneath it. Classic engine actor rendering is unchanged.
 This engine change also changes private-save fingerprints; preserve earlier
 bundles for earlier saves.
 
@@ -88,8 +91,10 @@ Translucent walls form a bounded vertical-plane BSP. Crossing walls and dynamic
 billboards split at those planes, giving them one back-to-front order with depth
 testing and no depth writes. This handles a wall crossing an actor rather than
 sorting both by their centers. Excessive subdivision fails explicitly. The
-existing fuzz pass remains separate. Custom per-object and weapon blending remain
-unimplemented.
+same ordering now includes fuzz polygons. Before each fuzz polygon, Metal copies
+the color attachment and resumes drawing with preserved depth; nearer translucent
+surfaces then see that fuzz result. Invisible weapons receive a fresh completed
+world snapshot. Classic rendering retains its existing path.
 
 ## Validation
 
@@ -102,3 +107,9 @@ normal/additive/custom pixels, both actor enumeration orders, shaded foregrounds
 opaque actor and wall occlusion, cutouts and fuzz precedence. Real Rust mesh/HUD,
 scrolling/save and interpolation pixel regressions remain. See VALIDATION.md for
 the final run and app evidence.
+
+`scripts/test-blend-motion-core.sh` privately links the core for object/respawn
+and weapon table precedence, generated alpha, fuzz precedence, spawn endpoints,
+fresh-worker restore and exact future snapshots. Native readbacks additionally
+check both fuzz/actor depth orders, crossing fuzz/wall fragments and all weapon
+blend modes, including mixed weapon/flash slot order.

@@ -146,6 +146,12 @@ int ME_Tick(const ME_Command *command)
          ((command->buttons & BT_WEAPONMASK) >> BT_WEAPONSHIFT) >= NUMWEAPONS))
         I_Error("Invalid worker command buttons");
     players[0].cmd.buttons = command->buttons;
+    for(thinker_t *t=thinkercap.next;t!=&thinkercap;t=t->next)if(t->function.p1==P_MobjThinker) {
+        mobj_t *m=(mobj_t *)t;
+        m->native_previous_tic=leveltime+1;
+        m->native_previous[0]=m->x;m->native_previous[1]=m->y;
+        m->native_previous[2]=m->z;m->native_previous[3]=m->floorz;
+    }
     P_Ticker(); gametic++; ME_AudioTick();
     if (gameaction == ga_completed) G_NativeComplete();
     entered = 0;
