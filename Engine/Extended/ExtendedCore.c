@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "ExtendedCore.h"
 #include "NativeInternal.h"
+#include "SessionPlan.h"
+#include "deh_strings.h"
 #include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +14,7 @@
 #include "dsdh_main.h"
 #include "deh_main.h"
 #include "g_game.h"
+#include "g_umapinfo.h"
 #include "w_wad.h"
 #include "r_data.h"
 #include "p_setup.h"
@@ -82,6 +85,7 @@ int ME_Init(const ME_Config *config)
     if (strlen(config->cache_directory) >= sizeof(cache_directory) ||
         stat(config->cache_directory, &st) || !S_ISDIR(st.st_mode))
         I_Error("An existing scratch directory is required");
+    ME_PlanSession(config);
     strcpy(cache_directory, config->cache_directory);
     myargc = 3; myargv = arguments;
     gamemode = commercial; gamemission = doom2;
@@ -102,17 +106,18 @@ int ME_Init(const ME_Config *config)
         if (!W_AddPath(path)) I_Error("Cannot add WAD: %s", path);
     }
     W_InitMultipleFiles();
-    if (W_CheckNumForName("GAMECONF") >= 0 || W_CheckNumForName("ID24CONF") >= 0)
-        I_Error("GAMECONF/ID24 content is not supported by this MBF21 worker milestone");
-    if (W_CheckNumForName("MAP01") < 0 || W_CheckNumForName("MAP32") < 0)
-        I_Error("This worker currently requires a Doom II IWAD");
     ValidateTable("ANIMATED", 23, 0);
     ValidateTable("SWITCHES", 20, 18);
     for (int i = 0; i < numlumps; i++)
         if (!strncasecmp(lumpinfo[i].name, "DEHACKED", 8)) DEH_LoadLump(i);
     DEH_PostProcess();
+    for (int i = 0; i < num_mobj_types; i++)
+        if (mobjinfo[i].pickup_message)
+            (void)DEH_StringForMnemonic(mobjinfo[i].pickup_message);
+    W_ProcessInWads("UMAPINFO", G_ParseMapInfo, PROCESS_IWAD | PROCESS_PWAD);
     G_ReloadDefaults(false);
     rngseed = config->random_seed;
+    ME_ApplySessionOptions();
     R_InitData(); P_Init();
     playeringame[0] = true; precache = false;
     G_InitNew((skill_t)(config->skill - 1), 1, config->map, false);
@@ -130,7 +135,11 @@ int ME_Tick(const ME_Command *command)
     players[0].cmd.forwardmove = command->forward_move;
     players[0].cmd.sidemove = command->side_move;
     players[0].cmd.angleturn = command->angle_turn;
-    players[0].cmd.buttons = command->buttons & 3;
+    if ((command->buttons & BT_SPECIAL) ||
+        ((command->buttons & BT_CHANGE) &&
+         ((command->buttons & BT_WEAPONMASK) >> BT_WEAPONSHIFT) >= NUMWEAPONS))
+        I_Error("Invalid worker command buttons");
+    players[0].cmd.buttons = command->buttons;
     P_Ticker(); gametic++;
     entered = 0;
     return 1;
@@ -148,6 +157,15 @@ int ME_CopySnapshot(ME_Snapshot *out)
     out->weapon_state = p->psprites[0].state ? (int)(p->psprites[0].state - states) : 0;
     out->pending_exit = gameaction != ga_nothing;
     out->sound_events = sound_events;
+    snprintf(out->message, sizeof(out->message), "%s", p->message ? p->message : "");
+    if (gamemapinfo) {
+        snprintf(out->level_name,sizeof(out->level_name),"%s",gamemapinfo->levelname ? gamemapinfo->levelname : "");
+        snprintf(out->next_map,sizeof(out->next_map),"%s",gamemapinfo->nextmap);
+        snprintf(out->secret_map,sizeof(out->secret_map),"%s",gamemapinfo->nextsecret);
+        snprintf(out->end_finale,sizeof(out->end_finale),"%s",gamemapinfo->endfinale);
+        out->map_flags = gamemapinfo->flags;
+        out->boss_action_count = array_size(gamemapinfo->bossactions);
+    }
     return 1;
 }
 size_t ME_CopyThings(ME_Thing *out, size_t capacity)
@@ -159,8 +177,16 @@ size_t ME_CopyThings(ME_Thing *out, size_t capacity)
         mobj_t *m = (mobj_t *)t;
         if (out && count < capacity) out[count] = (ME_Thing){
             m->type, m->info->doomednum, (int)(m->state - states), m->x, m->y, m->z,
-            m->health, m->flags, m->flags2};
+            m->health, m->flags, m->flags2, m->info->spawnhealth,
+            m->info->min_respawn_tics, m->info->respawn_dice};
         count++;
     }
     return count;
+}
+
+int ME_CopySession(ME_Session *out)
+{
+    if (!ready || !out) return 0;
+    *out = *ME_CurrentSession();
+    return 1;
 }

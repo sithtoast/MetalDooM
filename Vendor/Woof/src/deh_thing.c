@@ -17,6 +17,9 @@
 // Parses "Thing" sections in dehacked files
 //
 
+#include "SessionPlan.h"
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -142,15 +145,15 @@ DEH_BEGIN_MAPPING(thing_mapping, mobjinfo_t)
     DEH_MAPPING_SOUND("Rip sound", ripsound)
     // id24
     DEH_UNSUPPORTED_MAPPING("ID24 Bits")
-    DEH_UNSUPPORTED_MAPPING("Min respawn tics")
-    DEH_UNSUPPORTED_MAPPING("Respawn dice")
+    DEH_MAPPING("Min respawn tics", min_respawn_tics)
+    DEH_MAPPING("Respawn dice", respawn_dice)
     DEH_UNSUPPORTED_MAPPING("Pickup ammo type")
     DEH_UNSUPPORTED_MAPPING("Pickup ammo category")
     DEH_UNSUPPORTED_MAPPING("Pickup weapon type")
     DEH_UNSUPPORTED_MAPPING("Pickup item type")
     DEH_UNSUPPORTED_MAPPING("Pickup bonus count")
     DEH_UNSUPPORTED_MAPPING("Pickup sound")
-    DEH_UNSUPPORTED_MAPPING("Pickup message")
+    DEH_MAPPING_STRING("Pickup message", pickup_message)
     DEH_UNSUPPORTED_MAPPING("Translation")
     // mbf2y
     DEH_UNSUPPORTED_MAPPING("MBF2y Bits")
@@ -264,6 +267,21 @@ static void DEH_ThingParseLine(deh_context_t *context, char *line, int tag)
         return;
     }
 
+    if (!strcasecmp(variable_name, "Min respawn tics") ||
+        !strcasecmp(variable_name, "Respawn dice") ||
+        !strcasecmp(variable_name, "Pickup message"))
+    {
+        if (!ME_RustProbeEnabled())
+            DEH_Error(context, "ID24 field requires explicit Rust probe profile: %s", variable_name);
+        if (strcasecmp(variable_name, "Pickup message")) {
+            char *end; errno = 0;
+            long number = strtol(value, &end, 10);
+            while (*end == ' ' || *end == '\t') end++;
+            if (errno || end == value || *end || number < 0 || number > INT_MAX ||
+                (!strcasecmp(variable_name, "Respawn dice") && number > 255))
+                DEH_Error(context, "Invalid ID24 value for %s", variable_name);
+        }
+    }
     // most values are integers
     int ivalue = atoi(value);
 

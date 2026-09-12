@@ -40,6 +40,8 @@ void DSDH_MobjInfoInit(void)
     // don't want to reorganize info.c structure for a few tweaks...
     for (int i = 0; i < num_mobj_types; ++i)
     {
+        mobjinfo[i].min_respawn_tics = 420;
+        mobjinfo[i].respawn_dice = 4;
         // DEHEXTRA
         mobjinfo[i].droppeditem = MT_NULL;
         // MBF21
@@ -158,6 +160,8 @@ int DSDH_ThingTranslate(int thing_number)
     hashmap_put(translate, thing_number, &new_index);
 
     mobjinfo_t mobj = {
+        .min_respawn_tics = 420,
+        .respawn_dice = 4,
         // DEHEXTRA
         .droppeditem = MT_NULL,
         // MBF21

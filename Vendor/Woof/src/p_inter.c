@@ -623,6 +623,10 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       return;      // killough 12/98: suppress error message
     }
 
+  // ID24: message-only overrides retain the successful vanilla pickup behavior.
+  if (special->info->pickup_message)
+    pickupmsg(player, DEH_StringForMnemonic(special->info->pickup_message));
+
   if (special->flags & MF_COUNTITEM)
     player->itemcount++;
   P_RemoveMobj (special);

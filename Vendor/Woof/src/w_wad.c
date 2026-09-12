@@ -29,6 +29,7 @@
 #include "m_array.h"
 #include "m_misc.h"
 #include "w_wad.h"
+#include "SessionPlan.h"
 #include "w_internal.h"
 #include "z_zone.h"
 
@@ -592,7 +593,7 @@ boolean W_LumpExists(const int lump)
 
 boolean W_IsIWADLump (const int lump)
 {
-	return W_LumpExists(lump) && lumpinfo[lump].wad_file == wadfiles[0];
+	return W_LumpExists(lump) && lumpinfo[lump].wad_file == wadfiles[ME_CurrentSession()->base_wad_index];
 }
 
 // check if lump is from WAD
@@ -641,11 +642,11 @@ static void ProcessInWad(int i, const char *name, void (*process)(int lumpnum),
         int condition = 0;
         if (flag & PROCESS_IWAD)
         {
-            condition |= lumpinfo[i].wad_file == wadfiles[0];
+            condition |= lumpinfo[i].wad_file == wadfiles[ME_CurrentSession()->base_wad_index];
         }
         if (flag & PROCESS_PWAD)
         {
-            condition |= lumpinfo[i].wad_file != wadfiles[0];
+            condition |= lumpinfo[i].wad_file != wadfiles[ME_CurrentSession()->base_wad_index];
         }
 
         if (!strncasecmp(lumpinfo[i].name, name, 8)

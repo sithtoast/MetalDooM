@@ -2,35 +2,49 @@
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
-#define ME_ABI_VERSION 1
+#define ME_ABI_VERSION 2
 #define ME_API __attribute__((visibility("default")))
 /* Experimental single-session, single-thread worker ABI. All structures are
  * copied values. No Woof pointers/types cross this boundary. No unload/restart
  * or save contract yet: terminate the worker to reclaim a session (also after
  * an error). This core is NOT selected by the MetalDooM gameplay UI. */
+enum { ME_PROFILE_MBF21 = 0, ME_PROFILE_RUST_PROBE = 1 };
+/* RUST_PROBE is an explicit development opt-in, NOT ID24 compatibility. */
 typedef struct {
     uint32_t abi_version;
-    const char *const *wad_paths; /* Doom II IWAD first, then ordered overlays. */
+    const char *const *wad_paths; /* Exact resource order, independent of base identity. */
     uint32_t wad_count;
     const char *cache_directory; /* Existing caller-owned scratch directory. */
     uint32_t skill; /* 1..5 */
     uint32_t map;   /* MAP01..MAP32 for this bootstrap milestone. */
     uint32_t random_seed; /* Explicit seed; never use wall-clock time. */
+    uint32_t base_wad_index;
+    uint32_t profile;
 } ME_Config;
 typedef struct {
     int8_t forward_move, side_move;
     int16_t angle_turn;
-    uint8_t buttons; /* Doom ticcmd bits: attack=1, use=2. */
+    uint8_t buttons; /* Doom ticcmd attack/use and validated weapon-change bits. */
 } ME_Command;
 typedef struct {
     uint32_t tic, state_count, thing_type_count, compatibility;
     int32_t x, y, z, health, ready_weapon, ammo[4], weapon_state;
     uint32_t pending_exit, sound_events;
+    char message[256];
+    char level_name[128], next_map[9], secret_map[9], end_finale[9];
+    uint32_t map_flags, boss_action_count;
 } ME_Snapshot;
 typedef struct {
     int32_t type, editor_number, state, x, y, z, health;
     uint32_t flags, flags2;
+    int32_t spawn_health, min_respawn_tics, respawn_dice;
 } ME_Thing;
+typedef struct {
+    uint32_t profile, base_wad_index, wad_count, declared_feature, option_count;
+    char content_sha256[65]; /* Ordered content + base role + profile; no paths. */
+    char title[128], version[64];
+} ME_Session;
+ME_API int ME_CopySession(ME_Session *out);
 ME_API int ME_Init(const ME_Config *config);
 ME_API int ME_Tick(const ME_Command *command);
 ME_API int ME_CopySnapshot(ME_Snapshot *out);

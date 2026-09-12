@@ -1529,6 +1529,9 @@ typedef struct
     // [Woof!]
     int flags_extra;  // Woof!-exclusive extension
     int bloodcolor;   // [FG] colored blood and gibs
+    // MetalDooM: tested Rust subset of ID24HACKED.
+    int min_respawn_tics, respawn_dice;
+    const char *pickup_message;
 } mobjinfo_t;
 
 #define NO_ALTSPEED -1

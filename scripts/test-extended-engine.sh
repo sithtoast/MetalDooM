@@ -15,7 +15,7 @@ python3 - "$OUT" <<'PY'
 import pathlib, subprocess, sys
 out = pathlib.Path(sys.argv[1])
 exports = set((out/'exports.txt').read_text().splitlines())
-assert exports == {'_ME_Init','_ME_Tick','_ME_CopySnapshot','_ME_CopyThings','_ME_CopyError'}, exports
+assert exports == {'_ME_Init','_ME_Tick','_ME_CopySnapshot','_ME_CopyThings','_ME_CopyError','_ME_CopySession'}, exports
 links = subprocess.check_output(['otool','-L',str(out/'libMetalDooMExtended.dylib')],text=True)
 assert 'SDL' not in links and '/opt/homebrew' not in links, links
 print('PASS native dependencies and private engine symbols')

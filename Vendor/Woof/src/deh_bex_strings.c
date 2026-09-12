@@ -73,6 +73,11 @@ const bex_string_t bex_mnemonic_table[] =
     {"GAMMALVL4",            GAMMALVL4           },
     {"EMPTYSTRING",          EMPTYSTRING         },
     {"GGSAVED",              GGSAVED             },
+    // ID24HACKED 0.99.2 pickup mnemonic defaults (Rust's positive-ID replacements).
+    {"ID24_GOTFUELCAN", "Picked up a fuel can."},
+    {"ID24_GOTFUELTANK", "Picked up a fuel tank."},
+    {"ID24_GOTCALAMITYBLADE", "You got the calamity blade! Hot damn!"},
+    {"ID24_GOTINCINERATOR", "You got the incinerator!"},
     // part 2 - messages when the player gets things
     {"GOTARMOR",             GOTARMOR            },
     {"GOTMEGA",              GOTMEGA             },

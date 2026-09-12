@@ -6,3 +6,6 @@ build/
 # Signing credentials belong in Keychain/GitHub secrets, never source control.
 *.p12
 *.p8
+
+# Python fixture generator imports.
+__pycache__/

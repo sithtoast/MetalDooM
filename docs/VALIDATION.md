@@ -1,5 +1,42 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 128: Rust sessions, fields and native worker probes
+
+`scripts/test-rust-worker.sh original-doom2.wad /path/to/rerelease` passes. It
+rebuilds the native worker, reruns the full existing MBF21 suite, then verifies:
+
+- Base identity independent of resource position; GAMECONF null/max/order behavior;
+  content hashes invariant under relocation but sensitive to order, base role and
+  profile; malformed WAD/configuration and unsupported dependency/translation/
+  option/feature rejection. ID24 remains gated behind the explicit Rust profile.
+- Correct pickup amounts/default and BEX-replaced messages, invalid field values,
+  unknown mnemonic rejection; corpse delay/dice defaults and Rust values. With
+  seed 1993, death tic 4 gives respawn tics 97 (64/255), 2145 (2100/64), and 1601
+  (420/4). The reference comparison/prose discrepancy is documented.
+- Actual installed Rust 1.2 stack (id24res → Doom II → id1, base index 1): 203 actor
+  types/1543 states; 35 idle tics in each of the sixteen campaign maps. MAP13 uses
+  XNOD and has 1437 live actor snapshots. Selected UMAPINFO secret/return routes,
+  boss-action counts and MAP14 XFINALE1 metadata match the campaign declarations.
+- Actual Rust patch/resources on original fixture geometry: fuel can/tank +10/+50;
+  Incinerator 12-tic fire 20→16 fuel/4 maximum concurrent projectiles; Blade tap
+  20→10/6 projectiles, 25-tic hold 20→0/12, and full 85-tic charge 70→20/30.
+  These fixtures retain player health 100. They are not complete combat parity.
+
+Primary log: `build/rust128-validation.log`. Per-case logs and generated fixtures
+are in `build/extended/`, excluded from Git. The separate worker has six private
+API exports and only system dependencies. Full ID24, all monster/map behaviors,
+Swift XNOD geometry, native Rust graphics/audio, boss/exit execution, campaign
+presentation and extended saves remain unverified/unimplemented as detailed in
+[EXTENDED_ENGINE.md](EXTENDED_ENGINE.md). The GUI Rust guard is unchanged.
+
+Native build 128 succeeds in `build/rust-milestone/MetalDooM.app`; host signature
+verification passes, and bundled plist/CUA title/footer show 0.10.0/build 128.
+CUA inspected rendered classic Doom II MAP01 and the open menu; it is left paused.
+This is classic app validation, not a native Rust playthrough. Builds 126/127 and
+the primary notarized 0.9.0 build 124 release remain preserved. Build log:
+`build/build128.log`. No release packaging, upload or speedrunning work was done.
+
+
 ## 2026-09-12 — 0.10.0 build 127: extended-worker bootstrap
 
 `scripts/test-extended-engine.sh /path/to/original/doom2.wad` passes on arm64:

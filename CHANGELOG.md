@@ -4,6 +4,21 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust session and gameplay probes (build 128)
+
+- Plan explicit ordered resources independently of the Doom II base identity,
+  resolve the supported GAMECONF subset, and fingerprint ordered content/profile.
+  Keep ID24 requirements visible and require an experimental Rust worker opt-in.
+- Implement Rust pickup-message overrides and per-actor respawn delay/chance;
+  preserve vanilla pickup behavior and reject unsupported fields/configuration.
+- Load the actual Rust patch and UMAPINFO in the headless worker. Verify startup
+  of all sixteen maps, including MAP13 XNOD, fuel pickups, Incinerator fire and
+  Calamity Blade tap/partial/full charge probes using private installed resources.
+- Preserve the GUI Rust guard: rendering, complete combat/maps, campaign flow and
+  extended saves still need acceptance. No speedrunning/upload work is included.
+- Build and visually inspect native 0.10.0/build 128 in a separate preview;
+  preserve builds 126/127 and the notarized 0.9.0 build 124 release. No publishing.
+
 ## 0.10.0 refinement — Extended simulation worker (build 127)
 
 - Add a separate developer target for native MBF21 simulation, copied snapshots,

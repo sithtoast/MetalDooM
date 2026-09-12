@@ -34,5 +34,16 @@ Local changes from the pin:
   unknown sections and warning/error diagnostics, instead of silently accepting a
   partially applied patch. This deliberately accepts less input than upstream.
 
+- `info.h`, `dsdh_mobjinfo.c`, `deh_thing.c`, `p_mobj.c`: add defaulted and validated
+  pickup-message/minimum-respawn/dice fields under the explicit Rust probe profile;
+  use the per-actor respawn values with the reference comparison. Other ID24 fields
+  remain rejected. See the documented prose/reference discrepancy.
+- `deh_bex_strings.c`, `p_inter.c`, `g_game.c`: register four specification-defined
+  pickup mnemonics, apply successful-pickup message overrides and bound message
+  formatting. Source: ID24HACKED 0.99.2 at the pin in docs/LEGACY_OF_RUST.md.
+- `w_wad.c`: use the explicit base index for IWAD identity even when supporting
+  resources precede it. The native worker also invokes upstream UMAPINFO parsing
+  and preserves its episode flag without a presentation frontend.
+
 Native integration, limitations and reproduction: `docs/EXTENDED_ENGINE.md`.
 Future upstream updates must reapply/review this list and rerun the worker suite.

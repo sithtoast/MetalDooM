@@ -1,93 +1,139 @@
 # Experimental extended simulation worker
 
-The 0.10.0 build 127 development milestone adds a **separate native headless
-simulation target** based on pinned Woof code. The app still uses Chocolate Doom.
-Legacy of Rust remains rejected and is not playable. This is the beginning of
-milestone 2 in [the Rust roadmap](LEGACY_OF_RUST.md), not its completion.
+The **0.10.0 build 128** development milestone adds explicit session planning,
+three Rust-required ID24 fields, and native headless tests with the actual Rust
+patch/resources. The normal app still uses Chocolate Doom; its Rust rejection
+remains in place. **Legacy of Rust is not playable in the GUI yet.**
 
-## Build and exercise
+## Reproduce
 
 ```sh
 bash scripts/build-extended-engine.sh
 bash scripts/test-extended-engine.sh /path/to/original/doom2.wad
+bash scripts/test-rust-worker.sh /path/to/original/doom2.wad /path/to/rerelease
 ```
 
-Requires Apple Silicon and Xcode command-line tools; targets macOS 14+. No SDL or
-Homebrew dependency. Output stays under ignored `build/extended/`. Supply an
-original Doom II IWAD: this worker rejects GAMECONF, including the rerelease
-Doom II's configuration, until the session planner can interpret it correctly.
-The fixture generator creates original geometry/patches and resolves art from the
-user's IWAD. It contains no copied WAD data.
+Apple Silicon, Xcode tools, macOS 14+; no SDL or Homebrew dependency. The second
+command tests the MBF21 baseline. The third also tests session/error boundaries,
+ID24 fields, all sixteen Rust map startups and actual Rust weapons/pickups. It
+requires `id24res.wad`, `doom2.wad` and `id1.wad` in the supplied rerelease directory.
+Generated fixtures, copied private data and logs stay under ignored `build/`.
 
-## Boundary and lifetime
+## Session plan and ABI
 
-`Engine/Extended/ExtendedCore.h` defines ABI version 1. `ME_Init` takes ordered
-paths, a scratch directory, skill, map and an explicit RNG seed. `ME_Tick` accepts
-one 35 Hz command. Player and actor snapshots are copied scalars; no upstream
-pointers escape. `ME_CopyError` copies diagnostic text. The dylib exports exactly
-these five functions, with engine and helper-library symbols hidden.
+`Engine/Extended/ExtendedCore.h` is **ABI version 2**. `ME_Init` takes exact resource
+order, an independent base-WAD index, explicit profile, scratch directory, skill,
+map and RNG seed. The tested Rust order is id24res → Doom II → id1, base index 1.
+The native WAD code uses that base identity instead of assuming file zero is the
+IWAD. No sibling pack is automatically added.
 
-This target must run in a **dedicated, single-thread process, one session per
-process**. Initialization can be attempted only once. Engine failures are caught
-inside C, invalidate the session and return an error; terminate the worker after
-failure or completion to reclaim all engine allocations. Do not load it into the
-Swift app yet. There is no unload/reset/teardown, IPC protocol or production
-backend selection in this milestone. There is also no extended save format.
+Before engine initialization, the planner checks WAD headers/directories/lump
+bounds, rejects duplicate files, and checks that the selected base is a Doom
+II-format IWAD. GAMECONF is read from the base first, then the remaining supplied
+WADs in order. Non-null descriptive fields replace previous values; null retains
+previous values; executable requirements use the specified ordering/max operation.
+The explicit commercial base is already the maximum supported game mode.
 
-The worker initializes simulation defaults directly without loading a Woof user
-configuration. It explicitly selects MBF21 and replaces the clock-derived RNG
-seed before level setup. Upstream code owns actors, state transitions, weapons,
-collision, damage, thinker updates and Boom specials. Native hooks provide
-filesystem access and diagnostics. Presentation hooks are inert; sound calls
-are only counted. This does not validate audio, MIDI, rendering, rumble or UI.
-Ambient sound requests and level transitions fail with explicit errors.
+This is a **restricted GAMECONF implementation**: envelope 1.0.0, descriptors,
+IWAD filename matching and `comp_soul` options are supported. Options accumulate
+in declaration order. Dependency expansion, external DEH files and translations
+are rejected, along with unknown fields/features/modes, duplicate JSON keys,
+invalid integer options and IWAD paths. It never searches for or installs files.
+Files must remain unchanged during initialization; the worker reopens them after
+planning. It is not a sandbox or a general hostile-WAD validator.
 
-The entry point is intentionally limited to original Doom II, MAP01–MAP32,
-attack/use/movement commands and caller-owned trusted fixtures. GAMECONF/ID24
-configuration is rejected. Patch warnings/errors and unknown/unsupported mapped
-fields fail closed. These checks are not a general validator for malicious or
-arbitrary WADs. Custom ANIMATED/SWITCHES tables require complete terminator records
-in this worker; the normal app's resource loader supports compact terminators.
+`ME_CopySession` returns copied metadata and a SHA-256 identity over ordered file
+content hashes, base role and worker profile. Relocating the files preserves it;
+changing order, base role or profile changes it. This is a content identity for
+future persistence work, not a demo certification or a complete engine identity.
 
-## Verified behavior
+Profiles are explicit development choices:
 
-- Native arm64 library links only system dependencies and exports the five ABI
-  functions. Both `P_Ticker` and `states` are invisible to a client symbol lookup.
-- An original Doom II MAP01 runs real MBF21 simulation for 35 tics. Two fresh
-  workers with the same seed/commands produce matching actor snapshot digests.
-- Synthetic Thing 500 and Frames 1100/1101/1200/1201 extend the sparse data tables
-  to 146 actor types and 1080 states. `A_AddFlags` changes the actor's flags to
-  518 while preserving MBF21 LOGRAV.
-- A patched pistol executes `A_ConsumeAmmo` and `A_WeaponBulletAttack`: ammo
-  changes from 50 to 48 and the target's health changes from 200 to 193.
-- A Boom linedef 252 conveyor moves the player north without input, preserving x.
-- Weapon callbacks in actor states, and actor callbacks in weapon states, fail
-  before incorrect invocation and leave snapshots unavailable after the error.
-- Unsupported ID24 pickup fields, unknown fields/sections, GAMECONF and a
-  truncated animation table produce their expected diagnostics. The installed
-  `id1.wad` also stops at the GAMECONF/ID24 guard before gameplay initialization.
+- `ME_PROFILE_MBF21`: the baseline worker; rejects ID24 requirements/fields.
+- `ME_PROFILE_RUST_PROBE`: opts into MBF21 simulation plus the tested Rust subset.
+  The copied session still reports the declared ID24 requirement. This profile
+  does **not** advertise full ID24 conformance or silently relabel it as MBF21.
 
-Evidence logs: `build/extended-validation.log`, `build/extended/` and
-`build/extended-rust-rejection.log`. Native app build 127 was separately launched
-on Doom II MAP01 and inspected in CUA; title/footer and bundle report 0.10.0/127.
-The existing classic presentation/animation/save-phase regression passes. That
-GUI observation verifies the classic app, **not extended Rust rendering**.
+The dylib exports exactly six `ME_` functions, keeping both engine and helper
+symbols private. One `ME_Tick` consumes one 35 Hz command. Movement, attack/use
+and validated weapon-change bits are accepted; special command bits and invalid
+weapon indices fail. Player/actor snapshots copy values, messages and selected
+UMAPINFO fields (name, routes, finale and boss-action count); no engine pointers
+escape. Normal and secret exits still stop at the transition boundary.
 
-## Next implementation work
+## Process lifetime and presentation
 
-Build the session plan that separates base-game identity from resource order,
-then implement the required ID24 data fields/actions, Rust actors and weapons,
-XNOD/shared geometry, and copied render/audio data. Extend coverage to actual
-Rust combat and map mechanics before connecting the native renderer. Campaign
-routes, interlevels/finale and versioned extended saves remain separate gates.
-Do not switch the default backend or relax the Rust picker guard on this evidence.
+Use a **dedicated single-thread process, one session per process**. Initialization
+can be attempted once. Fatal engine errors stay inside the guarded C call and
+invalidate the session; terminate the worker after completion/error to reclaim
+its allocations. There is no teardown/restart API, IPC protocol or extended save
+format yet. Do not load the dylib into the Swift app process.
 
-To preserve a running app preview while building another candidate:
+Simulation uses directly initialized defaults and an explicit seed, without
+reading the user's Woof config. Upstream code owns physics, actors, weapons,
+damage and map thinkers. Native services provide filesystem access/diagnostics.
+Presentation hooks have no UI; sound requests are counted, not played. Ambient
+sound adapter requests fail. UMAPINFO is parsed before map setup, including Rust's
+boss-action overrides; episode hooks preserve the simulation flag without adding
+a menu. Routes/finale metadata are copied, but their execution/presentation is
+not implemented by this worker.
 
-```sh
-METALDOOM_BUILD_DIR="$PWD/build/extended-milestone" bash scripts/build.sh
-```
+## ID24 fields and validation
 
-The app builder uses one project-wide lock so alternate output directories still
-share the monotonic BUILD_NUMBER workflow. Build 126's paused resource preview
-and the primary checkout's notarized 0.9.0 build 124 release remain preserved.
+The new fields are `Pickup message`, `Min respawn tics` and `Respawn dice`, guarded
+by the explicit Rust profile. Built-in and sparse actors default to 420 tics and
+4. Messages resolve BEX mnemonics after patch loading and override the message of
+a successful vanilla pickup while retaining its ammo/weapon behavior. Unknown
+mnemonics and invalid numeric values fail before map setup; message formatting
+is bounded. Four ID24 pickup mnemonic defaults come from the pinned specification.
+Other ID24 fields and reserved signed data IDs remain unsupported.
+
+Respawn comparison follows the pinned Rum and Raisin implementation: it returns
+without respawning when the random roll is greater than the threshold, therefore
+allowing rolls **≤ threshold**. The 0.99.2 prose table says “greater than,” which
+contradicts that implementation and the legacy default. We preserve the executable
+reference/default behavior and record this discrepancy rather than claiming full
+conformance. See [ID24HACKED](https://github.com/doom-cross-port-collab/id24/blob/e96a9e1c9ee34621b03a4894f4053c2a3426496e/version_0_99_2_md/ID24HACKED.md)
+and [reference thinker](https://github.com/GooberMan/rum-and-raisin-doom/blob/eaf5381814e1b1993047b5e752d9e003951768aa/src/doom/p_mobj.cpp).
+
+With seed 1993, the synthetic corpse dies on tic 4 and respawns on tic 97 for
+64/255, tic 2145 for Rust's 2100/64, and tic 1601 for the default 420/4. Tests verify
+no respawn before the requested minimum. Pickup tests preserve cell quantities
+and exercise both default and BEX-replaced messages.
+
+The actual installed Rust 1.2 patch loads into 203 actor types and 1543 states.
+All sixteen campaign maps run 35 idle tics. MAP13 uses the upstream XNOD loader;
+its 1437 actor snapshots do not establish Swift geometry/rendering parity.
+Copied metadata verifies MAP02/MAP10 secret routes, MAP15/MAP16 returns, MAP13/14
+boss-action counts and MAP14's XFINALE1 declaration. Boss kills/exits are not yet
+exercised by these startup checks.
+
+Original test rooms using the actual unmodified Rust resource/weapon patch pass:
+
+| Probe | Verified result |
+| --- | --- |
+| Fuel can / tank | Adds 10 / 50 fuel and the correct ID24 message |
+| Incinerator, 12 tics held | 20→16 fuel; up to 4 concurrent projectiles |
+| Calamity Blade tap | 20→10 fuel; up to 6 concurrent projectiles |
+| Blade held 25 tics | 20→0 fuel; up to 12 concurrent projectiles |
+| Blade held 85 tics (full charge) | 70→20 fuel; up to 30 concurrent projectiles |
+
+These are bounded simulation probes. They do not establish every monster's combat
+behavior, projectile damage parity, all map specials, complete charging/dry-fire
+semantics, saves, audio or native visuals. Custom resource tables still require
+complete terminator records in this worker; the app loader also accepts compact
+terminators. See [the remaining roadmap](LEGACY_OF_RUST.md).
+
+## Build evidence and next work
+
+Primary log: `build/rust128-validation.log`; per-scenario logs:
+`build/extended/`. Native app `build/rust-milestone/MetalDooM.app` was built,
+signature-verified and inspected in CUA: rendered Doom II MAP01, title and footer
+show **0.10.0/build 128**. It is left paused. That verifies the classic app,
+not Rust's renderer. Build 126/127 previews and the separately notarized primary
+0.9.0 build 124 release remain intact. No new package or upload was made.
+
+Next: copied shared geometry/render data (especially XNOD), native render/audio
+integration, and targeted real-monster/map-special parity. Campaign transitions,
+boss/secret exits, JSON presentation and versioned saves remain acceptance gates.
+Keep the GUI Rust guard until native campaign play is validated.

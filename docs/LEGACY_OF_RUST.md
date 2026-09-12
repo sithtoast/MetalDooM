@@ -1,6 +1,6 @@
 # Legacy of Rust development and ID24 evidence
 
-Status: **0.10.0 build 127 extended-worker foundation; Legacy of Rust is not playable yet.**
+Status: **0.10.0 build 128 session/ID24 worker milestone; Legacy of Rust is not playable yet.**
 First campaign acceptance remains fully playable bundled single-player Rust.
 Multiplayer and the online add-on catalog are outside scope. General ID24
 conformance is a separate target and must never be inferred from this campaign.
@@ -109,10 +109,11 @@ Source snapshots inspected, rather than inferred from product labels:
 Pinned references: [Woof acd1c7f](https://github.com/fabiangreffrath/woof/tree/acd1c7f84fdd0fae92d1c58643c14364a131c75a),
 [Rum and Raisin eaf5381](https://github.com/GooberMan/rum-and-raisin-doom/tree/eaf5381814e1b1993047b5e752d9e003951768aa),
 [ID24 e96a9e1](https://github.com/doom-cross-port-collab/id24/tree/e96a9e1c9ee34621b03a4894f4053c2a3426496e).
-Review each imported file's license/attribution when adapting code. No extended
-engine snapshot was vendored by this milestone, and no new engine was compiled
-or benchmarked. The next integration must prove a narrow native build before
-committing to a full module transplant.
+The resource-only build 126 preceded engine import. Build 127 added the pinned
+Woof subset after a native bootstrap; build 128 adds session planning, three
+required ID24 fields and actual Rust probes. Review the per-file changes and
+licenses in `Vendor/Woof/UPSTREAM.md`. These tests do not establish full ID24
+compatibility or Rust playability.
 
 Keep Swift/AppKit/Metal ownership and the copied C snapshot boundary. Preserve
 classic save decoding and do not reinterpret old payloads as an extended layout.
@@ -128,15 +129,17 @@ before resource/game initialization, not guessed separately by Swift and C.
    SIGIL II now uses its actual ANIMATED lump instead of a hardcoded flame entry.
    Existing add-on guards remain intact. Limits: 65,536 records per table;
    positive rates below 65,536; no SMMU swirl or single-frame extension.
-2. **Extended engine seam and data (started in build 127):** a separate native
-   MBF21 worker now runs copied-snapshot, patched combat and Boom conveyor tests
-   ([boundary and limitations](EXTENDED_ENGINE.md)). Still required: ordered
-   session/resource/deh planning and extensible validated
-   actor/state/action/sound/sprite tables. Compare classic deterministic movement,
+2. **Extended engine seam and data (builds 127–128):** an isolated native worker
+   now has copied snapshots, typed actions, ordered session planning and a guarded
+   Rust profile. Tests cover required pickup/respawn fields, actual Rust weapons
+   and all sixteen map startups ([limits](EXTENDED_ENGINE.md)). Complete broader
+   data/action validation and remaining GAMECONF/ID24 semantics. Compare classic deterministic movement,
    combat, RNG, saves and all KEX profiles before switching any default backend.
 3. **Rust simulation:** complete Boom/MBF21/required ID24 actions and physics;
    both new weapons and all actors, XNOD/shared geometry, required skies and
-   materials. Validate every real map's resources and targeted behavior fixtures.
+   materials. Headless map startup (including MAP13 XNOD) and bounded real-weapon
+   probes pass in build 128; shared Swift geometry and native rendering are still
+   required. Validate targeted combat/map behavior, not just startup.
 4. **Campaign and persistence:** episodes, boss/secret routes, native interlevel
    animations and finale, music and extended saves. Test each route and restore
    during projectiles, charge attacks, moving sectors, switches and transitions.

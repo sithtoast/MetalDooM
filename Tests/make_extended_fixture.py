@@ -83,7 +83,7 @@ for mode, text in {
     'unknown-field': patch.replace('Hit points = 200', 'Misspelled health = 200'),
     'unknown-section': patch.replace('Thing 500', 'UNSUPPORTED 1\nValue = 3\n\nThing 500'),
 }.items(): (out / f'{mode}.wad').write_bytes(wad(room + [('DEHACKED',text.encode())]))
-(out / 'id24-config.wad').write_bytes(wad([('GAMECONF',b'{}')]))
+(out / 'id24-config.wad').write_bytes(wad([('GAMECONF',b'{"type":"gameconf","version":"1.0.0","data":{"executable":"id24"}}')]))
 (out / 'bad-table.wad').write_bytes(wad([('ANIMATED',b'\x01' * 22)]))
 # Boom floor conveyor: no input, the tagged floor carries the player north.
 conveyor = []

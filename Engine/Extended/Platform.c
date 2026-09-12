@@ -99,3 +99,7 @@ void S_StartSoundPreset(const struct mobj_s *origin,int id,pitchrange_t range){M
 SOUND2(S_StartSoundBFG) SOUND2(S_StartSoundCGun) SOUND2(S_StartSoundHitFloor) SOUND2(S_StartSoundPain) SOUND2(S_StartSoundPistol) SOUND2(S_StartSoundSSG) SOUND2(S_StartSoundShotgun)
 #define SOUND3(name) void name(const struct mobj_s *source,const struct mobj_s *origin,int id){ME_RecordSound();}
 SOUND3(S_StartSoundMissile) SOUND3(S_StartSoundOrigin) SOUND3(S_StartSoundSource)
+
+// Episode menu hooks retain the simulation flag; the worker has no menu.
+void MN_ClearEpisodes(void) { EpiCustom = true; }
+void MN_AddEpisode(const char *map, const char *gfx, const char *txt, char key) { EpiCustom = true; }

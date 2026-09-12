@@ -19,7 +19,7 @@ static ME_Thing target(void) {
 int main(int argc, char **argv) {
     assert(argc >= 4);
     const char *mode = argv[1];
-    ME_Config config = {ME_ABI_VERSION, (const char *const *)argv + 3, (uint32_t)(argc - 3), argv[2], 3, 1, 1993};
+    ME_Config config = {ME_ABI_VERSION, (const char *const *)argv + 3, (uint32_t)(argc - 3), argv[2], 3, 1, 1993, 0, ME_PROFILE_MBF21};
     int initialized = ME_Init(&config);
     if (!strcmp(mode, "reject")) {
         assert(!initialized); char error[2048]; ME_CopyError(error, sizeof(error));

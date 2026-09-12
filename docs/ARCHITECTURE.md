@@ -386,3 +386,15 @@ links nor selects it. Its one-session native worker API copies commands/snapshot
 uses explicit seeds and guards fatal errors inside C. Typed action dispatch
 prevents actor/weapon callback confusion. See [EXTENDED_ENGINE.md](EXTENDED_ENGINE.md)
 for tested MBF21 behavior, process-lifetime restrictions and remaining ID24 work.
+
+
+## Rust session plan and copied metadata (build 128)
+
+The worker ABI is now version 2. `SessionPlan.c` validates supplied WADs and
+resolves its explicit GAMECONF subset before engine mutation. Base identity is
+independent of resource order; a SHA-256 content/profile identity excludes paths.
+Only an explicit experimental Rust profile admits the declared ID24 requirement
+and the three newly supported Thing fields. UMAPINFO is parsed before level setup;
+selected routes/finale/boss metadata and pickup messages join copied snapshots.
+No default-backend switch or save layout reinterpretation follows from this work.
+See [EXTENDED_ENGINE.md](EXTENDED_ENGINE.md) for contracts and test limitations.

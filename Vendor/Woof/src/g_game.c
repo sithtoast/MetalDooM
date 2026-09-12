@@ -5442,7 +5442,7 @@ void doomprintf(player_t *player, msg_category_t category, const char *s, ...)
     return;
 
   va_start(v,s);
-  vsprintf(msg,s,v);                  // print message in buffer
+  vsnprintf(msg,sizeof(msg),s,v);                  // print message in buffer
   va_end(v);
 
   if (player)
