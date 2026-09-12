@@ -37,11 +37,11 @@ size_t ME_WritePresentation(void *out,size_t capacity) {
     if(actors>1000000 || weapons>2)I_Error("Excessive presentation count");
     size_t size=32+(size_t)actors*40+(size_t)weapons*24;
     if(!out || capacity<size)return size;
-    unsigned char *p=out;memcpy(p,"MSP1",4);p+=4;
-    word(&p,1);word(&p,leveltime);word(&p,actors);word(&p,weapons);
+    unsigned char *p=out;memcpy(p,"MSP2",4);p+=4;
+    word(&p,2);word(&p,leveltime);word(&p,actors);word(&p,weapons);
     word(&p,players[0].readyweapon);
     int ammo=weaponinfo[players[0].readyweapon].ammo;
-    word(&p,ammo==am_noammo ? -1:players[0].ammo[ammo]);word(&p,0);
+    word(&p,ammo==am_noammo ? -1:players[0].ammo[ammo]);word(&p,players[0].mo->interp > 0 ? 0:1);
     for(thinker_t *t=thinkercap.next;t!=&thinkercap;t=t->next) {
         if(t->function.p1!=P_MobjThinker)continue;
         mobj_t *m=(mobj_t *)t;if(!eligible(m))continue;
@@ -62,8 +62,8 @@ size_t ME_WritePresentation(void *out,size_t capacity) {
         pspdef_t *psp=&players[0].psprites[i];if(!psp->state || invisible(psp->state->sprite))continue;
         spriteframe_t *f=frame(psp->state->sprite,psp->state->frame & FF_FRAMEMASK);
         name(&p,firstspritelump+f->lump[0]);
-        // Copy simulation-space psprite offsets. Bob/interpolation is a later
-        // presentation step; the flash shares the weapon's base coordinates.
+        // Simulation offsets already include vanilla movement bob. The parent
+        // interpolates presentation only; flash shares the weapon coordinates.
         word(&p,psp->sx);word(&p,psp->sy);
         int light=players[0].mo->subsector->sector->lightlevel+players[0].extralight*32;
         word(&p,light>255?255:light<0?0:light);

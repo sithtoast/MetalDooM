@@ -175,3 +175,8 @@ require matching engine and WAD fingerprints; see [the contract](EXTENDED_SAVES.
 Rust scrolling: `scripts/test-extended-scroll.sh /path/to/rerelease` generates
 original floor/ceiling/carry fixtures; `scripts/test-extended-metal.sh` includes
 visible scrolling and saved-phase GPU readbacks. See EXTENDED_SCROLLING.md.
+
+Camera/weapon interpolation: `scripts/test-extended-interpolation.sh /path/to/rerelease`
+checks math and an actual short teleport. The Metal suite adds deterministic
+intermediate/paused image checks; native Save/Load validation also exercises
+continuous Run/Pause after restore. See EXTENDED_INTERPOLATION.md.

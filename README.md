@@ -5,7 +5,8 @@ by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
 **Version 0.10.0 · experimental source preview · local builds are not notarized.**
 
-Build 146 adds [scrolling floors and ceilings](docs/EXTENDED_SCROLLING.md),
+Build 148 smooths camera movement and weapon bob during Run with
+[presentation interpolation](docs/EXTENDED_INTERPOLATION.md). Build 146 added [scrolling floors and ceilings](docs/EXTENDED_SCROLLING.md),
 including correct saved phase and updates limited to flat meshes. Build 145 added [Rust Save/Load](docs/EXTENDED_SAVES.md) to the explicit
 [Rust preview](docs/EXTENDED_PREVIEW.md). Restore inventory, actors, moving sectors,
 weapon state and campaign progress into a fresh paused worker. Private `.mdrust`

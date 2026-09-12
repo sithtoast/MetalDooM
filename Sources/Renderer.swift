@@ -283,6 +283,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var animatedIDs: [MaterialKey:Int32] = [:]
     private var animatedWalls: [Int32:MTLTexture] = [:], animatedFlats: [Int32:MTLTexture] = [:]
     private var extendedPreview = false
+    private var previewInterpolation=ExtendedInterpolation()
     private var previewWeaponLabel:String?,previewAmmoLabel:String?
     private var previewTranslations:[MaterialKey:MaterialKey]=[:]
     private var engineReady = false
@@ -559,6 +560,10 @@ final class Renderer: NSObject, MTKViewDelegate {
         sky=textures[MaterialKey(name:scene.view.sky,flat:false)]
         previewTranslations=scene.view.materials.translations
         position=SIMD2(scene.view.x,scene.view.y);eyeZ=scene.view.eyeZ;yaw=scene.view.angle;pitch=0
+        previewInterpolation.accept(.init(tic:scene.view.tic,map:scene.view.ui.map,
+            playing:scene.view.ui.playing,snap:scene.view.presentation.snapCamera,
+            position:SIMD3(scene.view.x,scene.view.y,scene.view.eyeZ),angle:scene.view.angle,
+            weapon:scene.view.presentation.readyWeapon,weapons:scene.view.presentation.weapons),now:ProcessInfo.processInfo.systemUptime)
         if sprites == nil { sprites=try SpriteRenderer(device:device,wad:scene.resources,preload:false,hudOnly:true) }
         let actors=scene.view.presentation.actors.map { source -> MD_Thing in
             var value=MD_Thing()
@@ -652,6 +657,15 @@ final class Renderer: NSObject, MTKViewDelegate {
             self.map = map
         }
     }
+    func setExtendedPlayback(active:Bool) {
+        previewInterpolation.setActive(active)
+        if !active {applyExtendedInterpolation(now:ProcessInfo.processInfo.systemUptime)}
+    }
+    private func applyExtendedInterpolation(now:Double) {
+        guard extendedPreview,let sample=previewInterpolation.sample(now:now) else {return}
+        position=SIMD2(sample.position.x,sample.position.y);eyeZ=sample.position.z;yaw=sample.angle
+        sprites?.setPreviewWeaponPositions(sample.weapons)
+    }
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
     func draw(in mtkView: MTKView) {
         guard let view = mtkView as? GameView else { return }
@@ -662,6 +676,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         let time = CACurrentMediaTime(), delta = min(time-lastTime,0.25); lastTime = time
         do { try update(view:view,delta:delta) }
         catch { engineReady = false; view.releaseMouse(); DispatchQueue.main.async { [weak self] in self?.onError?(error) } }
+        applyExtendedInterpolation(now:ProcessInfo.processInfo.systemUptime)
         onHUDFrame?()
         guard let pass = view.currentRenderPassDescriptor, let drawable = view.currentDrawable,
               let command = queue.makeCommandBuffer() else { return }

@@ -50,7 +50,9 @@ against identical state with stationary flats, full reference meshes and restore
 saves, while checking unchanged wall buffer identity. Existing mesh and all-map
 geometry tests retain the classic baseline and extended-node coverage.
 
-This delivers floor/ceiling translation. Flat rotation, bob/interpolation,
+This delivers floor/ceiling translation. Flat rotation, actor/moving-surface interpolation,
 palette/TRANMAP translucency, control-sector/fake-floor/sky effects and complete
 campaign/boss playthrough acceptance remain separate work. It does not enable
 extras.wad, sibling id1 packs or ordinary Rust picker support.
+
+Build 148 smooths camera and weapon presentation; see EXTENDED_INTERPOLATION.md.

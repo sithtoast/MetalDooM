@@ -1,9 +1,9 @@
-# Copied Rust actor and weapon frames — build 132
+# Copied Rust actor and weapon frames — MSP2, build 148
 
-`ME_CopyPresentation` returns an MSP1 snapshot on the session thread between
+`ME_CopyPresentation` returns an MSP2 snapshot on the session thread between
 ticks. NULL queries required bytes; insufficient capacity returns that size and
 leaves the buffer untouched. Zero means no ready session/error. It is an additive
-ABI 2 export, with no change to existing structures or MGE1 geometry. No pointers
+ABI 2 export, with no change to existing structures or MGE2 geometry. No pointers
 or engine lump indices cross the process boundary.
 
 The engine resolves frames from its initialized sprite tables, including extended
@@ -13,20 +13,20 @@ also stays invisible: upstream normally supplies that blank in its own resource
 WAD. An explicit TNT1 replacement remains drawable. Other missing frames fail.
 No game artwork is bundled.
 
-## MSP1 layout
+## MSP2 layout
 
 All integers are little-endian. Fixed coordinates use signed 16.16 units.
 
 | Header offset | Value |
 | --- | --- |
-| 0 | `MSP1` magic, four bytes |
-| 4 | Version u32, 1 |
+| 0 | `MSP2` magic, four bytes |
+| 4 | Version u32, 2 |
 | 8 | Simulation tic u32 |
 | 12 | Actor count u32, at most 1,000,000 |
 | 16 | Weapon layer count u32, at most 2 |
 | 20 | Ready weapon i32, 0–8 |
 | 24 | Ready ammo i32; -1 for no ammo type |
-| 28 | Reserved u32, zero |
+| 28 | Flags u32: snap camera 1; other bits reject |
 
 The 32-byte header is followed by actor records (40 bytes each), then weapon
 records (24 bytes each). Names occupy eight bytes, zero-padded when shorter;
@@ -57,13 +57,14 @@ off when external weapon records are supplied, including an empty array.
 
 ## Limits and evidence
 
-This copies simulation psprite offsets; presentation bob/interpolation is pending.
+Simulation psprite offsets already include movement bob. Build 148 interpolates
+camera and compatible weapon positions during Run; see EXTENDED_INTERPOLATION.md.
 Translucent metadata is carried but sprites still render opaque. Per-state
 TRANMAPs, fixed-colormap palette effects, corpse mirroring enhancements,
 control-sector lighting and fake-floor clipping are not yet adapted. The preview
 has health/ammo text but no gameplay HUD; build 135 adds [sound effects](EXTENDED_AUDIO.md). Build 139 [updates affected geometry and materials](EXTENDED_MESH.md) while
 retaining unchanged Metal buffers. Build 137 adds a continuous clock and per-tic audio;
-large-map performance and presentation interpolation remain pending.
+large-map performance and full-world interpolation remain ongoing work.
 
 `scripts/test-extended-worker.sh` checks complete-copy canaries, nine malformed
 packets, all sixteen actual Rust maps at startup/tic 35, and eight directional

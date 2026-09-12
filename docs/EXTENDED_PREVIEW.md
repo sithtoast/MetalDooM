@@ -1,4 +1,4 @@
-# Rust native preview — 0.10.0 build 146
+# Rust native preview — 0.10.0 build 148
 
 An explicit development preview now starts the extended simulation in a separate
 child process and draws its copied geometry with the existing native Metal world
@@ -19,8 +19,8 @@ simulation; displayed health/ammo are simulation state. No speedrun/upload work.
 The helper is packaged only with the explicit development build option:
 
 ```sh
-METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/scroll-preview" bash scripts/build.sh
-open -n "$PWD/build/scroll-preview/MetalDooM.app" --args \
+METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/interpolation-final" bash scripts/build.sh
+open -n "$PWD/build/interpolation-final/MetalDooM.app" --args \
   --rust-preview "/path/to/Ultimate Doom/rerelease" --map MAP01
 ```
 
@@ -40,7 +40,8 @@ Run starts a 35-tics/s target clock. WASD moves/strafe, arrows turn/move, Shift
 runs, E/Space uses, F fires, 1–7 selects a weapon, and clicking captures horizontal
 mouse aim (subsequent clicks fire). Escape or Pause releases input and stops all
 sounds. Losing app/window focus or minimizing also pauses; resuming is explicit.
-There is no vertical look or interpolation yet.
+Run interpolates camera and compatible weapon positions; manual steps remain
+exact. No vertical look is added. See EXTENDED_INTERPOLATION.md.
 
 Both continuous and finite manual actions submit **one tic at a time**. Each
 prepared scene and that tic's sound events are applied on the main queue together,
@@ -128,7 +129,7 @@ byte or command terminates the session with a bounded error reply.
 Startup and geometry replies carry an `MVW5` body: magic, tic, fixed x/y/eye-z,
 unsigned Doom angle, signed health, eight-byte sky name, geometry byte count,
 sprite byte count, material byte count, audio byte count, UI byte count (56 bytes total), then optional [MGE2](EXTENDED_GEOMETRY.md),
-required [MSP1](EXTENDED_SPRITES.md), [MMT1](EXTENDED_MATERIALS.md) and
+required [MSP2](EXTENDED_SPRITES.md), [MMT1](EXTENDED_MATERIALS.md) and
 [MSA1](EXTENDED_AUDIO.md) and [MUI2](EXTENDED_LIFECYCLE.md). Tick replies
 include geometry when changed and always include sprite/material/UI state and drained sound events. Old body versions reject. Swift checks envelope size/
 sequence/status, view/geometry/sprite/material/audio/UI tic agreement, map identity and stable content identity. Maximum reply

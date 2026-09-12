@@ -113,6 +113,31 @@ func runMeshMetalValidation() throws {
         print("PASS \(kind): \(changed) GPU bytes differ from stationary flats, exact reference/save pixels and retained wall buffers")
     }
 
+    do {
+        let worker=ExtendedWorker();defer{worker.close()}
+        _=try worker.start(executable:exe,paths:paths,map:1,base:1)
+        let initial=try worker.tick(count:35)
+        let resources=try WAD(previewResources:paths,baseIndex:1,profile:1,identity:worker.identity!)
+        let builder=try ExtendedSceneBuilder(resources:resources)
+        let (window,view,renderer)=try surface(0);defer{view.delegate=nil;window.close()}
+        renderer.validationTime=0;try renderer.loadExtendedPreview(builder.prepare(initial))
+        renderer.setExtendedPlayback(active:true)
+        let current=try worker.tick(forward:25,turn:640)
+        renderer.validationTime=1.0/35;try renderer.loadExtendedPreview(builder.prepare(current))
+        let buffers=renderer.validationPreviewBuffers
+        let start=try frame(view,renderer)
+        renderer.validationTime=1.5/35;let midpoint=try frame(view,renderer)
+        renderer.validationTime=2.0/35;let end=try frame(view,renderer)
+        guard start != midpoint,midpoint != end,start != end else {throw PortError("Native interpolation did not render intermediate frames")}
+        renderer.validationTime=1.5/35;renderer.setExtendedPlayback(active:false)
+        guard try frame(view,renderer)==end else {throw PortError("Pause did not render exact endpoint")}
+        renderer.validationTime=100
+        guard try frame(view,renderer)==end else {throw PortError("Paused interpolation continued")}
+        guard buffers==renderer.validationPreviewBuffers else {throw PortError("Interpolation rebuilt world buffers")}
+        guard try worker.geometry().tic==current.tic else {throw PortError("Rendering advanced simulation")}
+        print("PASS native distinct start/mid/end frames, exact pause endpoint, no wall uploads or simulation ticks")
+    }
+
 }
 setbuf(stdout,nil)
 do { try runMeshMetalValidation() } catch { fputs("FAIL: \(error)\n",stderr);exit(1) }

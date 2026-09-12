@@ -12,7 +12,8 @@ import sys
 root,out=map(Path,sys.argv[1:])
 source=(root/'Sources/main.swift').read_text().split('\nlet app = NSApplication.shared\n')[0]
 (out/'main.swift').write_text(source+'\n'+(root/'Tests/ExtendedMetalValidation.swift').read_text())
-renderer=(root/'Sources/Renderer.swift').read_text().replace('final class Renderer: NSObject, MTKViewDelegate {','final class Renderer: NSObject, MTKViewDelegate {\n    var validationHUDVisible=true')
+renderer=(root/'Sources/Renderer.swift').read_text().replace('final class Renderer: NSObject, MTKViewDelegate {','final class Renderer: NSObject, MTKViewDelegate {\n    var validationHUDVisible=true;var validationTime:Double?')
+renderer=renderer.replace('now:ProcessInfo.processInfo.systemUptime','now:validationTime ?? ProcessInfo.processInfo.systemUptime')
 renderer='\n'.join('                if validationHUDVisible { '+line.strip()+' }' if line.strip().startswith('sprites.drawHUD(') else line for line in renderer.split('\n'))
 (out/'Renderer.swift').write_text(renderer+'''
 extension Renderer {

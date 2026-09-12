@@ -4,6 +4,22 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust camera and weapon interpolation (build 148)
+
+- Smooth walking, turning and existing view/weapon bob between 35 Hz snapshots
+  during Run, without advancing simulation or rebuilding world buffers.
+- Keep manual steps exact; pause snaps to the latest pose and clears history.
+  Teleports, map/tic changes, late replies and weapon-frame changes avoid blending
+  unrelated states. Restart/Continue and restored saves begin with fresh history.
+- Add an engine teleport marker in MSP2, including short teleports. Actor motion,
+  moving surfaces, animation frames, HUD and audio retain their per-tic timing.
+- Validate interpolation/yaw/flash boundaries, a real teleport, walking bob and
+  saved continuation, native Metal intermediate/paused frames, native Run/Pause,
+  and worker/save/clock regressions. Verify build148 live Run/input/Pause with
+  world/HUD intact. Preserve previous bundles and saves.
+- Keep the unreleased feature on 0.10.0. Build 148 is local, ad-hoc signed and
+  unnotarized; full-world rendering and campaign/boss acceptance remain ahead.
+
 ## 0.10.0 refinement — Rust scrolling floors and ceilings (build 146)
 
 - Render independent floor and ceiling texture scrolling from engine-owned offsets,

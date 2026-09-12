@@ -122,11 +122,12 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         guard ready,!stopped,!changingLevel,levelUI?.playing==true,!clock.busy else { return }
         manualTag=nil;view.releaseMouse();turnHeld=0
         clock.start(now:ProcessInfo.processInfo.systemUptime)
+        renderer.setExtendedPlayback(active:true)
         view.inputBlocked=false;window.makeFirstResponder(view)
         updateControls();musicPlayer?.update(active:true);schedule()
     }
     private func pause(preserveEffects:Bool=false) {
-        clock.pause();wake?.cancel();wake=nil;playbackGeneration+=1
+        clock.pause();renderer?.setExtendedPlayback(active:false);wake?.cancel();wake=nil;playbackGeneration+=1
         campaignTimer?.invalidate();campaignTimer=nil;campaignRunning=false
         campaignSound?.stopAll();try? campaignSound?.setActive(false)
         view?.inputBlocked=true;view?.releaseMouse();turnHeld=0

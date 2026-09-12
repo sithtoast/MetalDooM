@@ -35,6 +35,13 @@ func saveAppValidation() throws {
     subject.validationSave(folder.appendingPathComponent("missing/test.mdrust"));try wait("write error"){subject.validationStatus.hasPrefix("Save/load failed") && subject.validationPaused}
     guard subject.validationUI!.tic==70,subject.validationSaveEnabled else {throw PortError("Write failure lost game")}
     print("PASS corrupted save and write failure leave current worker usable")
+    subject.validationRun()
+    try wait("continuous playback"){subject.validationUI!.tic>72}
+    subject.validationPause();try wait("pause after continuous playback"){subject.validationPaused}
+    let paused=subject.validationUI!.tic
+    RunLoop.current.run(until:Date().addingTimeInterval(0.1))
+    guard subject.validationUI!.tic==paused else {throw PortError("Pause continued simulation")}
+    print("PASS native continuous Run/Pause after save restoration")
     subject.validationLoad(file);subject.validationClose()
     RunLoop.current.run(until:Date().addingTimeInterval(0.1))
     print("PASS close during pending restore cancels candidate and preserves teardown ordering")

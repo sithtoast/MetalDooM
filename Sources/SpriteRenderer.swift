@@ -58,6 +58,11 @@ final class SpriteRenderer {
             if inSprites && lump.bytes.count > 0 { patches[index] = try upload(art.patch(lump:index)) }
         }
     }
+    func setPreviewWeaponPositions(_ positions:[SIMD2<Float>]) {
+        guard var weapons=previewWeapons,weapons.count==positions.count else {return}
+        for i in weapons.indices {weapons[i].x=positions[i].x;weapons[i].y=positions[i].y}
+        previewWeapons=weapons
+    }
     func setPreview(things:[MD_Thing],weapons:[MD_WeaponSprite],images:[Int:PatchImage]) throws {
         for (index,image) in images where patches[index] == nil { patches[index]=try upload(image) }
         self.things=things;previewWeapons=weapons

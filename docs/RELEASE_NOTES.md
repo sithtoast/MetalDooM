@@ -5,7 +5,7 @@ Requires Apple Silicon and macOS 14 or later. This is an early preview.
 
 ## Install
 
-The current local development app is **0.10.0 build 146**, ad-hoc signed and
+The current local development app is **0.10.0 build 148**, ad-hoc signed and
 unnotarized. No new release package was produced. The previous **0.9.0 build 124**
 distribution was separately Developer ID signed, accepted by Apple and stapled.
 GitHub workflow assets remain unnotarized. For unnotarized previews, macOS may
@@ -16,7 +16,11 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.10.0 — Rust development foundations
 
-Final successful local build: **146**.
+Final successful local build: **148**.
+
+Build 148 smooths camera movement, turning and existing weapon bob during Run.
+Pause and discontinuities snap to engine state; manual steps remain exact.
+See EXTENDED_INTERPOLATION.md for timing and remaining world-rendering limits.
 
 Build 146 renders independent scrolling floors and ceilings with saved phase
 and updates limited to affected flat meshes. See EXTENDED_SCROLLING.md.

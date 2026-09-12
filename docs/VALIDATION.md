@@ -1,5 +1,41 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 148: Rust camera/weapon interpolation
+
+Candidate: `build/interpolation-final/MetalDooM.app`; `build/build 148.log`.
+Local ad-hoc build, unnotarized and unpackaged. Previous bundles/saves are preserved.
+
+- `build/interpolation-validation.log`: exact midpoint camera/weapon/flash
+  coordinates, shortest 359°→1° yaw, clamped endpoint, pause/resume and nine
+  discontinuity cases. A real short walk-over teleport sets MSP2's snap flag.
+  Actual MAP01 walking exhibits existing view/weapon bob, restoring the same phase
+  and continuing identically for 35 more tics.
+- `build/interpolation-metal.log`: a deterministic test clock renders distinct
+  start/middle/end images from two real movement snapshots. Pause equals the
+  endpoint image and remains fixed; world buffers retain identity and the worker
+  tic is unchanged. The previous 21 Rust reference comparisons, HUD restoration,
+  four scrolling pixel/readback cases and saved phase checks also pass.
+- `build/interpolation-native.log`: actual app Run/Pause after repeated save loads,
+  paused controls/music, corrupt-save and write-failure preservation, subsequent
+  audio/stepping and close during pending restore all pass.
+- `build/interpolation-worker-regression.log`: updated MSP2 malformed version/flag
+  rejection, all-map worker/render/audio and transport/cancellation checks.
+- `build/interpolation-save-regression.log`: all-map and weapon/transition save
+  continuation, malformed files, copied state and envelope boundaries.
+- `build/interpolation-clock.log`: existing one-tic playback pacing and pause/
+  in-flight boundary behavior.
+
+The earlier handoff incorrectly described basic bob as absent: G_BindWeapVariables
+already enables engine bob and the copied psprite coordinates carry it. This
+change interpolates presentation; it adds no simulation bob or engine commands.
+MSP2's marker reads the existing player mobj interpolation flag, including actual
+short teleports. The parent needs no distance-only guess for those transitions.
+
+Continuous presentation can lag by up to one tic. Actors, moving surfaces, weapon
+animation frames, audio and HUD still update on their original tics; this is not
+whole-world interpolation or sustained full-campaign performance acceptance.
+Manual buttons remain exact snapshots. See EXTENDED_INTERPOLATION.md for limits.
+
 ## 2026-09-12 — 0.10.0 build 146: Scrolling Rust floors/ceilings
 
 Final candidate: `build/scroll-preview/MetalDooM.app`; `build/build146.log`.
