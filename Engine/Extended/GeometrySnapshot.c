@@ -2,6 +2,7 @@
 #include "ExtendedCore.h"
 #include "NativeInternal.h"
 #include "SessionPlan.h"
+#include "RenderSector.h"
 #include "doomstat.h"
 #include "p_mobj.h"
 #include "r_state.h"
@@ -36,7 +37,7 @@ static void Flat(unsigned char **out, int index)
 size_t ME_WriteGeometry(void *out, size_t capacity)
 {
     const int counts[] = {numvertexes, numlines, numsides, numsectors, numsegs, numsubsectors, numnodes};
-    const size_t strides[] = {8,24,36,44,16,12,24};
+    const size_t strides[] = {8,24,36,76,16,12,24};
     size_t size = 120;
     for (int i = 0; i < 7; i++) {
         if (counts[i] < 0 || counts[i] > 1000000) I_Error("Excessive geometry count");
@@ -44,8 +45,8 @@ size_t ME_WriteGeometry(void *out, size_t capacity)
     }
     if (!out || capacity < size) return size;
     unsigned char *p = out;
-    memcpy(p,"MGE3",4); p += 4;
-    Word(&p,3); Word(&p,leveltime); Word(&p,gamemap);
+    memcpy(p,"MGE4",4); p += 4;
+    Word(&p,4); Word(&p,leveltime); Word(&p,gamemap);
     Word(&p,players[0].mo->x); Word(&p,players[0].mo->y); Word(&p,players[0].mo->angle);
     for (int i=0;i<7;i++) Word(&p,counts[i]);
     memcpy(p,ME_CurrentSession()->content_sha256,64); p += 64;
@@ -61,11 +62,17 @@ size_t ME_WriteGeometry(void *out, size_t capacity)
         Texture(&p,s->toptexture); Texture(&p,s->bottomtexture); Texture(&p,s->midtexture);
     }
     for (int i=0;i<numsectors;i++) {
-        const sector_t *s=&sectors[i];
+        sector_t front,back;int fl,cl,unused1,unused2;
+        ME_RenderSector(&sectors[i],0,&front,&fl,&cl);
+        ME_RenderSector(&sectors[i],1,&back,&unused1,&unused2);
+        const sector_t *s=&front;
         Word(&p,s->floorheight); Word(&p,s->ceilingheight); Word(&p,s->lightlevel);
         Flat(&p,s->floorpic); Flat(&p,s->ceilingpic);
         Word(&p,s->floor_xoffs); Word(&p,s->floor_yoffs);
         Word(&p,s->ceiling_xoffs); Word(&p,s->ceiling_yoffs);
+        Word(&p,MAX(0,MIN(255,fl))); Word(&p,MAX(0,MIN(255,cl)));
+        Word(&p,back.floorheight); Word(&p,back.ceilingheight); Flat(&p,back.ceilingpic);
+        fixed_t bottom,top;ME_SectorClip(&sectors[i],&bottom,&top);Word(&p,bottom);Word(&p,top);
     }
     for (int i=0;i<numsegs;i++) {
         const seg_t *s=&segs[i];

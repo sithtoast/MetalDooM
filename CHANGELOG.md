@@ -4,6 +4,22 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust fake floors and transferred lighting (build 152)
+
+- Render Boom control-sector heights, including deep-water, above-ceiling and
+  special sky-flat views, without changing collision heights or movement.
+- Apply independent floor/ceiling light transfers and resolved actor lighting.
+  Clip opaque, translucent and fuzz actors against fake surfaces while preserving
+  texture coordinates and holes.
+- Keep startup camera/sector classification consistent before the first tick.
+  Retain wall buffers when only a transferred plane light changes.
+- Pass 374,400 frozen Woof reference cases, real map-special and Save/Load fixtures,
+  native Metal plane/light and clipping pixel oracles, all-map geometry, mesh,
+  worker and save regressions. Verify signed 0.10.0/build152 running on MAP01.
+- Update current documentation and handoff. Same unreleased 0.10.0 refinement;
+  prior bundles/saves/sessions are preserved. Flat rotation, sky transfers, further
+  blending/interpolation and full campaign acceptance remain. No push or package.
+
 ## 0.10.0 refinement — Rust translucent walls and palette effects (build 151)
 
 - Render default/custom/tagged translucent middle walls, preserving texture holes,

@@ -66,8 +66,8 @@ func runMeshMetalValidation() throws {
         }
         let near=actor(0,100),far=actor(64,200),occluder=actor(-32,220)
         try renderer.validationActors(resources:resources,things:[],images:images,blend:[],tables:tables,reset:true)
-        func draw(_ actors:[MD_Thing],_ modes:[Int]) throws -> Data {
-            try renderer.validationActors(resources:resources,things:actors,images:images,blend:modes,tables:tables)
+        func draw(_ actors:[MD_Thing],_ modes:[Int],clips:[SIMD2<Float>]=[]) throws -> Data {
+            try renderer.validationActors(resources:resources,things:actors,images:images,blend:modes,tables:tables,clips:clips)
             return try frame(view,renderer)
         }
         let background=try draw([],[]),nearOpaque=try draw([near],[0]),farOpaque=try draw([far],[0])
@@ -97,6 +97,26 @@ func runMeshMetalValidation() throws {
                 throw PortError("Blend mode \(mode) differs from palette oracle in \(mismatches) bytes: \(examples)")
             }
         }
+        // Independently project a world-space cut into the framebuffer. Clipping
+        // must preserve the source texels above/below it for every actor pass.
+        let width=Int(view.drawableSize.width),height=Int(view.drawableSize.height)
+        let cut=Double(height)/2-(32-Double(initial.eyeZ))*Double(height)/(2*tan(Double.pi/6)*Double(near.x-initial.x))
+        for mode in [0,1,2,3,4] {
+            var thing=near;if mode==4 {thing.shadow=1}
+            let blend=mode==4 ? 0:mode,whole=try draw([thing],[blend])
+            for lower in [false,true] {
+                let clips=[lower ? SIMD2<Float>(32,32767):SIMD2<Float>(-32768,32)]
+                let clipped=try draw([thing],[blend],clips:clips)
+                var oracle=background,kept=0,removed=0
+                for p in stride(from:0,to:whole.count,by:4) {
+                    let keep=lower ? Double(p/4/width)+0.5<cut:Double(p/4/width)+0.5>=cut
+                    if keep {oracle.replaceSubrange(p..<p+4,with:whole[p..<p+4]);kept+=1} else {removed+=1}
+                }
+                guard kept>100,removed>100,clipped==oracle else {throw PortError("Actor plane clipping differs from projected oracle mode \(mode), lower \(lower)")}
+            }
+            guard try draw([thing],[blend],clips:[SIMD2(80,100)])==background else {throw PortError("Fully clipped actor remains visible")}
+        }
+        print("PASS world-plane clipping and rejection for opaque, normal/additive/custom and fuzz actors")
         var shaded=near;shaded.fullbright=0;shaded.light=0.4
         let shadedOpaque=try draw([shaded],[0]),shadedBlend=try draw([shaded],[1])
         var shadedOracle=background
@@ -180,6 +200,32 @@ func runMeshMetalValidation() throws {
         try renderer.validationWall(nil)
         print("PASS palette flash/removal, exact fixed-colormap and blend interaction, crossing wall/actor order (\(frontActor) actor-front, \(frontWall) wall-front pixels)")
 
+    }
+    for mode in ["normal","underwater","above","sky-below","sky-above","floorlight","ceilinglight"] {
+        let controlPaths=[root.appendingPathComponent("doom2.wad"),exe.deletingLastPathComponent().appendingPathComponent("fixtures/control-\(mode).wad")]
+        let worker=ExtendedWorker();defer{worker.close()}
+        let initial=try worker.start(executable:exe,paths:controlPaths,map:1,base:0,profile:0)
+        let resources=try WAD(previewResources:controlPaths,baseIndex:0,profile:0,identity:worker.identity!)
+        let scene=try ExtendedScene(view:initial,resources:resources)
+        var expected=try DoomMap(wad:resources,name:"MAP01")
+        let real=expected.sectors[0],control=expected.sectors[1]
+        var floor=real.floor,ceiling=real.ceiling,ft=real.floorTexture,ct=real.ceilingTexture,light=real.light
+        var fl=real.light,cl=real.light,bf=real.floor,bc=real.ceiling,bct=real.ceilingTexture
+        switch mode {
+        case "normal":floor=16;ceiling=96;bf=16;bc=96
+        case "underwater":floor=0;ceiling=64-1/65536;ft="NUKAGE1";ct="CEIL3_5";light=control.light;fl=light;cl=light;bf=0;bc=ceiling
+        case "above":floor=32+1/65536;ceiling=128;ft="NUKAGE1";ct="CEIL3_5";light=control.light;fl=light;cl=light;bf=floor;bc=ceiling;bct=ct
+        case "sky-below":floor=64;ceiling=64-1/65536;ft="NUKAGE1";ct=ft;light=control.light;fl=light;cl=light;bf=0;bc=ceiling
+        case "sky-above":floor=32+1/65536;ceiling=32;ft="CEIL3_5";ct=ft;light=control.light;fl=light;cl=light;bf=floor;bc=ceiling;bct=ct
+        case "floorlight":fl=control.light
+        default:cl=control.light
+        }
+        expected.sectors[0]=Sector(floor:floor,ceiling:ceiling,light:light,floorTexture:ft,ceilingTexture:ct,floorLight:fl,ceilingLight:cl,backFloor:bf,backCeiling:bc,backCeilingTexture:bct)
+        let (window,view,renderer)=try surface(0),(otherWindow,otherView,other)=try surface(650)
+        defer{view.delegate=nil;otherView.delegate=nil;window.close();otherWindow.close()}
+        try renderer.loadExtendedPreview(scene);try other.loadExtendedPreview(scene.validationReference(override:expected))
+        guard try frame(view,renderer)==frame(otherView,other) else {throw PortError("Control sector GPU frame differs from manually specified planes: \(mode)")}
+        print("PASS \(mode) actual engine control-sector frame vs manually specified reference planes and lighting")
     }
     for number in [1,13,16] {
         let worker=ExtendedWorker();defer{worker.close()}

@@ -21,6 +21,7 @@ final class SpriteRenderer {
     private var things: [MD_Thing] = []
     private var previewWeapons:[MD_WeaponSprite]?
     private var previewBlend:[Int]=[]
+    private var previewClips:[SIMD2<Float>]=[]
     private var blendPalette:MTLBuffer?
     private var blendTextures:[MTLTexture]=[]
     private let hudDepth: MTLDepthStencilState
@@ -67,7 +68,7 @@ final class SpriteRenderer {
         for i in weapons.indices {weapons[i].x=positions[i].x;weapons[i].y=positions[i].y}
         previewWeapons=weapons
     }
-    func setPreview(things:[MD_Thing],weapons:[MD_WeaponSprite],images:[Int:PatchImage],blend:[Int]=[],tables:ExtendedBlendTables?=nil) throws {
+    func setPreview(things:[MD_Thing],weapons:[MD_WeaponSprite],images:[Int:PatchImage],blend:[Int]=[],clips:[SIMD2<Float>]=[],tables:ExtendedBlendTables?=nil) throws {
         guard blend.isEmpty || blend.count==things.count && blend.allSatisfy({(0...64).contains($0)}) else {throw PortError("Invalid sprite blend modes.")}
         if blendTextures.isEmpty,let tables {
             guard let palette=device.makeBuffer(bytes:tables.palette,length:768,options:.storageModeShared) else {throw PortError("Cannot allocate blend palette.")}
@@ -82,7 +83,8 @@ final class SpriteRenderer {
             blendPalette=palette;blendTextures=textures
         }
         guard blend.allSatisfy({$0<=blendTextures.count}) else {throw PortError("Missing actor blend tables.")}
-        previewBlend=blend
+        guard clips.isEmpty || clips.count==things.count else {throw PortError("Invalid actor clipping count")}
+        previewBlend=blend;previewClips=clips
         for (index,image) in images where patches[index] == nil { patches[index]=try upload(image) }
         self.things=things;previewWeapons=weapons
     }
@@ -104,7 +106,7 @@ final class SpriteRenderer {
         }
         return GPUPatch(texture:texture,indices:indices,width:Float(image.width),height:Float(image.height),left:Float(patch.left),top:Float(patch.top))
     }
-    private func worldVertices(_ thing:MD_Thing,patch:GPUPatch,yaw:Float,gain:Float)->[WorldVertex] {
+    private func worldVertices(_ thing:MD_Thing,patch:GPUPatch,yaw:Float,gain:Float,clip:SIMD2<Float>?=nil)->[WorldVertex] {
         let right=SIMD3(sin(yaw),0,cos(yaw))
         let center = SIMD3(thing.x,thing.z,-thing.y)
         let left = center-right*patch.left
@@ -112,20 +114,25 @@ final class SpriteRenderer {
         // Unlike the software renderer, Metal's floor depth test clips it.
         // Lift only the visual quad, retaining offsets above the live floor.
         let bottom = max(patch.top-patch.height,thing.floorZ-thing.z)
-        let a = left+SIMD3(0,bottom,0), b = a+right*patch.width
-        let c = b+SIMD3(0,patch.height,0), d = a+SIMD3(0,patch.height,0)
+        let low=max(thing.z+bottom,clip?.x ?? -Float.infinity)
+        let high=min(thing.z+bottom+patch.height,clip?.y ?? Float.infinity)
+        guard high>low else {return []}
+        let a = left+SIMD3(0,low-thing.z,0), b = a+right*patch.width
+        let c = b+SIMD3(0,high-low,0), d = a+SIMD3(0,high-low,0)
+        let vBottom=patch.height-(low-thing.z-bottom),vTop=patch.height-(high-thing.z-bottom)
         let u0: Float = thing.flip != 0 ? patch.width : 0, u1: Float = thing.flip != 0 ? 0 : patch.width
         let light = max(0.12,thing.light), fullbright = Float(thing.fullbright)*gain
         func vertex(_ position: SIMD3<Float>, _ u: Float, _ v: Float) -> WorldVertex {
             WorldVertex(position:SIMD4(position,1),uvLight:SIMD4(u,v,light,fullbright))
         }
-        return [vertex(a,u0,patch.height),vertex(b,u1,patch.height),vertex(c,u1,0),
-                    vertex(a,u0,patch.height),vertex(c,u1,0),vertex(d,u0,0)]
+        return [vertex(a,u0,vBottom),vertex(b,u1,vBottom),vertex(c,u1,vTop),
+                    vertex(a,u0,vBottom),vertex(c,u1,vTop),vertex(d,u0,vTop)]
     }
     func transparentActors(yaw:Float)throws->[TransparentPolygon] {
-        try things.indices.filter {!previewBlend.isEmpty && previewBlend[$0]>0 && things[$0].shadow==0}.map {i in
+        try things.indices.filter {!previewBlend.isEmpty && previewBlend[$0]>0 && things[$0].shadow==0}.compactMap {i -> TransparentPolygon? in
             guard let p=patches[Int(things[i].lump)],let indices=p.indices else {throw PortError("Missing translucent actor patch")}
-            let v=worldVertices(things[i],patch:p,yaw:yaw,gain:1)
+            let v=worldVertices(things[i],patch:p,yaw:yaw,gain:1,clip:previewClips.isEmpty ? nil:previewClips[i])
+            guard !v.isEmpty else {return nil}
             return TransparentPolygon(vertices:[v[0],v[1],v[2],v[5]],material:nil,texture:p.texture,indices:indices,blend:previewBlend[i],wall:false)
         }
     }
@@ -163,7 +170,8 @@ final class SpriteRenderer {
                 encoder.setFragmentTexture(indices,index:3)
                 encoder.setFragmentBuffer(blendPalette,offset:0,index:3)
             }
-            let vertices=worldVertices(thing,patch:patch,yaw:yaw,gain:fullbrightGain)
+            let vertices=worldVertices(thing,patch:patch,yaw:yaw,gain:fullbrightGain,clip:previewClips.isEmpty ? nil:previewClips[index])
+            guard !vertices.isEmpty else {continue}
             encoder.setVertexBytes(vertices,length:MemoryLayout<WorldVertex>.stride*6,index:0)
             encoder.setFragmentTexture(patch.texture,index:0)
             encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:6)

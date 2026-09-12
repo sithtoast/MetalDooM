@@ -1,4 +1,4 @@
-# Copied extended geometry — MGE3, build 151
+# Copied extended geometry — MGE4, build 152
 
 The experimental worker now supplies its decoded map to the same `DoomMap` and
 `Geometry` types used by the native renderer. `Sources/ExtendedGeometry.swift`
@@ -25,8 +25,8 @@ resources; its fingerprint accompanies the map.
 
 | Offset | Header field |
 | --- | --- |
-| 0 | Four bytes `MGE3` |
-| 4 | Format version 3 |
+| 0 | Four bytes `MGE4` |
+| 4 | Format version 4 |
 | 8 | Simulation tic |
 | 12 | Map number, 1–32 |
 | 16, 20, 24 | Current player x, y, angle |
@@ -40,7 +40,7 @@ Arrays immediately follow the 120-byte header:
 | Vertices | 8 | x, y (engine simulation coordinates) |
 | Lines | 24 | vertex a, vertex b, flags, front side, back side, blend table ID (0–64) |
 | Sides | 36 | sector, x offset, y offset; upper/lower/middle names |
-| Sectors | 44 | floor, ceiling, light (0–255); floor/ceiling names; floor X/Y and ceiling X/Y offsets |
+| Sectors | 76 | resolved floor/ceiling/light/names/offsets; plane lights; back-view heights/ceiling name; actor clip limits (see EXTENDED_CONTROL_SECTORS.md) |
 | Segs | 16 | vertex a, vertex b, line, side (0/1) |
 | Subsectors | 12 | seg count, first seg, engine sector |
 | Nodes | 24 | x, y, dx, dy, right child, left child |
@@ -58,11 +58,10 @@ The map uses the engine's explicit subsector sector rather than guessing it.
 MBF21 level setup projects split vertices onto parent linedefs. Those coordinates
 can differ from the original lump, including XNOD's added vertices; the snapshot
 preserves the engine result. Mesh clipping continues to use original directed
-linedefs to avoid seams. Current physical sector heights/light and side offsets/
-switch textures are copied, but transfer heights, control-sector lighting, sky
-transfers, animation translation, sprites, interpolation and sound require the
-remaining presentation bridge. Whole-map copies/mesh rebuilds are validation
-work here, not a measured real-time update strategy.
+linedefs to avoid seams. Build152 adds camera-resolved transfer heights and
+independent plane lighting; see EXTENDED_CONTROL_SECTORS.md. Static topology and
+unchanged material buffers remain cached. Sky transfers and further rendering
+features remain separately tracked in the handoff.
 
 ## Evidence
 

@@ -43,9 +43,9 @@ for i in range(node_count):
 assert cursor+node_count*32 == len(nodes)
 
 snapshot = pathlib.Path(sys.argv[2]).read_bytes()
-assert snapshot[:4] == b'MGE3'
+assert snapshot[:4] == b'MGE4'
 counts = struct.unpack_from('<7I', snapshot, 28)
-strides = (8, 24, 36, 44, 16, 12, 24)
+strides = (8, 24, 36, 76, 16, 12, 24)
 offsets = []
 cursor = 120
 for count, stride in zip(counts, strides):

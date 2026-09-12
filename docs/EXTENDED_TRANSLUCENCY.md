@@ -68,8 +68,8 @@ draws. Palette buffers and table/index textures are cached, not rebuilt per fram
 
 This adapts the engine's blend operations to the existing native RGB renderer.
 It does not claim software-renderer pixel parity: native lighting is still RGB,
-and fake-floor clipping and ordering between fuzz and translucent surfaces
-remain separate work. Palette/fixed-colormap support is described in
+and ordering between fuzz and translucent surfaces remains separate work.
+Build152 adds fake-floor clipping; see EXTENDED_CONTROL_SECTORS.md. Palette/fixed-colormap support is described in
 [EXTENDED_PALETTES.md](EXTENDED_PALETTES.md). Weapons keep
 their existing opaque/fuzz paths. Classic engine actor rendering is unchanged.
 This engine change also changes private-save fingerprints; preserve earlier

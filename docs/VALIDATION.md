@@ -1,5 +1,48 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 152: fake floors and transferred lighting
+
+Candidate: `build/control-sector-preview/MetalDooM.app`; `build/build152.log`.
+Final source/bundle version and build are0.10.0/152. Host deep/strict verification
+passes for app/helper/dylib; eighteen exported private functions remain. No
+notarization, distribution package or push; this is the same unreleased feature.
+
+- `build/control-sector-validation.log`:374,400 cases against a frozen pinned Woof
+  R_FakeFlat oracle, comparing front/back heights, texture names, offsets and
+  lighting across camera boundaries and sky branches; source sectors unchanged.
+  Seven actual special242/213/261 rooms check resolved values, spawn eye height,
+  real collision step blocking, averaged actor light, immutable copies, fresh
+  restore and35 future tics, malformed full/cached light fields and a selective
+  plane-light update that rebuilds one flat chunk and retains wall materials.
+- `build/control-metal-validation.log`: exact framebuffer clipping/rejection
+  oracles for opaque, normal/additive/custom translucent and fuzz actors; seven
+  actual control-sector frames match manually specified reference planes/lights.
+  Previous wall/actor and palette oracles,21 actual Rust reference frames, HUD,
+  four scroll/save phases and interpolation endpoints pass with Metal API validation.
+- `build/control-geometry-validation.log`: all32 original and16 Rust map exports
+  plus XNOD byte/reference checks. An initial exact reference-vertex comparison
+  failed without location detail. The diagnostic rebuild and full decoder rerun
+  in `build/control-geometry-final-validation.log` pass all48 maps and14 malformed
+  cases; the initial mismatch was not reproduced. Exact GPU and mesh comparisons
+  pass independently.
+- `build/control-mesh-validation.log`: stable topology over140 tics, exact
+  triangle/UV/light/sky multisets and selective-change/malformed-data checks.
+- `build/control-worker-validation.log`: all16 maps and prior actor/table, palette,
+  wall, weapon, audio, protocol and timeout regressions.
+- `build/control-save-validation.log`: all-map future-state/keyframe regression,
+  copy/RNG/audio canaries and save envelope/fingerprint/atomic-write checks.
+
+Actual MAP01 ran in final build152. Run, Up/Right input, Escape pause and manual
+Forward were exercised. Left paused at tic13, health100, ammo50,283 actors;
+Music/Sound enabled. Running title confirms0.10.0/build152; screenshot shows world,
+pistol and HUD intact. Earlier bundles and paused sessions remain preserved.
+Control-effect pixel acceptance comes from synthetic fixtures; this does not
+establish full live campaign or boss-playthrough acceptance.
+
+MGE4 sectors now carry resolved front/back presentation, two plane lights and
+actor clip limits. Existing other packet versions and ABI2 stay. Native lighting
+and tic-discrete sector presentation retain the limits in EXTENDED_CONTROL_SECTORS.md.
+
 ## 2026-09-12 — 0.10.0 build 151: translucent walls and palette effects
 
 Candidate: `build/wall-palette-preview/MetalDooM.app`; `build/build151.log`.

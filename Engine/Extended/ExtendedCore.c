@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "ExtendedCore.h"
 #include "NativeInternal.h"
+#include "RenderSector.h"
 #include "SessionPlan.h"
 #include "deh_strings.h"
 #include <setjmp.h>
@@ -213,14 +214,8 @@ int ME_CopyView(ME_View *out)
     memset(out, 0, sizeof(*out));
     out->tic=leveltime; out->angle=players[0].mo->angle;
     out->x=players[0].mo->x; out->y=players[0].mo->y;
-    out->eye_z=players[0].viewz; out->health=players[0].health;
-    /* P_SpawnPlayer sets viewheight; viewz is first computed by P_PlayerThink.
-     * Supply the standing spawn camera without advancing simulation/RNG. */
-    if (!leveltime) {
-        int64_t eye=(int64_t)players[0].mo->z+players[0].viewheight;
-        int64_t ceiling=(int64_t)players[0].mo->ceilingz-4*FRACUNIT;
-        out->eye_z=(int32_t)(eye<ceiling ? eye:ceiling);
-    }
+    // Same camera used by fake sectors and clipping, including tic-zero spawn.
+    out->eye_z=ME_RenderEye();out->health=players[0].health;
     const char *sky=gamemapinfo && gamemapinfo->skytexture[0] ? gamemapinfo->skytexture :
         gamemap > 20 ? "SKY3" : gamemap > 11 ? "SKY2" : "SKY1";
     snprintf(out->sky,sizeof(out->sky),"%s",sky);

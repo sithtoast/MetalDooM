@@ -34,7 +34,8 @@ final class ExtendedMesh {
                 dirty.insert(map.lines.count+i)
                 let old=map.sectors[i],new=value.sectors[i]
                 if old.floor != new.floor || old.ceiling != new.ceiling || old.light != new.light ||
-                   old.floorTexture != new.floorTexture || old.ceilingTexture != new.ceilingTexture {
+                   old.floorTexture != new.floorTexture || old.ceilingTexture != new.ceilingTexture ||
+                   old.backFloor != new.backFloor || old.backCeiling != new.backCeiling || old.backCeilingTexture != new.backCeilingTexture {
                     dirty.formUnion(sectorLines[i])
                 }
             }

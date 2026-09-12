@@ -4,6 +4,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ $# != 1 ]]; then echo "Usage: $0 rerelease-directory" >&2; exit 2; fi
 OUT="$PROJECT_DIR/build/extended-metal"
 mkdir -p "$OUT"
+python3 "$PROJECT_DIR/Tests/make_control_fixture.py" "$PROJECT_DIR/build/extended/fixtures"
 python3 "$PROJECT_DIR/Tests/make_scroll_fixture.py" "$PROJECT_DIR/build/extended/fixtures"
 python3 "$PROJECT_DIR/Tests/make_translucency_fixture.py" "$PROJECT_DIR/build/extended/fixtures"
 bash "$PROJECT_DIR/scripts/build-engine.sh" "$OUT/engine"
@@ -18,9 +19,9 @@ renderer=renderer.replace('now:ProcessInfo.processInfo.systemUptime','now:valida
 renderer='\n'.join('                if validationHUDVisible { '+line.strip()+' }' if line.strip().startswith('sprites.drawHUD(') else line for line in renderer.split('\n'))
 (out/'Renderer.swift').write_text(renderer+'''
 extension Renderer {
-    func validationActors(resources:WAD,things:[MD_Thing],images:[Int:PatchImage],blend:[Int],tables:ExtendedBlendTables,reset:Bool=false) throws {
+    func validationActors(resources:WAD,things:[MD_Thing],images:[Int:PatchImage],blend:[Int],tables:ExtendedBlendTables,clips:[SIMD2<Float>]=[],reset:Bool=false) throws {
         if reset {sprites=try SpriteRenderer(device:device,wad:resources,preload:false)}
-        try sprites!.setPreview(things:things,weapons:[],images:images,blend:blend,tables:tables)
+        try sprites!.setPreview(things:things,weapons:[],images:images,blend:blend,clips:clips,tables:tables)
     }
     func validationColors(_ tables:ExtendedBlendTables?=nil,palette:UInt32=0,fixed:Int32=0) {
         if let tables {
@@ -44,8 +45,8 @@ extension Renderer {
 ''')
 (out/'ExtendedScene.swift').write_text((root/'Sources/ExtendedScene.swift').read_text()+'''
 extension ExtendedScene {
-    func validationReference(stationaryFlats:Bool=false) throws -> ExtendedScene {
-        var map=copiedGeometry.map
+    func validationReference(stationaryFlats:Bool=false,override:DoomMap?=nil) throws -> ExtendedScene {
+        var map=override ?? copiedGeometry.map
         if stationaryFlats {for i in map.sectors.indices {map.sectors[i].floorOffset = .zero;map.sectors[i].ceilingOffset = .zero}}
         let reference=try ReferenceGeometry(map:map,textureHeights:Art(wad:resources).textureHeights())
         let full=Geometry(batches:reference.batches,skyVertices:reference.skyVertices)

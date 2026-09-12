@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "ExtendedCore.h"
 #include "NativeInternal.h"
+#include "RenderSector.h"
 #include "doomstat.h"
 #include "d_items.h"
 #include "p_mobj.h"
@@ -54,7 +55,9 @@ size_t ME_WritePresentation(void *out,size_t capacity) {
         }
         name(&p,firstspritelump+f->lump[rot]);
         word(&p,m->x);word(&p,m->y);word(&p,m->z);word(&p,m->floorz);
-        int light=m->subsector->sector->lightlevel;
+        sector_t rendered;int fl,cl;
+        ME_RenderSector(m->subsector->sector,0,&rendered,&fl,&cl);
+        int light=(fl+cl)/2;
         word(&p,light>255?255:light<0?0:light);
         // Per-state tables precede object/default translucency, even when the
         // state is fullbright or the actor lacks MF_TRANSLUCENT. Fuzz wins.

@@ -318,7 +318,7 @@ struct Geometry {
                         wall(a,b,sector.ceiling,32768,side,"F_SKY1",1,0)
                     }
                 } else {
-                    let other = map.sectors[map.sides[otherIndex].sector]
+                    let other = map.sectors[map.sides[otherIndex].sector].backView
                     if !(sector.ceilingTexture == "F_SKY1" && other.ceilingTexture == "F_SKY1") {
                         wall(a,b,max(sector.floor,other.ceiling),sector.ceiling,side,side.upper,light,
                              topPegged ? sector.ceiling : other.ceiling+height(side.upper))
@@ -377,7 +377,7 @@ struct Geometry {
                 let v = shift.y.truncatingRemainder(dividingBy:64)
                 for points in triangles {
                     let triangle = points.map { p in
-                        vertex(SIMD2<Float>(p),height,Float(p.x)+u,Float(-p.y)+v,max(0.12,sector.light))
+                        vertex(SIMD2<Float>(p),height,Float(p.x)+u,Float(-p.y)+v,max(0.12,(ceiling ? sector.ceilingLight:sector.floorLight) ?? sector.light))
                     }
                     groups[MaterialKey(name:name,flat:true),default:[]] += triangle
                 }

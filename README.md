@@ -5,7 +5,8 @@ by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
 **Version 0.10.0 · experimental source preview · local builds are not notarized.**
 
-Build 151 adds translucent walls and [palette effects](docs/EXTENDED_PALETTES.md).
+Build 152 adds [fake floors and transferred lighting](docs/EXTENDED_CONTROL_SECTORS.md).
+Build 151 added translucent walls and [palette effects](docs/EXTENDED_PALETTES.md).
 Build 150 added per-state custom blend tables, including state changes and Save/Load.
 Build 149 added [normal/additive actor translucency](docs/EXTENDED_TRANSLUCENCY.md)
 using copied engine blend tables, with sprite cutouts and opaque-world occlusion.

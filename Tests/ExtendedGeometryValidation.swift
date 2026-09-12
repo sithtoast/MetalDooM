@@ -16,7 +16,7 @@ import simd
         let actual=try Geometry(map:map),reference=try ReferenceGeometry(map:map)
         guard actual.batches.map(\.material)==reference.batches.map(\.material) else { throw PortError("Reference materials differ") }
         for (a,b) in zip(actual.batches,reference.batches) {
-            guard canonical(a.vertices).withUnsafeBytes({Data($0)})==canonical(b.vertices).withUnsafeBytes({Data($0)}) else { throw PortError("Classic/reference vertices differ") }
+            guard canonical(a.vertices).withUnsafeBytes({Data($0)})==canonical(b.vertices).withUnsafeBytes({Data($0)}) else { throw PortError("Classic/reference vertices differ in \(map.name) material \(a.material): first \(zip(canonical(a.vertices),canonical(b.vertices)).first{ $0.position != $1.position || $0.uvLight != $1.uvLight }.map{String(describing:$0)} ?? "none")") }
         }
         guard canonical(actual.skyVertices).withUnsafeBytes({Data($0)})==canonical(reference.skyVertices).withUnsafeBytes({Data($0)}) else { throw PortError("Reference sky differs") }
     }
@@ -71,8 +71,8 @@ import simd
                     for i in 0..<4 { copy[offset+i]=UInt8(truncatingIfNeeded:value >> (8*i)) }
                     return copy
                 }
-                cases += [mutate(4,4),mutate(28,UInt32.max),mutate(28,1_000_001),mutate(12,99)]
-                let bytes=Bytes(data:data),counts=try (0..<7).map{try bytes.i32(28+$0*4)},strides=[8,24,36,44,16,12,24]
+                cases += [mutate(4,5),mutate(28,UInt32.max),mutate(28,1_000_001),mutate(12,99)]
+                let bytes=Bytes(data:data),counts=try (0..<7).map{try bytes.i32(28+$0*4)},strides=[8,24,36,76,16,12,24]
                 let offsets=(0..<7).map { k in 120+(0..<k).reduce(0){$0+counts[$1]*strides[$1]} }
                 cases += [mutate(offsets[1],UInt32.max),mutate(offsets[2],UInt32.max),mutate(offsets[4]+12,2),
                           mutate(offsets[5]+4,UInt32.max),mutate(offsets[5]+8,UInt32.max),

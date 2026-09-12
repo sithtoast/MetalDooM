@@ -1,4 +1,4 @@
-# Rust native preview — 0.10.0 build 151
+# Rust native preview — 0.10.0 build 152
 
 An explicit development preview now starts the extended simulation in a separate
 child process and draws its copied geometry with the existing native Metal world
@@ -19,8 +19,8 @@ simulation; displayed health/ammo are simulation state. No speedrun/upload work.
 The helper is packaged only with the explicit development build option:
 
 ```sh
-METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/wall-palette-preview" bash scripts/build.sh
-open -n "$PWD/build/wall-palette-preview/MetalDooM.app" --args \
+METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/control-sector-preview" bash scripts/build.sh
+open -n "$PWD/build/control-sector-preview/MetalDooM.app" --args \
   --rust-preview "/path/to/Ultimate Doom/rerelease" --map MAP01
 ```
 
@@ -81,9 +81,9 @@ Classic material lookup is unchanged.
 same world/sky/sprite shaders, depth handling and buffers as classic rendering.
 The sprite renderer accepts copied records and caches uploaded patches; it never
 queries the classic engine in preview mode. See [sprite details](EXTENDED_SPRITES.md).
-Current
-physical floors/ceilings, side offsets and switch texture identities are copied;
-control-sector lighting, fake floors, sky transfers, per-object translucency still need their full presentation adapters. Wall/flat animation
+The copied geometry resolves fake floors and transferred lighting for the camera;
+see [control sectors](EXTENDED_CONTROL_SECTORS.md). Sky transfers and per-object
+translucency remain separate work. Wall/flat animation
 uses the worker's current translation tables. See [materials and caching](EXTENDED_MATERIALS.md).
 Build 139 caches static clipping/stitching, updates affected wall/sector chunks,
 and retains unchanged Metal material buffers. MAP13's 140-tic worker/CPU mean
@@ -132,7 +132,7 @@ byte or command terminates the session with a bounded error reply.
 
 Startup and geometry replies carry an `MVW5` body: magic, tic, fixed x/y/eye-z,
 unsigned Doom angle, signed health, eight-byte sky name, geometry byte count,
-sprite byte count, material byte count, audio byte count, UI byte count (56 bytes total), then optional [MGE3](EXTENDED_GEOMETRY.md),
+sprite byte count, material byte count, audio byte count, UI byte count (56 bytes total), then optional [MGE4](EXTENDED_GEOMETRY.md),
 required [MSP4](EXTENDED_SPRITES.md), [MMT1](EXTENDED_MATERIALS.md) and
 [MSA1](EXTENDED_AUDIO.md) and [MUI3](EXTENDED_LIFECYCLE.md). Tick replies
 include geometry when changed and always include sprite/material/UI state and drained sound events. Old body versions reject. Swift checks envelope size/

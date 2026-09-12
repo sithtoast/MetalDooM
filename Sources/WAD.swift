@@ -240,6 +240,10 @@ struct Sector: Equatable {
     let floor: Float, ceiling: Float, light: Float
     let floorTexture: String, ceilingTexture: String
     var floorOffset: SIMD2<Float> = .zero, ceilingOffset: SIMD2<Float> = .zero
+    var floorLight:Float?=nil,ceilingLight:Float?=nil
+    var backFloor:Float?=nil,backCeiling:Float?=nil,backCeilingTexture:String?=nil
+    var spriteClip:SIMD2<Float> = SIMD2(-Float.infinity,Float.infinity)
+    var backView:Sector {Sector(floor:backFloor ?? floor,ceiling:backCeiling ?? ceiling,light:light,floorTexture:floorTexture,ceilingTexture:backCeilingTexture ?? ceilingTexture)}
 }
 struct Side: Equatable {
     let sector: Int, x: Float, y: Float

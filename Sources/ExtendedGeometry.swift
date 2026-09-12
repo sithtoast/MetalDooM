@@ -14,7 +14,7 @@ struct ExtendedGeometry {
         self.data=data
         let bytes=Bytes(data:data)
         try bytes.check(0,120)
-        guard data.prefix(4) == Data("MGE3".utf8), try bytes.i32(4) == 3 else {
+        guard data.prefix(4) == Data("MGE4".utf8), try bytes.i32(4) == 4 else {
             throw PortError("Unsupported worker geometry format.")
         }
         tic=try bytes.i32(8)
@@ -25,7 +25,7 @@ struct ExtendedGeometry {
             throw PortError("Invalid geometry content fingerprint.")
         }
         contentSHA256=String(decoding:hash,as:UTF8.self)
-        let counts=try (0..<7).map { try bytes.i32(28+$0*4) }, strides=[8,24,36,44,16,12,24]
+        let counts=try (0..<7).map { try bytes.i32(28+$0*4) }, strides=[8,24,36,76,16,12,24]
         var expected=120
         for (count,stride) in zip(counts,strides) {
             guard (0...1_000_000).contains(count) else { throw PortError("Excessive geometry count.") }
@@ -40,6 +40,13 @@ struct ExtendedGeometry {
             guard !visible.isEmpty, visible.allSatisfy({ (33...126).contains($0) }),
                   raw.dropFirst(visible.count).allSatisfy({$0 == 0}) else { throw PortError("Invalid geometry material name.") }
             return String(decoding:visible,as:UTF8.self).uppercased()
+        }
+        func sector(_ p:Int)throws->Sector {
+            let fl=try bytes.i32(p+44),cl=try bytes.i32(p+48)
+            guard (0...255).contains(fl),(0...255).contains(cl) else {throw PortError("Invalid transferred plane light")}
+            return try Sector(floor:fixed(p),ceiling:fixed(p+4),light:Float(bytes.i32(p+8)).clamped(0,255)/255,
+                floorTexture:name(p+12),ceilingTexture:name(p+20),floorOffset:SIMD2(fixed(p+28),fixed(p+32)),ceilingOffset:SIMD2(fixed(p+36),fixed(p+40)),
+                floorLight:Float(fl)/255,ceilingLight:Float(cl)/255,backFloor:fixed(p+52),backCeiling:fixed(p+56),backCeilingTexture:name(p+60),spriteClip:SIMD2(fixed(p+68),fixed(p+72)))
         }
         var offsets=[120]
         for i in 0..<7 { offsets.append(offsets.last!+counts[i]*strides[i]) }
@@ -59,8 +66,8 @@ struct ExtendedGeometry {
                     if !equal(p,36) { sides[i]=try Side(sector:bytes.i32(p),x:fixed(p+4),y:fixed(p+8),upper:name(p+12),lower:name(p+20),middle:name(p+28)) }
                 }
                 for i in sectors.indices {
-                    let p=offsets[3]+i*44
-                    if !equal(p,44) { sectors[i]=try Sector(floor:fixed(p),ceiling:fixed(p+4),light:Float(bytes.i32(p+8)).clamped(0,255)/255,floorTexture:name(p+12),ceilingTexture:name(p+20),floorOffset:SIMD2(fixed(p+28),fixed(p+32)),ceilingOffset:SIMD2(fixed(p+36),fixed(p+40))) }
+                    let p=offsets[3]+i*76
+                    if !equal(p,76) { sectors[i]=try sector(p) }
                 }
                 map=try DoomMap(copying:previous.map,sides:sides,sectors:sectors,start:SIMD2(fixed(16),fixed(20)),angle:Float(unsigned(24))*2 * .pi/4294967296)
                 reusedTopology=true;return
@@ -76,7 +83,7 @@ struct ExtendedGeometry {
         let lines=try records(1).map { try Line(a:bytes.i32($0),b:bytes.i32($0+4),flags:unsigned($0+8),front:bytes.i32($0+12),back:bytes.i32($0+16),blend:bytes.i32($0+20)) }
         guard lines.allSatisfy({(0...64).contains($0.blend)}) else {throw PortError("Invalid wall blend table ID")}
         let sides=try records(2).map { try Side(sector:bytes.i32($0),x:fixed($0+4),y:fixed($0+8),upper:name($0+12),lower:name($0+20),middle:name($0+28)) }
-        let sectors=try records(3).map { try Sector(floor:fixed($0),ceiling:fixed($0+4),light:Float(bytes.i32($0+8)).clamped(0,255)/255,floorTexture:name($0+12),ceilingTexture:name($0+20),floorOffset:SIMD2(fixed($0+28),fixed($0+32)),ceilingOffset:SIMD2(fixed($0+36),fixed($0+40))) }
+        let sectors=try records(3).map {try sector($0)}
         let segs=try records(4).map { try Seg(a:bytes.i32($0),b:bytes.i32($0+4),line:bytes.i32($0+8),side:bytes.i32($0+12)) }
         let leaves=try records(5).map { try Leaf(count:bytes.i32($0),first:bytes.i32($0+4),sector:bytes.i32($0+8)) }
         let nodes=try records(6).map { try Node(origin:SIMD2(fixed($0),fixed($0+4)),direction:SIMD2(fixed($0+8),fixed($0+12)),right:unsigned($0+16),left:unsigned($0+20)) }
