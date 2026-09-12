@@ -4,6 +4,23 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust material animation and scene reuse (build 133)
+
+- Show wall/flat animation frames from the worker's authoritative translation
+  tables. Cache decoded artwork and uploaded textures across manual updates;
+  reuse unchanged geometry/meshes instead of rebuilding on every button press.
+- Send changed geometry with tick replies, removing the preview's second request.
+  Moving heights, light levels, offsets and switches still invalidate the mesh.
+  Add bounded MMT1 material state in MVW3 replies without changing existing ABI
+  structures, geometry or sprite packet layouts.
+- Validate 65 exact animation phases with one static-room mesh build, moving
+  MAP16 geometry, packet/copy boundaries, all 16 Rust scenes and previous weapon/
+  MBF21/ID24 regressions. Classic Doom II's 32-map suite passes.
+- Verify native 0.10.0/build 133: MAP01 console artwork changes with simulation
+  time, MAP16's switch opens its surrounding geometry, and classic rendering
+  remains intact. Audio, finer world updates and full Rust play remain ahead.
+  Preserve prior previews/release artifacts; no push or distribution package.
+
 ## 0.10.0 refinement — Rust actor and weapon preview (build 132)
 
 - Draw native actor and weapon sprites from copied worker frame names, including

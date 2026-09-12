@@ -7,3 +7,5 @@ void ME_RecordSound(void);
 size_t ME_WriteGeometry(void *out, size_t capacity);
 
 size_t ME_WritePresentation(void *out, size_t capacity);
+
+size_t ME_WriteMaterials(void *out, size_t capacity);

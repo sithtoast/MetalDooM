@@ -1,7 +1,7 @@
 # Experimental extended simulation worker
 
-The **0.10.0 build 132** development milestone includes copied geometry and sprite
-frames, explicit session planning, three Rust-required ID24 fields, an explicit
+The **0.10.0 build 133** development milestone includes copied geometry, sprite
+frames and material animations, explicit session planning, three Rust-required ID24 fields, an explicit
 [native preview](EXTENDED_PREVIEW.md), and headless tests with the actual Rust
 patch/resources. The normal app still uses Chocolate Doom; its Rust rejection
 remains in place. **Legacy of Rust is not playable in the GUI yet.**
@@ -55,7 +55,7 @@ Profiles are explicit development choices:
   The copied session still reports the declared ID24 requirement. This profile
   does **not** advertise full ID24 conformance or silently relabel it as MBF21.
 
-The dylib exports exactly nine `ME_` functions, keeping both engine and helper
+The dylib exports exactly ten `ME_` functions, keeping both engine and helper
 symbols private. One `ME_Tick` consumes one 35 Hz command. Movement, attack/use
 and validated weapon-change bits are accepted; special command bits and invalid
 weapon indices fail. Player/actor snapshots copy values, messages and selected
@@ -69,7 +69,7 @@ can be attempted once. Fatal engine errors stay inside the guarded C call and
 invalidate the session; terminate the worker after completion/error to reclaim
 its allocations. There is no teardown/restart API or extended save format yet.
 The separate [preview worker protocol](EXTENDED_PREVIEW.md) now carries copied
-views/geometry and named actor/weapon frames. Do not load the dylib into the Swift app process.
+views/geometry, named actor/weapon frames and material translations. Do not load the dylib into the Swift app process.
 
 Simulation uses directly initialized defaults and an explicit seed, without
 reading the user's Woof config. Upstream code owns physics, actors, weapons,
@@ -143,8 +143,11 @@ Audio and complete presentation remain ahead. The classic app and
 normal picker remain unchanged. All older previews and the primary release are
 preserved. No package or upload.
 
-Next: animated materials and efficient
-moving-world updates, then audio and targeted real-monster/map-special parity.
+Build 133 adds `ME_CopyMaterials`, engine-timed native material animation and
+[scene/resource reuse](EXTENDED_MATERIALS.md). Tick replies include geometry only
+when world values change; explicit geometry requests remain complete.
+
+Next: partial moving-world updates and audio and targeted real-monster/map-special parity.
 Campaign transitions, boss/secret exits, JSON presentation and versioned saves
 remain acceptance gates. Keep the ordinary GUI Rust guard until native campaign
 play is validated.

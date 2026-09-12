@@ -7,67 +7,70 @@ Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, bran
 6171c87 and completed 0.9.0 build 124). Preserve `/Users/wmh/Dev/MetalDooM` and its
 release artifacts. The previous resolution/KEX branch description is historical.
 
-Current feature version is **0.10.0**, final successful app build **132**. The
-explicit **Rust native preview** now draws actors and weapons: a dedicated child
-process feeds copied camera/geometry and named sprite frames to native Metal.
-Manual Fire controls update weapon poses/ammo. HUD, audio, complete palette/
-translucency presentation and full map/campaign/save acceptance remain ahead.
-**Rust is not playable through the ordinary picker**, whose guard is unchanged.
+Current feature version is **0.10.0**, final successful app build **133**. The
+explicit Rust preview now shows engine-timed wall/flat animations and reuses
+unchanged meshes and resource images. Actors, weapons and manual Fire controls
+remain available. **Rust is not playable through the ordinary picker**; keep its
+guard until full native campaign acceptance.
 
 Read [preview/process contract](docs/EXTENDED_PREVIEW.md),
-[copied geometry](docs/EXTENDED_GEOMETRY.md), [worker](docs/EXTENDED_ENGINE.md), then
-[roadmap](docs/LEGACY_OF_RUST.md). ABI 2 now has nine exports (additive
-`ME_CopyPresentation`); existing struct layouts/MGE1 are unchanged. See the
-[MSP1 sprite contract](docs/EXTENDED_SPRITES.md); the worker view body is now MVW2.
-Keep one dedicated
-process per session. Never load the extended dylib into the Swift app process.
+[materials/cache](docs/EXTENDED_MATERIALS.md), [sprites](docs/EXTENDED_SPRITES.md),
+[geometry](docs/EXTENDED_GEOMETRY.md), [worker](docs/EXTENDED_ENGINE.md) and
+[roadmap](docs/LEGACY_OF_RUST.md). ABI 2 now has ten private exports, with additive
+`ME_CopyMaterials`; existing structures/MGE1/MSP1 are unchanged. The view body is
+MVW3 (48-byte header, optional MGE1, required MSP1 and MMT1). One dedicated process
+owns each session; never load the extended dylib into the Swift app process.
 
-Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/actor-preview" bash scripts/build.sh`.
-Launch that app with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
-Only the explicit build option packages/signs the helper/dylib and license notices.
+Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/material-preview" bash scripts/build.sh`.
+Launch with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
+Only the explicit build option packages/signs the helper/dylib and notices.
 Standard builds remain classic. Ordered resources are id24res → Doom II → id1,
-base index 1. Parent resource bytes must match the worker fingerprint. Flat
-namespaces remain separate from wall patches (TCMFLRE/F collisions). Missing
-materials/skies/frames fail the preview instead of using fallback artwork.
-Sprite names resolve within S_START/SS_START namespaces, with ordered replacement.
-Only absent TNT1 blank frames have an invisible fallback; explicit replacements
-remain drawable. Fullbright/mirror/shadow flags reach the existing sprite paths.
+base index 1. The parent checks the worker's ordered content identity. Flats,
+wall textures and sprites retain separate resource lookups; missing artwork fails.
+Absent TNT1 blank frames remain invisible, while explicit replacements render.
 
 Controls manually submit eight forward/back tics, a 45-degree turn, one Use tic,
-or 35 idle tics. Fire submits one attack tic; Fire 1 second submits 35. At spawn,
-use Step 1 second to raise the weapon. Geometry/images are prepared off the main
-thread, then uploaded to Metal. No automatic simulation clock; actors participate in the
-simulation. Closing cancels the worker, drains/reaps it and removes private scratch.
+one/35 attack tics, or 35 idle tics. At spawn use Step 1 second to raise the weapon
+and release the initial use latch before pressing Use. No automatic simulation
+clock. Closing cancels/reaps the child and removes private scratch.
 
-Tests: `scripts/test-extended-worker.sh original-doom2.wad /path/to/rerelease`
-passes protocol/deadline/cancellation/error boundaries, all sixteen scenes and
-actor/weapon decoding at startup/tic 35, eight rotations/mirrors, nine malformed
-MSP1 packets, C complete-copy canaries and actual Incinerator/Blade firing frames.
-`scripts/test-rust-worker.sh` passes the full prior MBF21, session, required ID24,
-all-map and real-weapon probes again with nine private exports. Classic Doom II's
-32-map geometry/material/sprite suite passes. Logs:
-`build/presentation132-validation.log`, `build/rust132-validation.log`,
-`build/classic132-validation.log`. The earlier XNOD byte/BSP parity evidence remains in
-`build/geometry129-validation.log` (MAP13: 32,992 nodes, 508,713 triangles).
+The UI now prepares tick replies directly, removing its extra geometry request.
+The worker copies/compares geometry exactly, excluding tic/player header values,
+and omits unchanged geometry. Explicit geometry requests remain full. The serial
+`ExtendedSceneBuilder` reuses the last geometry/mesh and decoded images/patches;
+Metal reuses material textures and vertex/sky buffers until geometry changes.
+Animations use copied canonical nonidentity translation names; absent mappings
+restore source frames. Swirl translations fail explicitly. Classic material
+translation continues through its existing engine path.
 
-Native app is `build/actor-preview/MetalDooM.app`, **0.10.0/build 132**. Host
-signature verification covers app/helper/dylib. CUA verifies its title, classic
-MAP01 monsters/pistol/HUD, and Rust MAP01 corpse/pistol/muzzle flash (tics 0→35→70,
-ammo 50→47). MAP16's starting switch opened its surrounding geometry after Use
-at tic 5 and Step to tic 40; the sprite/weapon scene is left there awaiting input.
-New Rust guns have automated frame-decoding evidence only; native animation
-acceptance remains ahead. Prior build 131's bundle is preserved at
-`build/worker-preview/MetalDooM.app`; it is no longer running at the final process
-check. Its last observed MAP13 starting panel was solid scenery,
-not a door. Build 130's helper-exit/scratch-cleanup check is historical evidence.
+Tests pass in `build/material133-validation.log`: C sprite/material copy canaries,
+protocol/deadline/cancellation checks, all 16 Rust scenes/frames, eight sprite
+rotations, actual Incinerator/Blade firing frames, nine malformed sprite packets,
+ten malformed material packets and material/view tic mismatch. A static room
+checks 65 exact animation phases (three NUKAGE flats, two FIREBLU walls), no geometry
+retransmission, one mesh build and stable decode caches. MAP16's switch checks
+changed heights and mesh invalidation after releasing the initial use latch.
+`build/rust133-validation.log` passes all previous MBF21/session/ID24/map/weapon
+checks with ten private exports. `build/classic133-validation.log` passes all 32
+Doom II maps, 502 materials and 1381 sprite/HUD patches. Historical MAP13 XNOD byte
+parity remains in `build/geometry129-validation.log`.
 
-Next: animated material translation and efficient world-state updates, then audio.
-Copy presentation bob/interpolation and palette/translucency behavior; validate
-new gun/monster frames visually. Complete Boom control-
-sector/sky/lighting presentation and targeted monster/map-special parity, campaign
-routes/boss exits, JSON presentation and versioned saves. Whole-world rebuilding
-on each manual command is not a real-time performance solution. Keep ordinary
-Rust acceptance guarded until native campaign play is validated.
+Native candidate: `build/material-preview/MetalDooM.app`, **0.10.0/build 133**;
+build log `build/build133.log`. Host deep/strict signature verification covers the
+app/helper/dylib; bundled plist and CUA running title agree. CUA checks classic
+MAP01 monsters/pistol/HUD, changed Rust MAP01 console artwork at tics 0/35/70/105,
+and MAP16's starting switch opening after Step → Use → Step (35→36→71). The final
+preview is left on MAP16 waiting for input. The prior build 132 actor-preview
+bundle and earlier previews are preserved. Its pistol/muzzle-flash/ammo evidence
+is recorded in VALIDATION.md; new Rust guns still need native visual acceptance.
+
+Next: audio event bridging and more granular moving-world updates. Worker geometry
+comparison is still linear in map size; any geometry change rebuilds the whole
+mesh. This is reduced redundant work, not proven continuous-play performance.
+Complete scrolling flat offsets, presentation bob/interpolation, palette/TRANMAP
+translucency, control-sector/fake-floor/sky effects, targeted monster/map-special
+parity, campaign/boss/secret routes, JSON presentation and versioned saves. Keep
+the ordinary Rust guard until native campaign play is validated.
 
 Older previews are preserved: build 126 `build/MetalDooM.app`, 127
 `build/extended-milestone/MetalDooM.app`, 128 `build/rust-milestone/MetalDooM.app`,
@@ -78,7 +81,7 @@ The **0.9.0 build 124** release was notarized by the user in the preceding task:
 Apple accepted `121f1db9-34a4-4f5f-aeb3-599a59de0727`; stapler, codesign and
 Gatekeeper were verified in the host context. ZIP location remains the primary
 checkout's `build/releases/MetalDooM-0.9.0-build124/`. This is prior-task evidence.
-Builds 126–132 are ad-hoc signed, unnotarized, and unpackaged. GitHub workflow outputs
+Builds 126–133 are ad-hoc signed, unnotarized, and unpackaged. GitHub workflow outputs
 remain unnotarized. No push, publish, upload or Apple submission was performed.
 
 The remaining sections are historical and describe earlier branches/previews.

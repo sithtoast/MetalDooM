@@ -18,20 +18,31 @@ static int send_frame(uint32_t seq,uint32_t error,const void *body,size_t length
     return fwrite(h,1,16,output)==16 && fwrite(body,1,length,output)==length && fflush(output)==0;
 }
 static int fail(uint32_t seq,const char *text) { send_frame(seq,1,text,strlen(text));return 1; }
-static int state(uint32_t seq,int geometry) {
+static unsigned char *previous_geometry;
+static size_t previous_size;
+static int state(uint32_t seq,int force_geometry) {
     ME_View view;
     if(!ME_CopyView(&view))return 0;
-    size_t size=geometry?ME_CopyGeometry(NULL,0):0;
-    if((geometry && !size) || size>160*1024*1024)return 0;
-    size_t presentation=ME_CopyPresentation(NULL,0);
-    if(!presentation || size+presentation>160*1024*1024)return 0;
-    unsigned char *body=calloc(1,44+size+presentation); if(!body)return 0;
-    memcpy(body,"MVW2",4);put(body+4,view.tic);put(body+8,view.x);put(body+12,view.y);
+    size_t size=ME_CopyGeometry(NULL,0);
+    if(size<120 || size>160*1024*1024)return 0;
+    unsigned char *geometry=malloc(size);if(!geometry)return 0;
+    if(ME_CopyGeometry(geometry,size)!=size){free(geometry);return 0;}
+    // A worker owns one fixed map. Ignore tic/player fields; compare counts,
+    // content identity and every geometry value exactly, without hash collisions.
+    int changed=force_geometry || previous_size!=size || !previous_geometry ||
+        memcmp(geometry+28,previous_geometry+28,size-28);
+    free(previous_geometry);previous_geometry=geometry;previous_size=size;
+    if(!changed)size=0;
+    size_t presentation=ME_CopyPresentation(NULL,0),materials=ME_CopyMaterials(NULL,0);
+    if(!presentation || !materials || size+presentation+materials>160*1024*1024)return 0;
+    unsigned char *body=calloc(1,48+size+presentation+materials);if(!body)return 0;
+    memcpy(body,"MVW3",4);put(body+4,view.tic);put(body+8,view.x);put(body+12,view.y);
     put(body+16,view.eye_z);put(body+20,view.angle);put(body+24,view.health);
-    memcpy(body+28,view.sky,8);put(body+36,(uint32_t)size); put(body+40,(uint32_t)presentation);
-    if(geometry && ME_CopyGeometry(body+44,size)!=size){free(body);return 0;}
-    if(ME_CopyPresentation(body+44+size,presentation)!=presentation){free(body);return 0;}
-    int result=send_frame(seq,0,body,44+size+presentation);free(body);return result;
+    memcpy(body+28,view.sky,8);put(body+36,(uint32_t)size);put(body+40,(uint32_t)presentation);put(body+44,(uint32_t)materials);
+    if(size)memcpy(body+48,geometry,size);
+    if(ME_CopyPresentation(body+48+size,presentation)!=presentation ||
+       ME_CopyMaterials(body+48+size+presentation,materials)!=materials){free(body);return 0;}
+    int result=send_frame(seq,0,body,48+size+presentation+materials);free(body);return result;
 }
 static unsigned number(const char *s) {
     char *end;errno=0;unsigned long v=strtoul(s,&end,10);

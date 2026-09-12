@@ -65,3 +65,6 @@ ME_API int ME_CopyView(ME_View *out);
 
 /* MSP1 resolved sprite/weapon values, same whole-buffer semantics as geometry. */
 ME_API size_t ME_CopyPresentation(void *out, size_t capacity);
+
+/* MMT1 animation translations, same whole-buffer semantics as geometry. */
+ME_API size_t ME_CopyMaterials(void *out, size_t capacity);

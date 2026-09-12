@@ -8,7 +8,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     private let status=NSTextField(labelWithString:"Loading worker…")
     private let queue=DispatchQueue(label:"MetalDooM.extended-preview")
     private let worker=ExtendedWorker()
-    private var resources:WAD?, buttons:[NSButton]=[], closed=false
+    private var sceneBuilder:ExtendedSceneBuilder?, buttons:[NSButton]=[], closed=false
     func applicationDidFinishLaunching(_ notification:Notification) {
         do {
             let args=CommandLine.arguments
@@ -50,8 +50,8 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
                     let state=try worker.start(executable:executable,paths:paths,map:map,base:1)
                     guard let identity=worker.identity else { throw PortError("Missing worker identity.") }
                     let resources=try WAD(previewResources:paths,baseIndex:1,profile:1,identity:identity)
-                    self.resources=resources
-                    let scene=try ExtendedScene(view:state,resources:resources)
+                    let builder=try ExtendedSceneBuilder(resources:resources);self.sceneBuilder=builder
+                    let scene=try builder.prepare(state)
                     DispatchQueue.main.async { [weak self] in self?.present(scene) }
                 } catch { DispatchQueue.main.async { [weak self] in self?.failed(error) } }
             }
@@ -65,9 +65,9 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         let tag=sender.tag
         queue.async { [self] in
             do {
-                guard let resources else { throw PortError("Preview resources unavailable.") }
-                _=try worker.tick(forward:tag==1 ? 25:tag==2 ? -25:0,turn:tag==3 ? 8192:tag==4 ? -8192:0,buttons:tag==6 ? 2:(tag==7 || tag==8) ? 1:0,count:tag<=2 ? 8:(tag==5 || tag==8) ? 35:1)
-                let scene=try ExtendedScene(view:worker.geometry(),resources:resources)
+                guard let sceneBuilder else { throw PortError("Preview resources unavailable.") }
+                let state=try worker.tick(forward:tag==1 ? 25:tag==2 ? -25:0,turn:tag==3 ? 8192:tag==4 ? -8192:0,buttons:tag==6 ? 2:(tag==7 || tag==8) ? 1:0,count:tag<=2 ? 8:(tag==5 || tag==8) ? 35:1)
+                let scene=try sceneBuilder.prepare(state)
                 DispatchQueue.main.async { [weak self] in self?.present(scene) }
             } catch { DispatchQueue.main.async { [weak self] in self?.failed(error) } }
         }

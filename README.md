@@ -5,11 +5,11 @@ by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
 **Version 0.10.0 · experimental source preview · local builds are not notarized.**
 
-Build 132 adds actors and weapons to the explicit [Rust preview](docs/EXTENDED_PREVIEW.md):
-a separate simulation worker feeds map geometry, skies and named sprite frames
-to the native Metal renderer. Manual firing controls update weapon poses and ammo.
-All sixteen maps pass scene and sprite checks. Audio and full gameplay remain
-ahead; the ordinary picker still rejects Rust. See the [remaining milestones](docs/LEGACY_OF_RUST.md).
+Build 133 adds engine-timed wall/flat animation and reuses unchanged geometry and
+textures in the explicit [Rust preview](docs/EXTENDED_PREVIEW.md). Actors, weapons
+and manual firing remain available. All sixteen maps pass scene checks; a
+65-tic animation test verifies timing and mesh reuse. Audio and full gameplay
+remain ahead; the ordinary picker still rejects Rust. See the [remaining milestones](docs/LEGACY_OF_RUST.md).
 The previous 0.9.0 build 124 was separately notarized; that release is preserved.
 
 This branch adds independently switchable AO, test/torch/projectile/muzzle

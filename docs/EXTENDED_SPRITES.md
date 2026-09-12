@@ -49,7 +49,7 @@ ordered WAD stack. Sprite replacements use the last matching name.
 | 20 | Flags u32: mirrored 1, fullbright 2, shadow 4 |
 
 Weapon and flash layers preserve psprite order. Swift rejects incorrect lengths,
-versions, counts, names, light ranges and unknown flags; the enclosing MVW2 tic
+versions, counts, names, light ranges and unknown flags; the enclosing view tic
 must agree. `ExtendedScene` decodes each selected sprite name once per update.
 `SpriteRenderer` caches its uploaded patch across updates and reuses the native
 world billboard, weapon overlay and fuzz paths. Classic engine calls are gated
@@ -61,8 +61,8 @@ This copies simulation psprite offsets; presentation bob/interpolation is pendin
 Translucent metadata is carried but sprites still render opaque. Per-state
 TRANMAPs, fixed-colormap palette effects, corpse mirroring enhancements,
 control-sector lighting and fake-floor clipping are not yet adapted. The preview
-has health/ammo text but no gameplay HUD or audio. Whole-world rebuilding remains
-too coarse for a continuous simulation clock.
+has health/ammo text but no gameplay HUD or audio. Build 133 [reuses unchanged scenes](EXTENDED_MATERIALS.md), but any geometry change
+still rebuilds the whole mesh; a continuous simulation clock remains pending.
 
 `scripts/test-extended-worker.sh` checks complete-copy canaries, nine malformed
 packets, all sixteen actual Rust maps at startup/tic 35, and eight directional

@@ -229,3 +229,12 @@ size_t ME_CopyPresentation(void *out, size_t capacity)
     size_t result=ME_WritePresentation(out,capacity);
     entered=0;return result;
 }
+
+size_t ME_CopyMaterials(void *out, size_t capacity)
+{
+    if (!ready) return 0;
+    entered=1;
+    if (setjmp(error_boundary)) { entered=0; return 0; }
+    size_t result=ME_WriteMaterials(out,capacity);
+    entered=0;return result;
+}

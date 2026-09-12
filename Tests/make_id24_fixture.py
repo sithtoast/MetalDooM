@@ -74,3 +74,7 @@ for name, things in {'rust-incinerator':[(*player,),(-110,0,0,2004,7)],
 # Eight directional zombie views around a stationary player; Doom art only.
 positions=[(128,0),(128,128),(0,128),(-128,128),(-128,0),(-128,-128),(0,-128),(128,-128)]
 write('render-rotations',replace_room(b''.join(struct.pack('<5h',*t) for t in [(0,0,0,1,7)]+[(x,y,0,3004,7) for x,y in positions])))
+# Native geometry stays static while both a flat and wall animate.
+animated_room=replace_room(struct.pack('<5h',*player))
+animated_room=[(n,d.replace(b'FLOOR0_1',b'NUKAGE1\0').replace(b'STARTAN3',b'FIREBLU1') if n in ['SECTORS','SIDEDEFS'] else d) for n,d in animated_room]
+write('render-materials',animated_room)

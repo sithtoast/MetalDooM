@@ -283,6 +283,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var animatedIDs: [MaterialKey:Int32] = [:]
     private var animatedWalls: [Int32:MTLTexture] = [:], animatedFlats: [Int32:MTLTexture] = [:]
     private var extendedPreview = false
+    private var previewTranslations:[MaterialKey:MaterialKey]=[:]
     private var engineReady = false
     private var previousPlayer = MD_Player(), currentPlayer = MD_Player()
     private var accumulator: Double = 0
@@ -531,10 +532,10 @@ final class Renderer: NSObject, MTKViewDelegate {
         try syncGeometry()
         return (geometry.triangleCount,Array(Set(missing)).sorted())
     }
-    /// World-only diagnostic path. Uses the same Metal world/sky pipelines as
+    /// Isolated diagnostic path. Uses the same Metal world/sky/sprite pipelines as
     /// classic gameplay, with no classic engine initialization or ticking.
     func loadExtendedPreview(_ scene: ExtendedScene) throws {
-        guard !engineReady, let copied=scene.view.geometry else { throw PortError("Preview requires a fresh renderer.") }
+        guard !engineReady else { throw PortError("Preview requires a fresh renderer.") }
         func texture(_ image:PixelImage) throws -> MTLTexture {
             let d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba8Unorm,width:image.width,height:image.height,mipmapped:false)
             d.storageMode = .shared;d.usage = .shaderRead
@@ -542,11 +543,14 @@ final class Renderer: NSObject, MTKViewDelegate {
             image.rgba.withUnsafeBytes { result.replace(region:MTLRegionMake2D(0,0,image.width,image.height),mipmapLevel:0,withBytes:$0.baseAddress!,bytesPerRow:image.width*4) }
             return result
         }
-        var cached:[MaterialKey:MTLTexture]=[:]
-        for (key,image) in scene.images { cached[key]=try texture(image) }
-        let loaded=try makeBatches(scene.geometry,textures:cached), loadedSky=try texture(scene.sky)
-        try uploadSkyGeometry(scene.geometry)
-        map=copied.map;textures=cached;batches=loaded;sky=loadedSky
+        for (key,image) in scene.images where textures[key]==nil { textures[key]=try texture(image) }
+        if scene.geometryChanged {
+            batches=try makeBatches(scene.geometry,textures:textures)
+            try uploadSkyGeometry(scene.geometry)
+            map=scene.copiedGeometry.map
+        }
+        sky=textures[MaterialKey(name:scene.view.sky,flat:false)]
+        previewTranslations=scene.view.materials.translations
         position=SIMD2(scene.view.x,scene.view.y);eyeZ=scene.view.eyeZ;yaw=scene.view.angle;pitch=0
         if sprites == nil { sprites=try SpriteRenderer(device:device,wad:scene.resources,preload:false) }
         let actors=scene.view.presentation.actors.map { source -> MD_Thing in
@@ -592,6 +596,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
     }
     private func animatedTexture(_ batch: GPUBatch) -> MTLTexture {
+        if extendedPreview { return textures[previewTranslations[batch.material] ?? batch.material] ?? batch.texture }
         guard let index=animatedIDs[batch.material] else { return batch.texture }
         let translated=MD_TranslatedMaterial(index,batch.material.flat ? 1 : 0)
         return (batch.material.flat ? animatedFlats[translated] : animatedWalls[translated]) ?? batch.texture

@@ -1,5 +1,39 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 133: Rust material animation and scene reuse
+
+`scripts/test-extended-worker.sh original-doom2.wad /path/to/rerelease` passes
+all 16 initial/tic-35 scenes and actor/weapon decodes, rotation/firing regressions,
+C complete-copy canaries for sprite/material records, nine malformed sprite and
+ten malformed material packets, material/view tic mismatch and existing process/
+deadline/error/cancellation checks. The original static room verifies every tic
+through 65: NUKAGE1–3 and FIREBLU1–2 match the engine's phase, no geometry is sent,
+one mesh is built and repeated snapshots leave image/sprite decode counts stable.
+
+MAP16's switch test verifies changed floor/ceiling heights and four mesh builds
+(startup, released tics, press, later motion). The fixture must first release the
+spawn use latch; pressing Use on the very first tic is intentionally ignored by
+the upstream player logic. Comparing triangle count alone did not establish motion;
+the final assertion compares heights. Logs: `build/material133-validation.log`.
+The full MBF21/private-symbol/session/ID24/all-map/weapon suite passes with ten
+exports (`build/rust133-validation.log`). Classic Doom II checks pass all 32 maps,
+502 materials and 1381 sprite/HUD patches (`build/classic133-validation.log`).
+
+The separate explicit build succeeds as **0.10.0/build 133** at
+`build/material-preview/MetalDooM.app` (`build/build133.log`). Host deep/strict
+signature verification passes; bundled plist and CUA running title agree. Native
+checks cover classic MAP01 monsters/pistol/HUD, Rust MAP01 console-art changes
+at the unchanged camera across tics 0/35/70/105, and MAP16 switch opening after
+Step → Use → Step (35→36→71). The preview is left on MAP16. The native check does
+not independently prove every animated flat/frame; those have decoding/phase tests.
+
+Unchanged scenes now reuse CPU/GPU resources. This is not a frame-rate benchmark:
+worker comparison still traverses full geometry, and any geometry change rebuilds
+the complete mesh. Partial moving-sector updates, scrolling flats, full sky/control-
+sector/palette/translucency effects, audio and continuous campaign/save acceptance
+remain ahead. No WADs, bundles or generated fixtures are committed; older previews
+and the primary release are preserved. Nothing pushed or packaged for distribution.
+
 ## 2026-09-12 — 0.10.0 build 132: native Rust actor and weapon frames
 
 `scripts/test-extended-worker.sh original-doom2.wad /path/to/rerelease` passes
