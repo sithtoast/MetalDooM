@@ -1,0 +1,89 @@
+# Copied extended geometry — build 129
+
+The experimental worker now supplies its decoded map to the same `DoomMap` and
+`Geometry` types used by the native renderer. `Sources/ExtendedGeometry.swift`
+decodes copied bytes without linking or loading Woof into the app process.
+This milestone builds CPU mesh batches; it does **not** select Rust in the GUI,
+render a live Rust session, or establish complete Boom/ID24 presentation.
+
+## Contract
+
+`ME_CopyGeometry(out, capacity)` is the seventh exported function in additive
+worker ABI 2. Existing config/snapshot layouts are unchanged. Call on the owning
+session thread between ticks. NULL queries the required size. An undersized
+buffer is untouched and returns the required size. A successful full copy returns
+that size; zero means not ready or a guarded engine error. Discard output on error.
+No engine pointers, compiler padding, native `size_t`, or resource paths enter the
+snapshot. This is an experimental value format, not production IPC or a save.
+
+All words are little-endian 32-bit. Coordinates/heights/offsets are signed 16.16;
+angles use unsigned Doom binary angles. Indices are unsigned except missing line
+sides, represented as signed -1. Names occupy eight ASCII bytes, NUL padded unless
+all eight bytes are used. Material names are current base identities, **not**
+per-tic animation translations. The session must still own the matching ordered
+resources; its fingerprint accompanies the map.
+
+| Offset | Header field |
+| --- | --- |
+| 0 | Four bytes `MGE1` |
+| 4 | Format version 1 |
+| 8 | Simulation tic |
+| 12 | Map number, 1–32 |
+| 16, 20, 24 | Current player x, y, angle |
+| 28–52 | Seven counts in the array order below |
+| 56–119 | 64 lowercase hex characters: session content SHA-256 |
+
+Arrays immediately follow the 120-byte header:
+
+| Array | Bytes/record | Fields |
+| --- | --- | --- |
+| Vertices | 8 | x, y (engine simulation coordinates) |
+| Lines | 20 | vertex a, vertex b, flags, front side, back side |
+| Sides | 36 | sector, x offset, y offset; upper/lower/middle names |
+| Sectors | 28 | floor, ceiling, light (0–255); floor/ceiling names |
+| Segs | 16 | vertex a, vertex b, line, side (0/1) |
+| Subsectors | 12 | seg count, first seg, engine sector |
+| Nodes | 24 | x, y, dx, dy, right child, left child |
+
+Node child bit 31 marks a subsector; remaining bits hold its index. The classic
+WAD decoder normalizes its bit-15 tags into this common representation. Missing
+side -1 similarly avoids collision with valid extended side index 65535.
+
+The decoder bounds each array at one million records, requires exact total size,
+and rejects unsupported versions, invalid identity/names, references, negative
+ranges, missing seg sides, degenerate partitions and non-postordered/cyclic node
+links before meshing. Engine export rejects minisegs needing a future GL adapter.
+The map uses the engine's explicit subsector sector rather than guessing it.
+
+MBF21 level setup projects split vertices onto parent linedefs. Those coordinates
+can differ from the original lump, including XNOD's added vertices; the snapshot
+preserves the engine result. Mesh clipping continues to use original directed
+linedefs to avoid seams. Current physical sector heights/light and side offsets/
+switch textures are copied, but transfer heights, control-sector lighting, sky
+transfers, animation translation, sprites, interpolation and sound require the
+remaining presentation bridge. Whole-map copies/mesh rebuilds are validation
+work here, not a measured real-time update strategy.
+
+## Evidence
+
+Run `scripts/test-extended-geometry.sh original-doom2.wad /path/to/rerelease`.
+Private snapshots/logs live in `build/extended/geometry/`, outside Git.
+
+- All 32 original Doom II maps: worker/classic linedef endpoints, BSP nodes,
+  subsector sectors and native triangle counts agree. The existing classic
+  geometry/material/sprite suite also passes.
+- All sixteen Rust maps: copied engine geometry decodes and produces nonempty,
+  finite native mesh batches. MAP13 has 37,547 vertices, 76,284 segs, 32,993 leaves,
+  32,992 nodes and 508,713 triangles (default texture heights, CPU generation).
+- Independent MAP13 byte check confirms all wall endpoints, seg/leaf ranges and
+  node partitions/children against the actual XNOD lump: 29,143 original + 8,404
+  added vertices; 3,558 split vertices retain engine projection adjustments.
+- Fourteen malformed snapshot cases reject before meshing, including truncated/
+  trailing bytes, version/count limits, invalid ranges and cyclic/out-of-range
+  BSP children. Per-map worker checks cover no-session queries, undersized-buffer
+  nonmutation, repeated-copy equality and buffer-end canaries.
+- Full existing Rust session/ID24/gameplay tests pass with seven private exports.
+
+Native build 129 remains the classic app. Its separate preview, signature and
+visible version are checked in the host context. No live Rust graphics, audio,
+frame-time, moving-sector visual parity or full campaign acceptance is claimed.

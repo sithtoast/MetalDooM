@@ -215,8 +215,11 @@ struct Side {
 }
 struct Line { let a: Int, b: Int, flags: Int, front: Int, back: Int }
 struct Seg { let a: Int, b: Int, line: Int, side: Int }
-struct Leaf { let count: Int, first: Int }
-struct Node { let origin: SIMD2<Float>, direction: SIMD2<Float>; let right: Int, left: Int }
+struct Leaf { let count: Int, first: Int; var sector: Int? = nil }
+struct Node {
+    static let leafBit = 0x80000000
+    static func classicChild(_ child: Int) -> Int { child & 0x8000 != 0 ? leafBit | (child & 0x7fff) : child }
+    let origin: SIMD2<Float>, direction: SIMD2<Float>; let right: Int, left: Int }
 
 struct DoomMap {
     let name: String
@@ -241,7 +244,7 @@ struct DoomMap {
         }
         let l = try wad.mapLump(name, "LINEDEFS")
         lines = try l.records(14).map { p in
-            Line(a: try l.u16(p), b: try l.u16(p+2), flags: try l.u16(p+4), front: try l.u16(p+10), back: try l.u16(p+12))
+            Line(a: try l.u16(p), b: try l.u16(p+2), flags: try l.u16(p+4), front: try l.u16(p+10), back: try l.u16(p+12) == 65535 ? -1 : l.u16(p+12))
         }
         let g = try wad.mapLump(name, "SEGS")
         segs = try g.records(12).map { Seg(a: try g.u16($0), b: try g.u16($0+2), line: try g.u16($0+6), side: try g.u16($0+8)) }
@@ -250,17 +253,26 @@ struct DoomMap {
         let n = try wad.mapLump(name, "NODES")
         nodes = try n.records(28).map { p in
             Node(origin: SIMD2(Float(try n.i16(p)),Float(try n.i16(p+2))),
-                 direction: SIMD2(Float(try n.i16(p+4)),Float(try n.i16(p+6))), right: try n.u16(p+24), left: try n.u16(p+26))
+                 direction: SIMD2(Float(try n.i16(p+4)),Float(try n.i16(p+6))), right: try Node.classicChild(n.u16(p+24)), left: try Node.classicChild(n.u16(p+26)))
         }
         let t = try wad.mapLump(name, "THINGS")
         guard let spawn = try t.records(10).first(where: { try t.u16($0+6) == 1 }) else { throw PortError("No player-one start in \(name).") }
         start = SIMD2(Float(try t.i16(spawn)), Float(try t.i16(spawn+2)))
         angle = Float(try t.i16(spawn+4)) * .pi / 180
+        try validate()
+    }
+    init(name: String, points: [SIMD2<Float>], lines: [Line], sides: [Side], sectors: [Sector],
+         segs: [Seg], leaves: [Leaf], nodes: [Node], start: SIMD2<Float>, angle: Float) throws {
+        self.name=name; self.points=points; self.lines=lines; self.sides=sides; self.sectors=sectors
+        self.segs=segs; self.leaves=leaves; self.nodes=nodes; self.start=start; self.angle=angle
+        try validate()
+    }
+    func validate() throws {
         guard !points.isEmpty, !sectors.isEmpty, !leaves.isEmpty else { throw PortError("Empty map geometry.") }
         for side in sides { guard sectors.indices.contains(side.sector) else { throw PortError("Invalid sidedef sector.") } }
         for line in lines {
             guard points.indices.contains(line.a), points.indices.contains(line.b), sides.indices.contains(line.front),
-                  line.back == 65535 || sides.indices.contains(line.back) else { throw PortError("Invalid linedef reference.") }
+                  line.back == -1 || sides.indices.contains(line.back) else { throw PortError("Invalid linedef reference.") }
         }
         for seg in segs {
             guard points.indices.contains(seg.a), points.indices.contains(seg.b), lines.indices.contains(seg.line), (0...1).contains(seg.side) else {
@@ -270,29 +282,31 @@ struct DoomMap {
             guard sides.indices.contains(side) else { throw PortError("Seg references a missing side.") }
         }
         for leaf in leaves {
-            guard leaf.count > 0, leaf.first <= segs.count, leaf.count <= segs.count - leaf.first else { throw PortError("Invalid subsector range.") }
+            if let sector = leaf.sector, !sectors.indices.contains(sector) { throw PortError("Invalid subsector sector.") }
+            guard leaf.count > 0, leaf.first >= 0, leaf.first <= segs.count, leaf.count <= segs.count - leaf.first else { throw PortError("Invalid subsector range.") }
         }
         for (index, node) in nodes.enumerated() {
             guard simd_length_squared(node.direction) > 0 else { throw PortError("Degenerate BSP partition.") }
             for child in [node.right, node.left] {
-                guard child & 0x8000 != 0 ? leaves.indices.contains(child & 0x7fff) : child < index else {
-                    throw PortError("Invalid or cyclic classic BSP tree.")
+                guard child & Node.leafBit != 0 ? leaves.indices.contains(child & ~Node.leafBit) : (child >= 0 && child < index) else {
+                    throw PortError("Invalid or cyclic BSP tree.")
                 }
             }
         }
     }
     func leafSector(_ index: Int) -> Int {
+        if let sector = leaves[index].sector { return sector }
         let seg = segs[leaves[index].first], line = lines[seg.line]
         return sides[seg.side == 0 ? line.front : line.back].sector
     }
     func sector(at point: SIMD2<Float>) -> Int {
         guard !nodes.isEmpty else { return leafSector(0) }
         var index = nodes.count - 1
-        while index & 0x8000 == 0 {
+        while index & Node.leafBit == 0 {
             let node = nodes[index]
             index = cross(node.direction, point - node.origin) <= 0 ? node.right : node.left
         }
-        return leafSector(index & 0x7fff)
+        return leafSector(index & ~Node.leafBit)
     }
 
 }

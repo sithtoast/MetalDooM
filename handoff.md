@@ -7,50 +7,58 @@ Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, bran
 6171c87 and completed 0.9.0 build 124). Preserve `/Users/wmh/Dev/MetalDooM` and its
 release artifacts. The previous resolution/KEX branch description is historical.
 
-Current feature version is **0.10.0**, successful app build **128**. The separate
-native worker now plans ordered resources with an explicit base identity, resolves
-a guarded GAMECONF subset, and implements Rust-required pickup/respawn fields.
-**Legacy of Rust is not playable in the GUI yet**; the app still uses Chocolate
-Doom and its Rust guard is unchanged. No full ID24 compatibility claim.
+Current feature version is **0.10.0**, successful app build **129**. The separate
+native worker supplies bounded copied geometry to the native `DoomMap`/`Geometry`
+types. All sixteen Rust maps produce finite CPU mesh batches, including MAP13
+XNOD. **Legacy of Rust is not playable in the GUI yet**; the app still uses
+Chocolate Doom and its Rust guard is unchanged. No full ID24 compatibility claim.
 
-Read [extended-worker contract/evidence](docs/EXTENDED_ENGINE.md), then the
-[Rust roadmap](docs/LEGACY_OF_RUST.md). The public worker ABI is version 2 and
-requires one dedicated process per session. It has no cleanup/restart, IPC, render/
-audio bridge or extended saves yet. Do not load it into the Swift app process.
-`Vendor/Woof/UPSTREAM.md` records the source pin, licenses and local modifications.
+Read [copied geometry contract/evidence](docs/EXTENDED_GEOMETRY.md),
+[extended-worker contract](docs/EXTENDED_ENGINE.md), then the
+[Rust roadmap](docs/LEGACY_OF_RUST.md). Worker ABI remains version 2, with seven
+exports (additive `ME_CopyGeometry`). It requires one dedicated process per
+session; no cleanup/restart, production IPC, native Rust rendering/audio or
+extended saves yet. Do not load it into the Swift app process.
 
-Run `scripts/test-rust-worker.sh /path/to/original/doom2.wad /path/to/rerelease`.
-The full MBF21 baseline and new suite pass: session order/identity/fingerprint and
-error boundaries, pickup messages/amounts, BEX replacements and respawn timing.
-The actual id24res → Doom II → id1 stack (base index 1) loads 203 actor types and
-1543 states, with 35-tic startup checks on all sixteen maps, including MAP13 XNOD.
-Actual Rust fuel and Incinerator/Calamity Blade tap/partial/full-charge probes pass
-on original geometry. Copied UMAPINFO route/finale/boss-count metadata is checked;
-actual boss kills and campaign transitions remain ahead. Logs: `build/extended/`
-and `build/rust128-validation.log`. The explicit Rust profile is a development
-probe, not a general ID24 backend. See the documented respawn prose/reference
-comparison discrepancy before altering that behavior.
+Run `scripts/test-extended-geometry.sh original-doom2.wad /path/to/rerelease`.
+All 32 original Doom II maps agree on wall endpoints, BSP partitions/children,
+subsector sectors and triangle counts. All sixteen Rust maps build meshes.
+MAP13 has 37,547 vertices, 76,284 segs, 32,993 leaves, 32,992 nodes and 508,713
+triangles (default texture heights). An independent byte check verifies XNOD
+references and original wall coordinates. MBF21 projects 3,558 split vertices;
+the copied representation intentionally takes those engine coordinates. Fourteen
+malformed snapshot cases reject. Logs: `build/geometry129-validation.log`,
+`build/extended/geometry/`; the classic geometry/material suite also passes.
 
-Next: shared/copied geometry and native render/audio data, especially XNOD parity;
-then targeted real-monster combat and ID24 map-special validation. Campaign routes,
-boss exits, JSON interlevel/finale/HUD and versioned saves remain required. Native
-acceptance across both episodes/all sixteen maps must precede relaxing the GUI
-guard. MAP99 remains a hidden test block, and sibling packs are not dependencies.
+Run `scripts/test-rust-worker.sh original-doom2.wad /path/to/rerelease`.
+The full prior MBF21/session/ID24/weapon suite passes again for build 129. The
+actual id24res → Doom II → id1 stack (base index 1) loads 203 actor types and 1543
+states, with 35-tic startup checks on all sixteen maps. Fuel, Incinerator and
+Blade tap/partial/full-charge probes pass. Log: `build/rust129-validation.log`.
+See the documented respawn prose/reference discrepancy before changing behavior.
 
-The user floated built-in speedrun demo recording and possible external uploads
-as a future aside, explicitly leaving it outside this work. No implementation or
-upload authorization was implied; continue Rust first.
+Next: dedicated worker process transport and native render/audio integration.
+Copied geometry includes physical sector/side values but not complete Boom
+transfer-height/lighting/sky/animation presentation. Measure/update moving
+geometry efficiently; MAP13's large CPU mesh is not a real-time performance
+result. Then targeted real-monster combat and ID24 map-special validation,
+campaign routes/boss exits, JSON presentation and versioned saves. Native campaign
+acceptance must precede relaxing the GUI guard. MAP99 remains a hidden test block.
 
-Build 128 is `build/rust-milestone/MetalDooM.app`. CUA confirms its rendered Doom
-II MAP01 and 0.10.0/build 128 title/footer; it is left paused. Host signature check
-passes. This verifies the classic app, not Rust rendering. Builds 126 and 127
-remain at `build/MetalDooM.app` and `build/extended-milestone/MetalDooM.app`.
+The user's speedrun demo-recording/external-upload idea remains a future aside.
+No implementation or upload authorization was implied; continue Rust first.
+
+Build 129 is `build/geometry-milestone/MetalDooM.app`. Host signature check passes;
+CUA verifies rendered Doom II MAP01, title and menu footer **0.10.0/build 129**.
+It is left paused. This verifies the classic app, not live Rust rendering. Older
+previews are preserved: build 126 `build/MetalDooM.app`, 127
+`build/extended-milestone/MetalDooM.app`, 128 `build/rust-milestone/MetalDooM.app`.
 
 The **0.9.0 build 124** release was notarized by the user in the preceding task:
 Apple accepted `121f1db9-34a4-4f5f-aeb3-599a59de0727`; stapler, codesign and
 Gatekeeper were verified in the host context. ZIP location remains the primary
 checkout's `build/releases/MetalDooM-0.9.0-build124/`. This is prior-task evidence.
-Builds 126–128 are ad-hoc signed, unnotarized, and unpackaged. GitHub workflow outputs
+Builds 126–129 are ad-hoc signed, unnotarized, and unpackaged. GitHub workflow outputs
 remain unnotarized. No push, publish, upload or Apple submission was performed.
 
 The remaining sections are historical and describe earlier branches/previews.

@@ -398,3 +398,12 @@ and the three newly supported Thing fields. UMAPINFO is parsed before level setu
 selected routes/finale/boss metadata and pickup messages join copied snapshots.
 No default-backend switch or save layout reinterpretation follows from this work.
 See [EXTENDED_ENGINE.md](EXTENDED_ENGINE.md) for contracts and test limitations.
+
+## Extended geometry values (build 129)
+
+The isolated worker exports bounded `MGE1` bytes. `ExtendedGeometry` decodes these
+into the native `DoomMap`; both the classic loader and this adapter use 32-bit BSP
+child tags and -1 for missing sides. Mesh generation uses copied engine vertices
+and authoritative subsector sectors, including MAP13 XNOD. No extended dylib is
+loaded into the main app. See [EXTENDED_GEOMETRY.md](EXTENDED_GEOMETRY.md) for the
+wire layout, validation evidence and remaining live presentation/transport work.

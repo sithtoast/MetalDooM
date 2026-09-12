@@ -190,3 +190,13 @@ int ME_CopySession(ME_Session *out)
     *out = *ME_CurrentSession();
     return 1;
 }
+
+size_t ME_CopyGeometry(void *out, size_t capacity)
+{
+    if (!ready) return 0;
+    entered = 1;
+    if (setjmp(error_boundary)) { entered = 0; return 0; }
+    size_t result = ME_WriteGeometry(out, capacity);
+    entered = 0;
+    return result;
+}

@@ -160,7 +160,7 @@ struct Geometry {
         for line in map.lines {
             for isBack in [false,true] {
                 let sideIndex = isBack ? line.back : line.front
-                guard sideIndex != 65535 else { continue }
+                guard sideIndex != -1 else { continue }
                 let side = map.sides[sideIndex], sector = map.sectors[side.sector]
                 let a = map.points[isBack ? line.b : line.a], b = map.points[isBack ? line.a : line.b]
                 let otherIndex = isBack ? line.front : line.back
@@ -168,7 +168,7 @@ struct Geometry {
                 let light = max(0.12,sector.light*shade)
                 let bottomPegged = line.flags & 16 != 0, topPegged = line.flags & 8 != 0
                 func height(_ name: String) -> Float { textureHeights[name] ?? 128 }
-                if otherIndex == 65535 {
+                if otherIndex == -1 {
                     wall(a,b,sector.floor,sector.ceiling,side,side.middle,light,
                          bottomPegged ? sector.floor+height(side.middle) : sector.ceiling)
                     if sector.ceilingTexture == "F_SKY1" {
@@ -215,19 +215,19 @@ struct Geometry {
             }
             return result
         }
-        var pending: [(Int,[SIMD2<Double>])] = [(map.nodes.isEmpty ? 0x8000 : map.nodes.count-1,bounds)]
+        var pending: [(Int,[SIMD2<Double>])] = [(map.nodes.isEmpty ? Node.leafBit : map.nodes.count-1,bounds)]
         var flats: [(polygon:[SIMD2<Double>],sector:Sector)] = []
         var visits = 0
         while let (index,polygon) = pending.popLast() {
             visits += 1
             guard visits < 1_000_000 else { throw PortError("Excessive BSP complexity.") }
             guard polygon.count >= 3 else { continue }
-            if index & 0x8000 == 0 {
+            if index & Node.leafBit == 0 {
                 let node = map.nodes[index]
                 pending.append((node.right,clipped(polygon,node,true)))
                 pending.append((node.left,clipped(polygon,node,false)))
             } else {
-                let leaf = map.leaves[index & 0x7fff]
+                let leaf = map.leaves[index & ~Node.leafBit]
                 var polygon = polygon
                 // BSP partitions alone do not include every outer room edge.
                 // Clip against the original directed linedef, not its seg endpoints:
@@ -243,7 +243,7 @@ struct Geometry {
                     }
                 }
                 guard polygon.count >= 3 else { continue }
-                let sector = map.sectors[map.leafSector(index & 0x7fff)]
+                let sector = map.sectors[map.leafSector(index & ~Node.leafBit)]
                 flats.append((polygon,sector))
             }
         }

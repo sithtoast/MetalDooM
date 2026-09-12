@@ -1,5 +1,29 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 129: shared geometry and XNOD parity
+
+`scripts/test-extended-geometry.sh original-doom2.wad /path/to/rerelease` passes:
+all 32 original Doom II maps agree between the classic and worker paths on wall
+endpoints, BSP partitions/children, subsector sectors and native triangle counts.
+All sixteen Rust maps decode into the shared map and produce finite CPU meshes.
+MAP13: 37,547 vertices, 76,284 segs, 32,993 leaves, 32,992 nodes, 508,713 triangles
+with default texture heights. Independent byte-level XNOD checks verify references
+and original wall endpoints. Engine-projected split vertices are intentionally
+retained. Fourteen malformed snapshot cases reject; copied-buffer capacity,
+nonmutation, repeated equality and canaries pass. Full contract/limits:
+[EXTENDED_GEOMETRY.md](EXTENDED_GEOMETRY.md). Log: `build/geometry129-validation.log`.
+
+The existing classic geometry/material/sprite suite passes for all 32 Doom II
+maps (`build/geometry-classic.log`). The full MBF21/session/ID24/map/weapon suite
+passes again with seven private exports (`build/rust129-validation.log`). No
+live Rust visuals, audio, moving-sector presentation or frame-time acceptance.
+
+Native host build/signature verification succeeds. The bundled plist and CUA
+window/menu footer show **0.10.0/build 129**, with rendered classic Doom II MAP01.
+`build/geometry-milestone/MetalDooM.app` is left paused, preserving previews
+126–128 and the primary 0.9.0/build 124 release. Log: `build/build129.log`.
+No package, upload or speedrunning work; GUI Rust guard remains.
+
 ## 2026-09-12 — 0.10.0 build 128: Rust sessions, fields and native worker probes
 
 `scripts/test-rust-worker.sh original-doom2.wad /path/to/rerelease` passes. It

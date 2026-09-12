@@ -1,6 +1,6 @@
 # Legacy of Rust development and ID24 evidence
 
-Status: **0.10.0 build 128 session/ID24 worker milestone; Legacy of Rust is not playable yet.**
+Status: **0.10.0 build 129 shared geometry milestone; Legacy of Rust is not playable yet.**
 First campaign acceptance remains fully playable bundled single-player Rust.
 Multiplayer and the online add-on catalog are outside scope. General ID24
 conformance is a separate target and must never be inferred from this campaign.
@@ -136,10 +136,10 @@ before resource/game initialization, not guessed separately by Swift and C.
    data/action validation and remaining GAMECONF/ID24 semantics. Compare classic deterministic movement,
    combat, RNG, saves and all KEX profiles before switching any default backend.
 3. **Rust simulation:** complete Boom/MBF21/required ID24 actions and physics;
-   both new weapons and all actors, XNOD/shared geometry, required skies and
+   both new weapons and all actors, required skies and
    materials. Headless map startup (including MAP13 XNOD) and bounded real-weapon
-   probes pass in build 128; shared Swift geometry and native rendering are still
-   required. Validate targeted combat/map behavior, not just startup.
+   probes pass in build 128. Build 129 adds [copied shared geometry](EXTENDED_GEOMETRY.md)
+   and all-map CPU mesh validation; native rendering is still required. Validate targeted combat/map behavior, not just startup.
 4. **Campaign and persistence:** episodes, boss/secret routes, native interlevel
    animations and finale, music and extended saves. Test each route and restore
    during projectiles, charge attacks, moving sectors, switches and transitions.

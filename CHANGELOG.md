@@ -4,6 +4,20 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Shared extended geometry (build 129)
+
+- Feed decoded worker geometry into the native mesh builder, including MAP13's
+  XNOD vertices and 32-bit BSP references. Normalize classic maps into the same
+  representation while preserving their wall endpoints and mesh triangle counts.
+- Copy bounded, versioned geometry values with session identity and authoritative
+  subsector sectors; reject malformed snapshots before native meshing.
+- Validate meshes on all sixteen Rust maps, independent MAP13 XNOD reference
+  parity and all 32 original Doom II maps; rerun the full worker/gameplay suite.
+- Rust remains unavailable in the GUI pending live rendering/audio, broader
+  gameplay, campaign and save acceptance. Keep the ongoing 0.10.0 feature version.
+- Build/sign/visually verify separate native build 129 on classic Doom II MAP01;
+  preserve previous previews and the 0.9.0 release. No package or push.
+
 ## 0.10.0 refinement — Rust session and gameplay probes (build 128)
 
 - Plan explicit ordered resources independently of the Doom II base identity,

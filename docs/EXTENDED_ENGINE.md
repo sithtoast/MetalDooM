@@ -1,7 +1,7 @@
 # Experimental extended simulation worker
 
-The **0.10.0 build 128** development milestone adds explicit session planning,
-three Rust-required ID24 fields, and native headless tests with the actual Rust
+The **0.10.0 build 129** development milestone includes copied shared geometry,
+explicit session planning, three Rust-required ID24 fields, and native headless tests with the actual Rust
 patch/resources. The normal app still uses Chocolate Doom; its Rust rejection
 remains in place. **Legacy of Rust is not playable in the GUI yet.**
 
@@ -54,7 +54,7 @@ Profiles are explicit development choices:
   The copied session still reports the declared ID24 requirement. This profile
   does **not** advertise full ID24 conformance or silently relabel it as MBF21.
 
-The dylib exports exactly six `ME_` functions, keeping both engine and helper
+The dylib exports exactly seven `ME_` functions, keeping both engine and helper
 symbols private. One `ME_Tick` consumes one 35 Hz command. Movement, attack/use
 and validated weapon-change bits are accepted; special command bits and invalid
 weapon indices fail. Player/actor snapshots copy values, messages and selected
@@ -126,14 +126,19 @@ terminators. See [the remaining roadmap](LEGACY_OF_RUST.md).
 
 ## Build evidence and next work
 
-Primary log: `build/rust128-validation.log`; per-scenario logs:
-`build/extended/`. Native app `build/rust-milestone/MetalDooM.app` was built,
-signature-verified and inspected in CUA: rendered Doom II MAP01, title and footer
-show **0.10.0/build 128**. It is left paused. That verifies the classic app,
-not Rust's renderer. Build 126/127 previews and the separately notarized primary
-0.9.0 build 124 release remain intact. No new package or upload was made.
+The build 128 simulation evidence is in `build/rust128-validation.log`, rerun for
+129 in `build/rust129-validation.log`. Build 129 adds the seventh API export,
+`ME_CopyGeometry`, without changing ABI 2 structures. See the [copied geometry
+contract and evidence](EXTENDED_GEOMETRY.md): every Rust map builds CPU native
+mesh batches, and MAP13 XNOD references match independently decoded lump records.
 
-Next: copied shared geometry/render data (especially XNOD), native render/audio
-integration, and targeted real-monster/map-special parity. Campaign transitions,
-boss/secret exits, JSON presentation and versioned saves remain acceptance gates.
-Keep the GUI Rust guard until native campaign play is validated.
+Native app `build/geometry-milestone/MetalDooM.app` is **0.10.0/build 129**,
+ad-hoc signed and unnotarized. Its classic Doom II MAP01 rendering and version are
+inspected in CUA; this is not a Rust playthrough. Builds 126–128 and the separately
+notarized primary 0.9.0/build 124 release remain intact. No package or upload.
+
+Next: process transport and native render/audio integration, including efficient
+moving-sector/material updates, then targeted real-monster/map-special parity.
+Campaign transitions, boss/secret exits, JSON presentation and versioned saves
+remain acceptance gates. Keep the GUI Rust guard until native campaign play is
+validated.
