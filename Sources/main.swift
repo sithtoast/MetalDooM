@@ -537,6 +537,6 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
 let app = NSApplication.shared
 app.setActivationPolicy(.regular)
-let delegate = App()
+let delegate: NSApplicationDelegate = CommandLine.arguments.contains("--rust-preview") ? ExtendedPreviewApp() : App()
 app.delegate = delegate
 app.run()

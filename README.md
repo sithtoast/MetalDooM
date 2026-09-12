@@ -5,11 +5,11 @@ by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
 **Version 0.10.0 · experimental source preview · local builds are not notarized.**
 
-Build 129 continues Legacy of Rust development with a separate experimental
-[native extended simulation worker](docs/EXTENDED_ENGINE.md) and
-[copied geometry](docs/EXTENDED_GEOMETRY.md). All sixteen Rust maps, including
-MAP13 XNOD, now build native mesh batches. Rust itself remains unsupported in the
-GUI; see the [remaining milestones](docs/LEGACY_OF_RUST.md).
+Build 131 adds an explicit [Rust world preview](docs/EXTENDED_PREVIEW.md): a
+separate simulation worker feeds actual map geometry and skies to the native Metal
+renderer. All sixteen maps pass textured-scene checks. This is a development
+preview without actors, weapons or audio; Rust gameplay remains unsupported in
+the ordinary picker. See the [remaining milestones](docs/LEGACY_OF_RUST.md).
 The previous 0.9.0 build 124 was separately notarized; that release is preserved.
 
 This branch adds independently switchable AO, test/torch/projectile/muzzle

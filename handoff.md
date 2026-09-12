@@ -7,58 +7,66 @@ Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, bran
 6171c87 and completed 0.9.0 build 124). Preserve `/Users/wmh/Dev/MetalDooM` and its
 release artifacts. The previous resolution/KEX branch description is historical.
 
-Current feature version is **0.10.0**, successful app build **129**. The separate
-native worker supplies bounded copied geometry to the native `DoomMap`/`Geometry`
-types. All sixteen Rust maps produce finite CPU mesh batches, including MAP13
-XNOD. **Legacy of Rust is not playable in the GUI yet**; the app still uses
-Chocolate Doom and its Rust guard is unchanged. No full ID24 compatibility claim.
+Current feature version is **0.10.0**, final successful app build **131**. There
+is now an explicit **Rust world-only native preview**: a dedicated child process
+feeds copied camera/geometry values to the existing Metal world/sky pipeline.
+Actors, weapons, HUD, audio and full map/campaign/save acceptance remain ahead.
+**Rust is not playable through the ordinary picker**, whose guard is unchanged.
 
-Read [copied geometry contract/evidence](docs/EXTENDED_GEOMETRY.md),
-[extended-worker contract](docs/EXTENDED_ENGINE.md), then the
-[Rust roadmap](docs/LEGACY_OF_RUST.md). Worker ABI remains version 2, with seven
-exports (additive `ME_CopyGeometry`). It requires one dedicated process per
-session; no cleanup/restart, production IPC, native Rust rendering/audio or
-extended saves yet. Do not load it into the Swift app process.
+Read [preview/process contract](docs/EXTENDED_PREVIEW.md),
+[copied geometry](docs/EXTENDED_GEOMETRY.md), [worker](docs/EXTENDED_ENGINE.md), then
+[roadmap](docs/LEGACY_OF_RUST.md). ABI 2 now has eight exports (additive
+`ME_CopyView`); existing struct layouts/MGE1 are unchanged. Keep one dedicated
+process per session. Never load the extended dylib into the Swift app process.
 
-Run `scripts/test-extended-geometry.sh original-doom2.wad /path/to/rerelease`.
-All 32 original Doom II maps agree on wall endpoints, BSP partitions/children,
-subsector sectors and triangle counts. All sixteen Rust maps build meshes.
-MAP13 has 37,547 vertices, 76,284 segs, 32,993 leaves, 32,992 nodes and 508,713
-triangles (default texture heights). An independent byte check verifies XNOD
-references and original wall coordinates. MBF21 projects 3,558 split vertices;
-the copied representation intentionally takes those engine coordinates. Fourteen
-malformed snapshot cases reject. Logs: `build/geometry129-validation.log`,
-`build/extended/geometry/`; the classic geometry/material suite also passes.
+Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/worker-preview" bash scripts/build.sh`.
+Launch that app with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
+Only the explicit build option packages/signs the helper/dylib and license notices.
+Standard builds remain classic. Ordered resources are id24res → Doom II → id1,
+base index 1. Parent resource bytes must match the worker fingerprint. Flat
+namespaces remain separate from wall patches (TCMFLRE/F collisions). Missing
+materials/skies fail the preview instead of using fallback artwork.
 
-Run `scripts/test-rust-worker.sh original-doom2.wad /path/to/rerelease`.
-The full prior MBF21/session/ID24/weapon suite passes again for build 129. The
-actual id24res → Doom II → id1 stack (base index 1) loads 203 actor types and 1543
-states, with 35-tic startup checks on all sixteen maps. Fuel, Incinerator and
-Blade tap/partial/full-charge probes pass. Log: `build/rust129-validation.log`.
-See the documented respawn prose/reference discrepancy before changing behavior.
+Controls manually submit eight forward/back tics, a 45-degree turn, one Use tic,
+or 35 idle tics. Geometry/images are prepared off the main thread, then uploaded
+to Metal. No automatic simulation clock; unseen actors still participate in the
+simulation. Closing cancels the worker, drains/reaps it and removes private scratch.
 
-Next: dedicated worker process transport and native render/audio integration.
-Copied geometry includes physical sector/side values but not complete Boom
-transfer-height/lighting/sky/animation presentation. Measure/update moving
-geometry efficiently; MAP13's large CPU mesh is not a real-time performance
-result. Then targeted real-monster combat and ID24 map-special validation,
-campaign routes/boss exits, JSON presentation and versioned saves. Native campaign
-acceptance must precede relaxing the GUI guard. MAP99 remains a hidden test block.
+Tests: `scripts/test-extended-worker.sh original-doom2.wad /path/to/rerelease`
+passes protocol/deadline/cancellation/error boundaries and all sixteen complete
+textured scenes/skies. `scripts/test-rust-worker.sh` passes the full prior MBF21,
+session, required ID24, all-map and real-weapon probes again with eight private
+exports. Classic Doom II's 32-map geometry/material/sprite suite passes. Logs:
+`build/worker130-validation.log`, `build/rust130-validation.log`,
+`build/classic130-validation.log`; 130 was the intermediate check, final 131 adds
+only the Use UI control. The earlier XNOD byte/BSP parity evidence remains in
+`build/geometry129-validation.log` (MAP13: 32,992 nodes, 508,713 triangles).
 
-The user's speedrun demo-recording/external-upload idea remains a future aside.
-No implementation or upload authorization was implied; continue Rust first.
+Native app is `build/worker-preview/MetalDooM.app`, **0.10.0/build 131**. Host
+signature verification covers app/helper/dylib. CUA verifies final MAP13 world
+rendering/title and Forward/Use/Step commands (tics 0→8→16→17→52; then one turn to
+53). The starting panel is solid scenery: this did not prove door-opening behavior.
+Intermediate 130 verified classic MAP01, Rust MAP01 camera movement/turning and
+MAP13. Closing MAP01 exited helper PID 30630 and removed its observed scratch.
+The final preview is left on MAP13, waiting for manual input.
 
-Build 129 is `build/geometry-milestone/MetalDooM.app`. Host signature check passes;
-CUA verifies rendered Doom II MAP01, title and menu footer **0.10.0/build 129**.
-It is left paused. This verifies the classic app, not live Rust rendering. Older
-previews are preserved: build 126 `build/MetalDooM.app`, 127
-`build/extended-milestone/MetalDooM.app`, 128 `build/rust-milestone/MetalDooM.app`.
+Next: actor/weapon snapshot identities and native presentation, animated material
+translation and efficient world-state updates, then audio. Complete Boom control-
+sector/sky/lighting presentation and targeted monster/map-special parity, campaign
+routes/boss exits, JSON presentation and versioned saves. Whole-world rebuilding
+on each manual command is not a real-time performance solution. Keep ordinary
+Rust acceptance guarded until native campaign play is validated.
+
+Older previews are preserved: build 126 `build/MetalDooM.app`, 127
+`build/extended-milestone/MetalDooM.app`, 128 `build/rust-milestone/MetalDooM.app`,
+129 `build/geometry-milestone/MetalDooM.app`. The user's speedrun demo/upload idea
+remains a future aside, with no implementation or upload authorization implied.
 
 The **0.9.0 build 124** release was notarized by the user in the preceding task:
 Apple accepted `121f1db9-34a4-4f5f-aeb3-599a59de0727`; stapler, codesign and
 Gatekeeper were verified in the host context. ZIP location remains the primary
 checkout's `build/releases/MetalDooM-0.9.0-build124/`. This is prior-task evidence.
-Builds 126–129 are ad-hoc signed, unnotarized, and unpackaged. GitHub workflow outputs
+Builds 126–131 are ad-hoc signed, unnotarized, and unpackaged. GitHub workflow outputs
 remain unnotarized. No push, publish, upload or Apple submission was performed.
 
 The remaining sections are historical and describe earlier branches/previews.

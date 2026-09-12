@@ -1,7 +1,7 @@
 # Experimental extended simulation worker
 
-The **0.10.0 build 129** development milestone includes copied shared geometry,
-explicit session planning, three Rust-required ID24 fields, and native headless tests with the actual Rust
+The **0.10.0 build 131** development milestone includes copied shared geometry,
+explicit session planning, three Rust-required ID24 fields, and an explicit [native world preview](EXTENDED_PREVIEW.md), and headless tests with the actual Rust
 patch/resources. The normal app still uses Chocolate Doom; its Rust rejection
 remains in place. **Legacy of Rust is not playable in the GUI yet.**
 
@@ -54,7 +54,7 @@ Profiles are explicit development choices:
   The copied session still reports the declared ID24 requirement. This profile
   does **not** advertise full ID24 conformance or silently relabel it as MBF21.
 
-The dylib exports exactly seven `ME_` functions, keeping both engine and helper
+The dylib exports exactly eight `ME_` functions, keeping both engine and helper
 symbols private. One `ME_Tick` consumes one 35 Hz command. Movement, attack/use
 and validated weapon-change bits are accepted; special command bits and invalid
 weapon indices fail. Player/actor snapshots copy values, messages and selected
@@ -66,8 +66,9 @@ escape. Normal and secret exits still stop at the transition boundary.
 Use a **dedicated single-thread process, one session per process**. Initialization
 can be attempted once. Fatal engine errors stay inside the guarded C call and
 invalidate the session; terminate the worker after completion/error to reclaim
-its allocations. There is no teardown/restart API, IPC protocol or extended save
-format yet. Do not load the dylib into the Swift app process.
+its allocations. There is no teardown/restart API or extended save format yet.
+The separate [preview worker protocol](EXTENDED_PREVIEW.md) now carries copied
+views/geometry. Do not load the dylib into the Swift app process.
 
 Simulation uses directly initialized defaults and an explicit seed, without
 reading the user's Woof config. Upstream code owns physics, actors, weapons,
@@ -132,13 +133,15 @@ The build 128 simulation evidence is in `build/rust128-validation.log`, rerun fo
 contract and evidence](EXTENDED_GEOMETRY.md): every Rust map builds CPU native
 mesh batches, and MAP13 XNOD references match independently decoded lump records.
 
-Native app `build/geometry-milestone/MetalDooM.app` is **0.10.0/build 129**,
-ad-hoc signed and unnotarized. Its classic Doom II MAP01 rendering and version are
-inspected in CUA; this is not a Rust playthrough. Builds 126–128 and the separately
-notarized primary 0.9.0/build 124 release remain intact. No package or upload.
+Build 131 adds `ME_CopyView` and the [isolated worker/world preview](EXTENDED_PREVIEW.md).
+The development build option packages an independently signed helper/dylib. The
+native app now renders Rust world geometry and skies through copied process data;
+actors, weapons, audio and full presentation remain ahead. The classic app and
+normal picker remain unchanged. All older previews and the primary release are
+preserved. No package or upload.
 
-Next: process transport and native render/audio integration, including efficient
-moving-sector/material updates, then targeted real-monster/map-special parity.
+Next: actor/weapon snapshots and presentation, animated materials and efficient
+moving-world updates, then audio and targeted real-monster/map-special parity.
 Campaign transitions, boss/secret exits, JSON presentation and versioned saves
-remain acceptance gates. Keep the GUI Rust guard until native campaign play is
-validated.
+remain acceptance gates. Keep the ordinary GUI Rust guard until native campaign
+play is validated.

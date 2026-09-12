@@ -56,3 +56,9 @@ ME_API size_t ME_CopyError(char *out, size_t capacity);
  * size. Zero means no ready session/error. Call on the session thread between
  * ticks. This is copied data, not an IPC or save-game contract. */
 ME_API size_t ME_CopyGeometry(void *out, size_t capacity);
+typedef struct {
+    uint32_t tic, angle;
+    int32_t x, y, eye_z, health;
+    char sky[9];
+} ME_View;
+ME_API int ME_CopyView(ME_View *out);

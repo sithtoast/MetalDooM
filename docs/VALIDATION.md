@@ -1,5 +1,35 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 131: isolated worker and native Rust world preview
+
+`scripts/test-extended-worker.sh original-doom2.wad /path/to/rerelease` passes:
+framed startup, movement/tic/geometry identity, cancellation, EOF/graceful quit,
+sequence/length/operation/truncation/reserved-byte rejection and client deadline/
+bad-reply handling. All sixteen Rust maps resolve every world material and sky
+through the ordered resource plan. Incorrect base identity rejects. Flat/patch
+name collisions TCMFLRE/F resolve separately. Log: `build/worker130-validation.log`.
+The final 131 refinement only adds the Use button to the same tested transport.
+
+The prior MBF21/session/ID24/map/weapon suite passes with eight private exports
+(`build/rust130-validation.log`). Classic Doom II's 32-map geometry/material/sprite
+suite passes (`build/classic130-validation.log`). Build 131's app/helper/dylib
+signature and bundled 0.10.0/build 131 version are verified in the host context;
+CUA window title confirms the running final build. Log: `build/build131.log`.
+
+Native CUA acceptance: intermediate 130 renders classic Doom II MAP01 and Rust
+MAP01 (23,396 textured triangles, SKYX1) plus MAP13 (508,713 triangles, SKYX4).
+MAP01 Forward updates tic 0→8 and changes the rendered camera; left turn reaches
+9 and visibly rotates. Closing its window exits helper PID 30630 and removes the
+observed private worker scratch directory. Final 131 renders MAP13 and handles
+Forward 0→8→16, Use→17 and Step 1 second→52. The panel in front of this spawn is
+solid scenery; no door-open success is claimed. The preview remains on MAP13.
+
+This is world-only rendering: no actor/weapon/HUD/audio presentation, complete
+Boom/ID24 visual parity, campaign or save acceptance. All geometry is rebuilt on
+manual actions, so screenshots/GPU overlay samples are not real-time simulation
+performance results. Normal picker Rust guard and earlier build 126–129 previews
+remain; primary 0.9.0/build 124 is preserved. No package/upload/speedrun work.
+
 ## 2026-09-12 — 0.10.0 build 129: shared geometry and XNOD parity
 
 `scripts/test-extended-geometry.sh original-doom2.wad /path/to/rerelease` passes:

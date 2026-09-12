@@ -530,6 +530,26 @@ final class Renderer: NSObject, MTKViewDelegate {
         try syncGeometry()
         return (geometry.triangleCount,Array(Set(missing)).sorted())
     }
+    /// World-only diagnostic path. Uses the same Metal world/sky pipelines as
+    /// classic gameplay, with no classic engine initialization or ticking.
+    func loadExtendedPreview(_ scene: ExtendedScene) throws {
+        guard !engineReady, let copied=scene.view.geometry else { throw PortError("Preview requires a fresh renderer.") }
+        func texture(_ image:PixelImage) throws -> MTLTexture {
+            let d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba8Unorm,width:image.width,height:image.height,mipmapped:false)
+            d.storageMode = .shared;d.usage = .shaderRead
+            guard let result=device.makeTexture(descriptor:d) else { throw PortError("Cannot allocate preview texture.") }
+            image.rgba.withUnsafeBytes { result.replace(region:MTLRegionMake2D(0,0,image.width,image.height),mipmapLevel:0,withBytes:$0.baseAddress!,bytesPerRow:image.width*4) }
+            return result
+        }
+        var cached:[MaterialKey:MTLTexture]=[:]
+        for (key,image) in scene.images { cached[key]=try texture(image) }
+        let loaded=try makeBatches(scene.geometry,textures:cached), loadedSky=try texture(scene.sky)
+        try uploadSkyGeometry(scene.geometry)
+        map=copied.map;textures=cached;batches=loaded;sky=loadedSky
+        position=SIMD2(scene.view.x,scene.view.y);eyeZ=scene.view.eyeZ;yaw=scene.view.angle;pitch=0
+        hudStyle = .minimal
+    }
+
     func saveGame(to url: URL, title: String? = nil) throws {
         guard engineReady, let wad, let map else { throw PortError("Open a WAD before saving.") }
         try SaveStore.write(to:url,wad:wad,map:map.name,pitch:pitch,title:title)

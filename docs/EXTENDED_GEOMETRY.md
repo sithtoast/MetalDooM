@@ -3,7 +3,7 @@
 The experimental worker now supplies its decoded map to the same `DoomMap` and
 `Geometry` types used by the native renderer. `Sources/ExtendedGeometry.swift`
 decodes copied bytes without linking or loading Woof into the app process.
-This milestone builds CPU mesh batches; it does **not** select Rust in the GUI,
+This build-129 milestone builds CPU mesh batches; it does **not** select Rust in the GUI,
 render a live Rust session, or establish complete Boom/ID24 presentation.
 
 ## Contract
@@ -87,3 +87,7 @@ Private snapshots/logs live in `build/extended/geometry/`, outside Git.
 Native build 129 remains the classic app. Its separate preview, signature and
 visible version are checked in the host context. No live Rust graphics, audio,
 frame-time, moving-sector visual parity or full campaign acceptance is claimed.
+
+Build 131 connects these values to an explicit [native world preview](EXTENDED_PREVIEW.md)
+through a separate process. The format above is unchanged; live actor/audio and
+full presentation acceptance remain pending.

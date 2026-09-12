@@ -47,6 +47,22 @@ cp "$PROJECT_DIR/Vendor/ChocolateDoom/UPSTREAM.md" "$APP_DIR/Contents/Resources/
 cp "$PROJECT_DIR/Info.plist" "$APP_DIR/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEXT_BUILD" "$APP_DIR/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :MetalDooMBuildDate string $(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$APP_DIR/Contents/Info.plist"
+# Explicit development-only worker packaging; standard releases remain classic.
+if [[ "${METALDOOM_EXTENDED_PREVIEW:-0}" == 1 ]]; then
+  bash "$PROJECT_DIR/scripts/build-extended-worker.sh" "$TEMP_BUILD/extended"
+  mkdir -p "$APP_DIR/Contents/Helpers"
+  cp "$TEMP_BUILD/extended/MetalDooMWorker" "$TEMP_BUILD/extended/libMetalDooMExtended.dylib" "$APP_DIR/Contents/Helpers/"
+  cp "$PROJECT_DIR/Vendor/Woof/COPYING" "$APP_DIR/Contents/Resources/Woof-COPYING.txt"
+  cp "$PROJECT_DIR/Vendor/Woof/UPSTREAM.md" "$APP_DIR/Contents/Resources/Woof-UPSTREAM.md"
+  mkdir -p "$APP_DIR/Contents/Resources/Woof-licenses"
+  for lib in miniz yyjson sha1 md5 spng; do
+    for license in "$PROJECT_DIR/Vendor/Woof/third-party/$lib"/*; do
+      case "$(basename "$license")" in *LICENSE*|*COPYING*) cp "$license" "$APP_DIR/Contents/Resources/Woof-licenses/$lib-$(basename "$license")";; esac
+    done
+  done
+  codesign --force --sign - "$APP_DIR/Contents/Helpers/libMetalDooMExtended.dylib"
+  codesign --force --sign - "$APP_DIR/Contents/Helpers/MetalDooMWorker"
+fi
 codesign --force --sign - "$APP_DIR"
 if [[ -d "$BUILD_DIR/MetalDooM.app" ]]; then
   mv "$BUILD_DIR/MetalDooM.app" "$TEMP_BUILD/previous.app"

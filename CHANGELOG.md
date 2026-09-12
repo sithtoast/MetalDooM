@@ -4,6 +4,23 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Isolated Rust world preview (build 131)
+
+- Add an explicit development preview that renders actual Rust worlds/skies
+  through the existing Metal pipeline, using a separately packaged native worker.
+  Provide manual Forward/Back, turn, Use and simulation-step controls.
+- Add framed, bounded process messages, camera snapshots, cancellation/deadlines
+  and child/scratch cleanup. Keep the simulation outside the Swift app process.
+- Verify ordered resource identity and resolve flat namespaces independently from
+  wall patches, including Rust's TCMFLRE/F name collisions. All sixteen maps pass
+  complete textured-scene preparation with their UMAPINFO-selected skies.
+- Native checks cover classic MAP01, Rust MAP01/MAP13, movement/turn updates and
+  child cleanup. Final 0.10.0/build 131 verifies the Use control; the observed
+  MAP13 starting panel is solid scenery, not a door-opening acceptance test.
+- Keep the normal Rust gameplay guard: actors, weapons, audio, complete map/
+  campaign behavior and saves remain ahead. Preserve earlier previews/release;
+  build 130 was an intermediate check, 131 the final successful build. No push.
+
 ## 0.10.0 refinement — Shared extended geometry (build 129)
 
 - Feed decoded worker geometry into the native mesh builder, including MAP13's

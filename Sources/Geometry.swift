@@ -82,7 +82,7 @@ final class Art {
     }
     func image(_ key: MaterialKey) throws -> PixelImage? {
         if key.flat {
-            guard let flat = wad.lump(key.name), flat.count == 4096 else { return nil }
+            guard let flat = wad.flatLump(key.name), flat.count == 4096 else { return nil }
             return PixelImage(width: 64, height: 64, rgba: flat.data.flatMap { color($0) })
         }
         guard let texture = definitions[key.name] else { return nil }

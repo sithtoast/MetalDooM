@@ -407,3 +407,13 @@ child tags and -1 for missing sides. Mesh generation uses copied engine vertices
 and authoritative subsector sectors, including MAP13 XNOD. No extended dylib is
 loaded into the main app. See [EXTENDED_GEOMETRY.md](EXTENDED_GEOMETRY.md) for the
 wire layout, validation evidence and remaining live presentation/transport work.
+
+## Isolated world preview (build 131)
+
+`ExtendedWorker` owns a framed pipe connection to one `MetalDooMWorker` process.
+`ExtendedScene` checks ordered resource identity and prepares native mesh/images
+on a serial queue; `Renderer.loadExtendedPreview` uploads them using the existing
+world/sky pipeline without starting Chocolate Doom. A command-line-only delegate
+provides manual simulation controls and cancels/reaps the helper on close.
+The development packaging flag is explicit. See [EXTENDED_PREVIEW.md](EXTENDED_PREVIEW.md)
+for protocol, lifecycle, namespace handling and the remaining presentation work.

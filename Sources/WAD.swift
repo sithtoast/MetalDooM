@@ -44,6 +44,7 @@ struct WAD {
     let engineOrder: [Int32]
     let lumps: [Lump]
     let maps: [String]
+    private var previewFlatLumps: [String:Bytes]? = nil
     // Detect from the base IWAD resources, before any add-on can override them.
     // These campaign-specific patch sets also identify renamed original IWADs.
     let isKEXEdition: Bool
@@ -111,6 +112,29 @@ struct WAD {
             return found[i].name
         }
         guard signature == "PWAD" || !maps.isEmpty else { throw PortError("No classic Doom maps found in this WAD.") }
+    }
+    // Diagnostic resources only. The worker owns map decoding and simulation;
+    // normal gameplay refuses this PWAD-labelled resource view.
+    init(previewResources paths: [URL], baseIndex: Int, profile: Int, identity: String) throws {
+        guard (1...32).contains(paths.count), paths.indices.contains(baseIndex), (0...1).contains(profile) else { throw PortError("Invalid preview resource plan.") }
+        let files=try paths.map { try WAD(url:$0) }
+        var material=Data([77,69,83,69,83,83,50,0,UInt8(baseIndex),UInt8(profile),UInt8(paths.count),0,0,0,0,0])
+        for file in files { material.append(contentsOf:SHA256.hash(data:file.sourceData[0])) }
+        guard SHA256.hash(data:material).map({String(format:"%02x",$0)}).joined() == identity else { throw PortError("Preview resources differ from the worker session.") }
+        url=files[baseIndex].url;signature="PWAD";sourceURLs=files.map(\.url);sourceData=files.flatMap(\.sourceData)
+        lumps=files.flatMap(\.lumps);engineOrder=[];maps=[];campaign=nil;finalDoom=0;isKEXEdition=false
+        var flats:[String:Bytes]=[:]
+        for file in files {
+            var inFlats=false
+            for lump in file.lumps {
+                if ["F_START","FF_START"].contains(lump.name) { inFlats=true;continue }
+                if ["F_END","FF_END"].contains(lump.name) { inFlats=false;continue }
+                if inFlats && lump.bytes.count>0 { flats[lump.name]=lump.bytes }
+            }
+            guard !inFlats else { throw PortError("Unclosed preview flat namespace.") }
+        }
+        previewFlatLumps=flats
+
     }
     // One shared directory plan preserves native lump indices without copying
     // game data into a stitched file. Only the directory is reordered.
@@ -192,6 +216,7 @@ struct WAD {
     var isSigil: Bool { sourceURLs.count>1 && maps.contains("E5M1") && lump("E5TEXT") != nil }
     var displayFiles: String { sourceURLs.map(\.lastPathComponent).joined(separator:" + ") }
     var sigilStory: String { String(data:lump("E5TEXT")?.data ?? Data(),encoding:.utf8) ?? "" }
+    func flatLump(_ name: String) -> Bytes? { previewFlatLumps.map { $0[name] } ?? lump(name) }
     func lump(_ name: String) -> Bytes? { lumps.last { $0.name == name }?.bytes }
     func mapLump(_ map: String, _ name: String) throws -> Bytes {
         guard let marker = lumps.lastIndex(where: { $0.name == map }) else { throw PortError("Map \(map) not found.") }
