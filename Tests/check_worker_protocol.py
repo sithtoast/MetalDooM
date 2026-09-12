@@ -15,14 +15,14 @@ def read(p):
     return seq, status, body
 with tempfile.TemporaryDirectory() as cache:
     command = [executable, cache, '1', '0', '0', '3', base]
-    for mode in ['sequence', 'length', 'operation', 'truncated', 'reserved', 'quit', 'eof', 'action', 'action-length', 'campaign-playing', 'campaign-length', 'save-length', 'restore-empty', 'restore-oversize', 'restore-truncated']:
+    for mode in ['sequence', 'length', 'operation', 'truncated', 'reserved', 'quit', 'eof', 'action', 'action-length', 'campaign-playing', 'campaign-length', 'save-length', 'blend-length', 'restore-empty', 'restore-oversize', 'restore-truncated']:
         p = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
             initial = read(p)
             assert initial[:2] == (0, 0) and initial[2][:4] == b'MVW5'
             geometry, presentation, materials, audio, ui = struct.unpack_from('<IIIII', initial[2], 36)
             sprite_data = initial[2][56+geometry:56+geometry+presentation]
-            assert len(sprite_data) == presentation and sprite_data[:4] == b'MSP2'
+            assert len(sprite_data) == presentation and sprite_data[:4] == b'MSP3'
             (pathlib.Path(executable).parent / 'initial-presentation.msp').write_bytes(sprite_data)
             (pathlib.Path(executable).parent / 'initial-view.mvw').write_bytes(initial[2])
             assert len(initial[2]) == 56+geometry+presentation+materials+audio+ui and initial[2][56+geometry+presentation:][:4] == b'MMT1'
@@ -39,6 +39,7 @@ with tempfile.TemporaryDirectory() as cache:
             if mode == 'quit': op = 3
             if mode == 'campaign-playing': op = 5
             if mode == 'campaign-length': op,body,length=5,b'\0',1
+            if mode == 'blend-length': op,body,length=8,b'\0',1
             if mode == 'save-length': op,body,length=6,b'\0',1
             if mode == 'restore-empty': op=7
             if mode == 'restore-oversize': op,length=7,64*1024*1024+1

@@ -5,6 +5,8 @@ by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
 **Version 0.10.0 · experimental source preview · local builds are not notarized.**
 
+Build 149 adds [normal/additive actor translucency](docs/EXTENDED_TRANSLUCENCY.md)
+using copied engine blend tables, with sprite cutouts and opaque-world occlusion.
 Build 148 smooths camera movement and weapon bob during Run with
 [presentation interpolation](docs/EXTENDED_INTERPOLATION.md). Build 146 added [scrolling floors and ceilings](docs/EXTENDED_SCROLLING.md),
 including correct saved phase and updates limited to flat meshes. Build 145 added [Rust Save/Load](docs/EXTENDED_SAVES.md) to the explicit

@@ -1,5 +1,46 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 149: Rust translucent actors
+
+Candidate: `build/translucency-preview/MetalDooM.app`; `build/build149.log`.
+Same unreleased 0.10.0 feature version; ad-hoc signed, not notarized or packaged.
+Host deep/strict signature verification passed, including helper/dylib. Source
+Info.plist, bundled version/build, BUILD_NUMBER and the running title agree.
+The final dylib exposes exactly the 18 names in Engine/Extended/exports.txt.
+
+- `build/translucency-worker-validation.log`: complete-copy/short-buffer canaries
+  for sprite/material/blend packets; exact supplied TRANMAP bytes, a distinct
+  additive table, normal/fullbright-additive/shadow selection, seven malformed
+  blend packets, and rejection of malformed/custom tables. Existing protocol,
+  all-sixteen-map startup/tic35, rotations, Rust gun frames and audio checks pass.
+- `build/translucency-metal-validation.log`: native Metal with API validation,
+  exact normal/additive palette-oracle output across 25,724 overlapping pixels,
+  both actor enumeration orders, source-index and shaded-foreground paths,
+  cutouts, 104,636 opaque occluder pixels, wall occlusion and fuzz precedence.
+  Also 21 exact real Rust reference-frame comparisons, HUD hide/restore,
+  floor/ceiling/both/reverse scrolling and saved phase, and distinct interpolated
+  start/mid/end with exact Pause pixels. No Metal validation errors.
+- `build/translucency-save-validation.log`: private-save/campaign/death/malformed
+  snapshot regressions, all sixteen maps and 140 future tics per restored map,
+  unchanged copied state/RNG/audio, envelope fingerprints and atomic file writes.
+
+The first diagnostic GPU oracle disagreed on four pixels because opaque test
+colors coincided with their background, making the test's visibility mask
+ambiguous. Distinct RGB control colors removed that ambiguity; original palette
+indices still select the intended blend colors. The final oracle passes exactly.
+
+Native app verification used the final bundle's explicit `--rust-preview` mode
+on actual MAP01. Running title is 0.10.0/build149. Run, Up/Right input and Pause
+were exercised; left paused at tic48, health100, ammo50, 283 actors, Music/Sound on.
+The screenshot shows intact world geometry, pistol and HUD. Older candidates and
+saved sessions were preserved. Translucency's detailed visual evidence comes from
+the controlled GPU checks, not a claimed live Rust campaign playthrough.
+
+Normal/additive actor blending is implemented. Native RGB lighting still differs
+from software colormap rendering. Custom actor tables, wall/weapon blending,
+palette powerups, fake-floor/control-sector/sky effects and actual campaign/boss
+acceptance remain ahead; see EXTENDED_TRANSLUCENCY.md.
+
 ## 2026-09-12 — 0.10.0 build 148: Rust camera/weapon interpolation
 
 Candidate: `build/interpolation-final/MetalDooM.app`; `build/build 148.log`.

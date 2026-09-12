@@ -55,7 +55,7 @@ Profiles are explicit development choices:
   The copied session still reports the declared ID24 requirement. This profile
   does **not** advertise full ID24 conformance or silently relabel it as MBF21.
 
-The dylib exports exactly seventeen `ME_` functions, keeping both engine and helper
+The dylib exports exactly eighteen `ME_` functions, keeping both engine and helper
 symbols private. One `ME_Tick` consumes one 35 Hz command. Movement, attack/use
 and validated weapon-change bits are accepted; special command bits and invalid
 weapon indices fail. Player/actor snapshots copy values, messages and selected
@@ -74,7 +74,7 @@ invalidate the session; terminate the worker after completion/error to reclaim
 its allocations. Level restart/continue now use ME_Advance within that session. There is no
 second initialization, teardown/reinitialization API. Private saves restore only into fresh workers; see EXTENDED_SAVES.md.
 The separate [preview worker protocol](EXTENDED_PREVIEW.md) now carries copied
-views/geometry, named actor/weapon frames and material translations/sound events and HUD/music selection. Do not load the dylib into the Swift app process.
+views/geometry, named actor/weapon frames, blend tables, material translations/sound events and HUD/music selection. Do not load the dylib into the Swift app process.
 
 Simulation uses directly initialized defaults and an explicit seed, without
 reading the user's Woof config. Upstream code owns physics, actors, weapons,

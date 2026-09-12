@@ -43,6 +43,35 @@ import Foundation
         }
         let fixtures=executable.deletingLastPathComponent().appendingPathComponent("fixtures")
         do {
+            let worker=ExtendedWorker();defer{worker.close()}
+            let initial=try worker.start(executable:executable,paths:[base,fixtures.appendingPathComponent("blend-actors.wad")],map:1,base:0,profile:0)
+            guard initial.presentation.actors.map({$0.flags & 30})==[8,26,12],let tables=initial.blendTables else {throw PortError("Incorrect normal/additive/shadow modes")}
+            for bg in 0..<256 {for fg in 0..<256 {guard tables.normal[bg*256+fg]==UInt8((bg+2*fg)/3) else {throw PortError("TRANMAP bytes changed")}}}
+            guard tables.normal != tables.additive else {throw PortError("Additive table missing")}
+            let repeated=try worker.geometry()
+            guard repeated.tic==0,repeated.blendTables?.additive==tables.additive else {throw PortError("Blend copy changed simulation or tables")}
+            func words(_ values:[UInt32])->Data {Data(values.flatMap {v in (0..<4).map{UInt8(truncatingIfNeeded:v>>(8*$0))}})}
+            let packet=Data("MBL1".utf8)+words([1,768,2])+Data(tables.palette+tables.normal+tables.additive)
+            _=try ExtendedBlendTables(data:packet)
+            var cases=[Data(packet.prefix(15)),Data(packet.dropLast()),packet+Data([0])]
+            for (offset,value) in [(0,UInt32(0)),(4,2),(8,767),(12,3)] {
+                var d=packet;d.replaceSubrange(offset..<offset+4,with:words([value]));cases.append(d)
+            }
+            for invalid in cases {
+                var rejected=false;do {_=try ExtendedBlendTables(data:invalid)}catch {rejected=true}
+                guard rejected else {throw PortError("Malformed blend packet accepted")}
+            }
+            print("PASS exact TRANMAP bytes, separate additive table, actor selection, stable copied state and 7 malformed blend packets")
+        }
+        for name in ["blend-bad-table","blend-custom"] {
+            let worker=ExtendedWorker();defer{worker.close()}
+            var rejected=false
+            do {_=try worker.start(executable:executable,paths:[base,fixtures.appendingPathComponent(name+".wad")],map:1,base:0,profile:0)}catch {rejected=true}
+            guard rejected else {throw PortError("Unsupported blend data accepted: \(name)")}
+            print("PASS rejected \(name)")
+        }
+
+        do {
             let worker=ExtendedWorker()
             let state=try worker.start(executable:executable,paths:[base,fixtures.appendingPathComponent("render-rotations.wad")],map:1,base:0,profile:0)
             let names=["POSSA5","POSSA4A6","POSSA3A7","POSSA2A8","POSSA1","POSSA2A8","POSSA3A7","POSSA4A6"]
@@ -125,7 +154,7 @@ import Foundation
                 return data
             }
             let invalid=[Data(original.prefix(31)),Data(original.dropLast()),original+Data([0]),
-                mutate(4,3),mutate(12,UInt32.max),mutate(16,3),mutate(28,2),mutate(32,0),mutate(32+28,16)]
+                mutate(4,4),mutate(12,UInt32.max),mutate(16,3),mutate(28,2),mutate(32,0),mutate(32+28,16),mutate(32+28,32)]
             for data in invalid {
                 var rejected=false
                 do { _=try ExtendedPresentation(data:data) } catch { rejected=true }

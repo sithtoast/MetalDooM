@@ -120,6 +120,8 @@ int ME_Init(const ME_Config *config)
     G_ReloadDefaults(false);
     rngseed = config->random_seed;
     ME_ApplySessionOptions();
+    int tranmap=W_CheckNumForName("TRANMAP");
+    if(tranmap>=0 && W_LumpLength(tranmap)!=65536)I_Error("TRANMAP must contain exactly 65536 entries");
     R_InitData(); P_Init();
     playeringame[0] = true; precache = false;
     G_InitNew((skill_t)(config->skill - 1), 1, config->map, false);
@@ -240,6 +242,12 @@ size_t ME_CopyMaterials(void *out, size_t capacity)
     if (setjmp(error_boundary)) { entered=0; return 0; }
     size_t result=ME_WriteMaterials(out,capacity);
     entered=0;return result;
+}
+
+size_t ME_CopyBlendTables(void *out,size_t capacity) {
+    if(!ready || failed)return 0;
+    entered=1;if(setjmp(error_boundary)){entered=0;return 0;}
+    size_t result=ME_WriteBlendTables(out,capacity);entered=0;return result;
 }
 
 int ME_EnableAudio(void) { if(attempted)return 0;ME_AudioEnable();return 1; }

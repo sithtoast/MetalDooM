@@ -363,6 +363,28 @@ final class Renderer: NSObject, MTKViewDelegate {
             float shade = (power.x>0 || power.y>0) ? 1.0 : in.fullbright>0.5 ? max(1.0,in.fullbright) : in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
             return float4(powerColor(c.rgb*shade,power),1.0);
         }
+        uint paletteIndex(float3 color, constant uchar *palette) {
+            int3 rgb=int3(round(clamp(color,0.0,1.0)*255.0));
+            uint best=0;int distance=195076;
+            for(uint i=0;i<256;i++) {
+                int3 delta=rgb-int3(palette[i*3],palette[i*3+1],palette[i*3+2]);
+                int d=delta.x*delta.x+delta.y*delta.y+delta.z*delta.z;
+                if(d<distance) {best=i;distance=d;}
+            }
+            return best;
+        }
+        // Programmable blending reads the current attachment, including earlier
+        // translucent draws. Lookup order matches Woof: background then foreground.
+        fragment float4 translucentSpriteFragment(Out in [[stage_in]], float4 background [[color(0)]],
+                texture2d<float> tex [[texture(0)]], texture2d<float,access::read> table [[texture(2)]],
+                texture2d<uint,access::read> indices [[texture(3)]], constant uchar *palette [[buffer(3)]]) {
+            uint2 pixel=uint2(clamp(floor(in.uv),float2(0),float2(tex.get_width()-1,tex.get_height()-1)));
+            float4 c=tex.read(pixel);
+            if(c.a<0.5) discard_fragment();
+            float shade=in.fullbright>0.5 ? 1.0:in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
+            uint foreground=shade==1.0 ? indices.read(pixel).r:paletteIndex(c.rgb*shade,palette);
+            return table.read(uint2(foreground,paletteIndex(background.rgb,palette)));
+        }
         fragment float4 fuzzFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]],
                 texture2d<float, access::read> scene [[texture(1)]], constant float4 &power [[buffer(2)]]) {
             constexpr sampler s(coord::normalized,address::clamp_to_edge,filter::nearest);
@@ -577,7 +599,8 @@ final class Renderer: NSObject, MTKViewDelegate {
             value.lump=Int32(scene.spriteIndices[source.name]!);value.flip=Int32(source.flags&1)
             value.fullbright=source.flags&2 != 0 ? 1:0;value.shadow=source.flags&4 != 0 ? 1:0;return value
         }
-        try sprites?.setPreview(things:actors,weapons:weapons,images:scene.spritePatches)
+        try sprites?.setPreview(things:actors,weapons:weapons,images:scene.spritePatches,
+            blend:scene.view.presentation.actors.map {$0.flags&16 != 0 ? 2:$0.flags&8 != 0 ? 1:0},tables:scene.view.blendTables)
         let ui=scene.view.ui
         hud.health=Int32(ui.health);hud.armor=Int32(ui.armor);hud.readyAmmo=Int32(ui.readyAmmo);hud.readyWeapon=Int32(ui.weapon)
         hud.keys=ui.keys;hud.weapons=ui.weapons
@@ -819,6 +842,13 @@ final class Renderer: NSObject, MTKViewDelegate {
                     ? ambientOcclusion!.spritePipeline:spritePipeline)
                 do { try sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw,fullbrightGain:hdrEnabled && hdrSpriteBoost ? 1.5:1) }
                 catch { engineReady = false; DispatchQueue.main.async { [weak self] in self?.onError?(error) } }
+                if sprites.hasTranslucency {
+                    encoder.setRenderPipelineState(programs.translucentSprite)
+                    encoder.setDepthStencilState(fuzzDepth)
+                    do {try sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw,translucent:true)}
+                    catch {DispatchQueue.main.async { [weak self] in self?.onError?(error) }}
+                    encoder.setDepthStencilState(depth)
+                }
                 if sprites.hasFuzz || hud.invisibility>128 || (hud.invisibility&8) != 0 {
                     if sceneSnapshot?.width != Int(width) || sceneSnapshot?.height != Int(height) {
                         let d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:view.colorPixelFormat,width:Int(width),height:Int(height),mipmapped:false)

@@ -4,6 +4,22 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust translucent actors (build 149)
+
+- Draw ordinary translucent actors and additive glowing actors with the engine's
+  actual blend tables, retaining sprite cutouts and opaque-world/actor occlusion.
+- Sort overlapping translucent actors back-to-front, preserve fuzz precedence,
+  and cache the copied palette/tables and source sprite indices.
+- Reject malformed blend tables and unsupported per-state/per-object custom
+  tables explicitly. Translucent walls, weapon blending and palette powerups
+  remain separate work; native RGB lighting is not software-renderer parity.
+- Validate exact normal/additive GPU pixels and draw order, shaded foregrounds,
+  occlusion/cutouts, copied-buffer/protocol boundaries, all sixteen Rust maps,
+  existing HUD/scrolling/interpolation pixels and private save regressions.
+  Verify the final bundle/signature and running MAP01 Run/input/Pause with HUD intact.
+- Keep this unreleased Rust refinement on 0.10.0. Build 149 is local, ad-hoc signed
+  and unnotarized. Preserve older bundles for their matching private saves.
+
 ## 0.10.0 refinement — Rust camera and weapon interpolation (build 148)
 
 - Smooth walking, turning and existing view/weapon bob between 35 Hz snapshots

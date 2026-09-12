@@ -7,6 +7,7 @@
 #include "p_tick.h"
 #include "r_state.h"
 #include "r_main.h"
+#include "r_tranmap.h"
 #include "w_wad.h"
 #include "i_system.h"
 #include <string.h>
@@ -37,8 +38,8 @@ size_t ME_WritePresentation(void *out,size_t capacity) {
     if(actors>1000000 || weapons>2)I_Error("Excessive presentation count");
     size_t size=32+(size_t)actors*40+(size_t)weapons*24;
     if(!out || capacity<size)return size;
-    unsigned char *p=out;memcpy(p,"MSP2",4);p+=4;
-    word(&p,2);word(&p,leveltime);word(&p,actors);word(&p,weapons);
+    unsigned char *p=out;memcpy(p,"MSP3",4);p+=4;
+    word(&p,3);word(&p,leveltime);word(&p,actors);word(&p,weapons);
     word(&p,players[0].readyweapon);
     int ammo=weaponinfo[players[0].readyweapon].ammo;
     word(&p,ammo==am_noammo ? -1:players[0].ammo[ammo]);word(&p,players[0].mo->interp > 0 ? 0:1);
@@ -55,7 +56,15 @@ size_t ME_WritePresentation(void *out,size_t capacity) {
         word(&p,m->x);word(&p,m->y);word(&p,m->z);word(&p,m->floorz);
         int light=m->subsector->sector->lightlevel;
         word(&p,light>255?255:light<0?0:light);
-        word(&p,(f->flip[rot]?1:0)|((m->frame & FF_FULLBRIGHT)?2:0)|((m->flags & MF_SHADOW)?4:0)|((m->flags & MF_TRANSLUCENT)?8:0));
+        // Match R_ProjectSprite precedence. Custom tables need a future bank;
+        // never silently render those actors with the wrong blend operation.
+        const unsigned char *table=m->state->tranmap ? m->state->tranmap:m->tranmap;
+        if(table && table!=main_tranmap && table!=main_addimap && !(m->flags & MF_SHADOW))
+            I_Error("Custom actor translucency tables are not supported by the native preview");
+        unsigned blend=table==main_addimap && table ? 24:table ? 8:
+            (m->flags & MF_TRANSLUCENT) ? ((m->state->frame & FF_FULLBRIGHT) ? 24:8):
+            (m->intflags & MIF_GHOST) ? 8:0;
+        word(&p,(f->flip[rot]?1:0)|((m->frame & FF_FULLBRIGHT)?2:0)|((m->flags & MF_SHADOW)?4:0)|blend);
         word(&p,m->info->doomednum);word(&p,m->state-states);
     }
     for(int i=0;i<NUMPSPRITES;i++) {

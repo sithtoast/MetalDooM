@@ -9,6 +9,7 @@ size_t ME_WriteGeometry(void *out, size_t capacity);
 size_t ME_WritePresentation(void *out, size_t capacity);
 
 size_t ME_WriteMaterials(void *out, size_t capacity);
+size_t ME_WriteBlendTables(void *out, size_t capacity);
 
 void ME_AudioEnable(void);
 void ME_AudioTick(void);

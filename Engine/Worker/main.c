@@ -75,11 +75,12 @@ int main(int argc,char **argv) {
         if(op==7 && length){payload=malloc(length);if(!payload)return fail(seq,"Restore allocation failed");}
         if(fread(payload,1,length,stdin)!=length)return fail(seq,"Truncated request body");
         if(op==3 && !length)return send_frame(seq,0,"",0)?0:1;
-        if((op==5 || op==6) && !length) {
-            size_t size=op==5 ? ME_CopyCampaign(NULL,0):ME_CopySave(NULL,0);
-            if(!size || size>(op==5 ? 1024*1024:64*1024*1024)){char e[2048];ME_CopyError(e,sizeof(e));return fail(seq,e[0]?e:"Snapshot unavailable at this lifecycle phase");}
+        if((op==5 || op==6 || op==8) && !length) {
+            size_t (*copy)(void *,size_t)=op==5 ? ME_CopyCampaign:op==6 ? ME_CopySave:ME_CopyBlendTables;
+            size_t size=copy(NULL,0);
+            if(!size || size>(op==8 ? 131856:op==5 ? 1024*1024:64*1024*1024)){char e[2048];ME_CopyError(e,sizeof(e));return fail(seq,e[0]?e:"Snapshot unavailable at this lifecycle phase");}
             void *body=malloc(size);if(!body)return fail(seq,"Snapshot allocation failed");
-            if((op==5 ? ME_CopyCampaign(body,size):ME_CopySave(body,size))!=size){free(body);return fail(seq,"Cannot copy snapshot");}
+            if(copy(body,size)!=size){free(body);return fail(seq,"Cannot copy snapshot");}
             int sent=send_frame(seq,0,body,size);free(body);if(!sent)return 1;
             expected++;continue;
         }

@@ -2,7 +2,7 @@ import Foundation
 import simd
 
 struct PixelImage { let width: Int, height: Int; let rgba: [UInt8] }
-struct PatchImage { let image: PixelImage; let left: Int, top: Int }
+struct PatchImage { let image: PixelImage; let left: Int, top: Int; var paletteIndices:[UInt8]? = nil }
 struct MaterialKey: Hashable { let name: String; let flat: Bool }
 struct WorldVertex {
     var position: SIMD4<Float>
@@ -60,6 +60,7 @@ final class Art {
         }
         try bytes.check(8,width*4)
         var pixels = [UInt8](repeating:0,count:width*height*4)
+        var indices=[UInt8](repeating:0,count:width*height)
         for column in 0..<width {
             var cursor = try bytes.i32(8+column*4), previousTop = -1
             guard cursor >= 8+width*4 else { throw PortError("Patch column overlaps its directory.") }
@@ -73,12 +74,13 @@ final class Art {
                 previousTop = row
                 for pixel in 0..<length where row+pixel < height {
                     let offset = ((row+pixel)*width+column)*4
+                    indices[offset/4]=bytes.data[cursor+3+pixel]
                     pixels.replaceSubrange(offset..<offset+4,with:color(bytes.data[cursor+3+pixel]))
                 }
                 cursor += length+4
             }
         }
-        return PatchImage(image:PixelImage(width:width,height:height,rgba:pixels),left:left,top:top)
+        return PatchImage(image:PixelImage(width:width,height:height,rgba:pixels),left:left,top:top,paletteIndices:indices)
     }
     func image(_ key: MaterialKey) throws -> PixelImage? {
         if key.flat {

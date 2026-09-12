@@ -8,6 +8,7 @@ struct ExtendedView {
     let materials: ExtendedMaterials
     let ui:ExtendedUI
     let audio: ExtendedAudio
+    var blendTables:ExtendedBlendTables?
     init(data: Data,previousGeometry:ExtendedGeometry?=nil) throws {
         let bytes=Bytes(data:data); try bytes.check(0,56)
         guard data.prefix(4) == Data("MVW5".utf8) else { throw PortError("Invalid worker view header.") }
@@ -44,6 +45,7 @@ final class ExtendedWorker {
     private var closed=false
     private var previousGeometry:ExtendedGeometry?
     private var lastUI:ExtendedUI?
+    private var blendTables:ExtendedBlendTables?
     private(set) var identity:String?
     private let timeout:Double
     init(timeout:Double=30) { self.timeout=max(0.1,min(120,timeout)) }
@@ -66,9 +68,11 @@ final class ExtendedWorker {
         // Only the child owns these ends after launch, so EOF is observable.
         input.fileHandleForReading.closeFile();output.fileHandleForWriting.closeFile()
         do {
-            let view=try receive(deadline:deadline())
+            var view=try receive(deadline:deadline())
             guard let geometry=view.geometry, geometry.map.name == String(format:"MAP%02d",map) else { throw PortError("Worker returned the wrong map.") }
             identity=geometry.contentSHA256
+            blendTables=try ExtendedBlendTables(data:exchange(operation:8,body:Data(),limit:ExtendedBlendTables.byteCount))
+            view.blendTables=blendTables
             return view
         } catch { cancel(); throw error }
     }
@@ -175,7 +179,8 @@ final class ExtendedWorker {
         return body
     }
     private func decodeView(_ body:Data) throws -> ExtendedView {
-        let result=try ExtendedView(data:body,previousGeometry:previousGeometry)
+        var result=try ExtendedView(data:body,previousGeometry:previousGeometry)
+        result.blendTables=blendTables
         if let geometry=result.geometry { previousGeometry=geometry }
         lastUI=result.ui
         return result

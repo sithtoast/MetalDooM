@@ -35,6 +35,87 @@ func runMeshMetalValidation() throws {
             return Data(bytes:buffer.contents(),count:w*h*4)
         }
     }
+    do {
+        let blendPaths=paths+[exe.deletingLastPathComponent().appendingPathComponent("fixtures/blend-empty.wad")]
+        let worker=ExtendedWorker();defer{worker.close()}
+        let initial=try worker.start(executable:exe,paths:blendPaths,map:1,base:1)
+        let resources=try WAD(previewResources:blendPaths,baseIndex:1,profile:1,identity:worker.identity!)
+        let builder=try ExtendedSceneBuilder(resources:resources)
+        let (window,view,renderer)=try surface(0);defer{view.delegate=nil;window.close()}
+        try renderer.loadExtendedPreview(builder.prepare(initial));renderer.validationHUDVisible=false
+        func words(_ values:[UInt32])->Data {Data(values.flatMap {v in (0..<4).map{UInt8(truncatingIfNeeded:v>>(8*$0))}})}
+        let palette=(0..<256).flatMap{[UInt8($0),UInt8($0),UInt8($0)]}
+        let normal=(0..<256).flatMap{bg in (0..<256).map{fg in UInt8((bg+2*fg)/3)}}
+        let additive=(0..<256).flatMap{bg in (0..<256).map{fg in UInt8(min(255,bg+fg))}}
+        let tables=try ExtendedBlendTables(data:Data("MBL1".utf8)+words([1,768,2])+Data(palette+normal+additive))
+        var images:[Int:PatchImage]=[:]
+        // Distinct RGB control colors avoid invisible mask pixels where opaque
+        // art equals the background; fullbright blending must use source indices.
+        for color in [100,200,220] {
+            var pixels=[UInt8](repeating:0,count:32*64*4)
+            for y in 0..<64 {for x in 0..<32 where !(14..<18).contains(x) || !(28..<36).contains(y) {
+                let p=(y*32+x)*4;pixels[p]=UInt8(color);pixels[p+1]=0;pixels[p+2]=255;pixels[p+3]=255
+            }}
+            images[color]=PatchImage(image:PixelImage(width:32,height:64,rgba:pixels),left:16,top:64,paletteIndices:[UInt8](repeating:UInt8(color),count:32*64))
+        }
+        func actor(_ x:Float,_ color:Int)->MD_Thing {
+            var value=MD_Thing();value.x=x;value.lump=Int32(color);value.light=1;value.fullbright=1;return value
+        }
+        let near=actor(0,100),far=actor(64,200),occluder=actor(-32,220)
+        try renderer.validationActors(resources:resources,things:[],images:images,blend:[],tables:tables,reset:true)
+        func draw(_ actors:[MD_Thing],_ modes:[Int]) throws -> Data {
+            try renderer.validationActors(resources:resources,things:actors,images:images,blend:modes,tables:tables)
+            return try frame(view,renderer)
+        }
+        let background=try draw([],[]),nearOpaque=try draw([near],[0]),farOpaque=try draw([far],[0])
+        let nearMask=stride(from:0,to:background.count,by:4).map{nearOpaque[$0..<$0+4] != background[$0..<$0+4]}
+        let farMask=stride(from:0,to:background.count,by:4).map{farOpaque[$0..<$0+4] != background[$0..<$0+4]}
+        let overlap=zip(nearMask,farMask).filter{$0 && $1}.count
+        guard overlap>500 else {throw PortError("Translucency fixture has no overlap")}
+        func expected(_ mode:Int)->Data {
+            var output=background
+            for i in nearMask.indices where nearMask[i] || farMask[i] {
+                let p=i*4
+                var color=(Int(background[p])+Int(background[p+1])+Int(background[p+2])+1)/3
+                for (visible,fg) in [(farMask[i],200),(nearMask[i],100)] where visible {
+                    color=mode==1 ? (color+2*fg)/3:min(255,color+fg)
+                }
+                output[p]=UInt8(color);output[p+1]=UInt8(color);output[p+2]=UInt8(color);output[p+3]=255
+            }
+            return output
+        }
+        for mode in [1,2] {
+            let actual=try draw([near,far],[mode,mode]),reverse=try draw([far,near],[mode,mode])
+            guard actual==reverse else {throw PortError("Translucency depends on actor enumeration order")}
+            let oracle=expected(mode)
+            guard actual==oracle else {
+                let mismatches=zip(actual,oracle).filter{$0 != $1}.count
+                let examples=stride(from:0,to:actual.count,by:4).filter{actual[$0..<$0+4] != oracle[$0..<$0+4]}.prefix(5).map{p in "pixel \(p/4): actual=\(Array(actual[p..<p+4])) expected=\(Array(oracle[p..<p+4])) bg=\(Array(background[p..<p+4])) masks=\(nearMask[p/4])/\(farMask[p/4])"}
+                throw PortError("Blend mode \(mode) differs from palette oracle in \(mismatches) bytes: \(examples)")
+            }
+        }
+        var shaded=near;shaded.fullbright=0;shaded.light=0.4
+        let shadedOpaque=try draw([shaded],[0]),shadedBlend=try draw([shaded],[1])
+        var shadedOracle=background
+        for p in stride(from:0,to:background.count,by:4) where shadedOpaque[p..<p+4] != background[p..<p+4] {
+            let bg=(Int(background[p])+Int(background[p+1])+Int(background[p+2])+1)/3
+            let fg=(Int(shadedOpaque[p])+Int(shadedOpaque[p+1])+Int(shadedOpaque[p+2])+1)/3
+            let color=UInt8((bg+2*fg)/3)
+            shadedOracle[p]=color;shadedOracle[p+1]=color;shadedOracle[p+2]=color;shadedOracle[p+3]=255
+        }
+        guard shadedBlend==shadedOracle else {throw PortError("Shaded translucent foreground differs from palette oracle")}
+        let opaque=try draw([occluder],[0]),behind=try draw([near,occluder,far],[1,0,2])
+        var occluded=0
+        for p in stride(from:0,to:opaque.count,by:4) where opaque[p..<(p+4)] != background[p..<(p+4)] {
+            guard opaque[p..<(p+4)]==behind[p..<(p+4)] else {throw PortError("Translucency draws through opaque actors")};occluded+=1
+        }
+        guard occluded>500 else {throw PortError("No opaque actor occlusion tested")}
+        let outside=actor(512,100)
+        guard try draw([outside],[1])==background else {throw PortError("Translucency draws through room walls")}
+        var shadow=near;shadow.shadow=1
+        guard try draw([shadow],[2])==draw([shadow],[0]) else {throw PortError("Fuzz did not take precedence over translucency")}
+        print("PASS native fullbright/shaded normal/additive lookup pixels, \(overlap) overlapping pixels sorted both orders, cutouts, \(occluded) opaque actor pixels, wall occlusion and fuzz precedence")
+    }
     for number in [1,13,16] {
         let worker=ExtendedWorker();defer{worker.close()}
         let first=try worker.start(executable:exe,paths:paths,map:number,base:1)

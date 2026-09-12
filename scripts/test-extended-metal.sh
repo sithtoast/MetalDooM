@@ -5,6 +5,7 @@ if [[ $# != 1 ]]; then echo "Usage: $0 rerelease-directory" >&2; exit 2; fi
 OUT="$PROJECT_DIR/build/extended-metal"
 mkdir -p "$OUT"
 python3 "$PROJECT_DIR/Tests/make_scroll_fixture.py" "$PROJECT_DIR/build/extended/fixtures"
+python3 "$PROJECT_DIR/Tests/make_translucency_fixture.py" "$PROJECT_DIR/build/extended/fixtures"
 bash "$PROJECT_DIR/scripts/build-engine.sh" "$OUT/engine"
 python3 - "$PROJECT_DIR" "$OUT" <<'PY'
 from pathlib import Path
@@ -17,6 +18,10 @@ renderer=renderer.replace('now:ProcessInfo.processInfo.systemUptime','now:valida
 renderer='\n'.join('                if validationHUDVisible { '+line.strip()+' }' if line.strip().startswith('sprites.drawHUD(') else line for line in renderer.split('\n'))
 (out/'Renderer.swift').write_text(renderer+'''
 extension Renderer {
+    func validationActors(resources:WAD,things:[MD_Thing],images:[Int:PatchImage],blend:[Int],tables:ExtendedBlendTables,reset:Bool=false) throws {
+        if reset {sprites=try SpriteRenderer(device:device,wad:resources,preload:false)}
+        try sprites!.setPreview(things:things,weapons:[],images:images,blend:blend,tables:tables)
+    }
     var validationPreviewBuffers:[MaterialKey:ObjectIdentifier] { Dictionary(uniqueKeysWithValues:batches.map{($0.material,ObjectIdentifier($0.vertices))}) }
 }
 ''')

@@ -4,6 +4,7 @@ import simd
 
 private struct GPUPatch {
     let texture: MTLTexture
+    let indices:MTLTexture?
     let width: Float, height: Float, left: Float, top: Float
 }
 
@@ -19,6 +20,9 @@ final class SpriteRenderer {
     private var hudPatches: [String:GPUPatch] = [:]
     private var things: [MD_Thing] = []
     private var previewWeapons:[MD_WeaponSprite]?
+    private var previewBlend:[Int]=[]
+    private var blendPalette:MTLBuffer?
+    private var blendTextures:[MTLTexture]=[]
     private let hudDepth: MTLDepthStencilState
     init(device: MTLDevice, wad: WAD, preload: Bool = true, hudOnly:Bool=false) throws {
         self.device = device; art = try Art(wad:wad)
@@ -63,7 +67,22 @@ final class SpriteRenderer {
         for i in weapons.indices {weapons[i].x=positions[i].x;weapons[i].y=positions[i].y}
         previewWeapons=weapons
     }
-    func setPreview(things:[MD_Thing],weapons:[MD_WeaponSprite],images:[Int:PatchImage]) throws {
+    func setPreview(things:[MD_Thing],weapons:[MD_WeaponSprite],images:[Int:PatchImage],blend:[Int]=[],tables:ExtendedBlendTables?=nil) throws {
+        guard blend.isEmpty || blend.count==things.count && blend.allSatisfy({(0...2).contains($0)}) else {throw PortError("Invalid sprite blend modes.")}
+        if blendTextures.isEmpty,let tables {
+            guard let palette=device.makeBuffer(bytes:tables.palette,length:768,options:.storageModeShared) else {throw PortError("Cannot allocate blend palette.")}
+            var textures:[MTLTexture]=[]
+            for add in [false,true] {
+                let d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba8Unorm,width:256,height:256,mipmapped:false)
+                d.storageMode = .shared;d.usage = .shaderRead
+                guard let texture=device.makeTexture(descriptor:d) else {throw PortError("Cannot allocate blend table.")}
+                tables.rgba(add:add).withUnsafeBytes {texture.replace(region:MTLRegionMake2D(0,0,256,256),mipmapLevel:0,withBytes:$0.baseAddress!,bytesPerRow:1024)}
+                textures.append(texture)
+            }
+            blendPalette=palette;blendTextures=textures
+        }
+        guard !blend.contains(where:{$0>0}) || blendTextures.count==2 else {throw PortError("Missing actor blend tables.")}
+        previewBlend=blend
         for (index,image) in images where patches[index] == nil { patches[index]=try upload(image) }
         self.things=things;previewWeapons=weapons
     }
@@ -75,18 +94,45 @@ final class SpriteRenderer {
         image.rgba.withUnsafeBytes { bytes in
             texture.replace(region:MTLRegionMake2D(0,0,image.width,image.height),mipmapLevel:0,withBytes:bytes.baseAddress!,bytesPerRow:image.width*4)
         }
-        return GPUPatch(texture:texture,width:Float(image.width),height:Float(image.height),left:Float(patch.left),top:Float(patch.top))
+        var indices:MTLTexture?
+        if let values=patch.paletteIndices {
+            guard values.count==image.width*image.height else {throw PortError("Invalid sprite palette indices.")}
+            descriptor.pixelFormat = .r8Uint
+            guard let t=device.makeTexture(descriptor:descriptor) else {throw PortError("Cannot allocate sprite indices.")}
+            values.withUnsafeBytes {t.replace(region:MTLRegionMake2D(0,0,image.width,image.height),mipmapLevel:0,withBytes:$0.baseAddress!,bytesPerRow:image.width)}
+            indices=t
+        }
+        return GPUPatch(texture:texture,indices:indices,width:Float(image.width),height:Float(image.height),left:Float(patch.left),top:Float(patch.top))
     }
     var hasFuzz: Bool { things.contains { $0.shadow != 0 } }
-    func drawWorld(encoder: MTLRenderCommandEncoder, camera: SIMD2<Float>, yaw: Float, fuzz: Bool=false, fullbrightGain: Float=1) throws {
+    var hasTranslucency:Bool {zip(things,previewBlend).contains {$0.0.shadow==0 && $0.1>0}}
+    func drawWorld(encoder: MTLRenderCommandEncoder, camera: SIMD2<Float>, yaw: Float, fuzz: Bool=false, translucent:Bool=false, fullbrightGain: Float=1) throws {
         if previewWeapons == nil {
             let count = Int(MD_CopyThings(nil,0,camera.x,camera.y))
             if things.count != count { things = [MD_Thing](repeating:MD_Thing(),count:count) }
             if count > 0 { _ = things.withUnsafeMutableBufferPointer { MD_CopyThings($0.baseAddress,Int32(count),camera.x,camera.y) } }
         }
         let right = SIMD3(sin(yaw),0,cos(yaw))
-        for thing in things where (thing.shadow != 0)==fuzz {
+        var order=things.indices.filter { i in
+            (things[i].shadow != 0)==fuzz && (fuzz || ((previewBlend.isEmpty ? 0:previewBlend[i])>0)==translucent)
+        }
+        if translucent {
+            let forward=SIMD2(cos(yaw),sin(yaw))
+            order.sort { a,b in
+                let da=simd_dot(SIMD2(things[a].x,things[a].y)-camera,forward)
+                let db=simd_dot(SIMD2(things[b].x,things[b].y)-camera,forward)
+                return da==db ? a<b:da>db
+            }
+        }
+        for index in order {
+            let thing=things[index]
             guard let patch = patches[Int(thing.lump)] else { throw PortError("Missing sprite frame \(thing.lump).") }
+            if translucent {
+                guard let indices=patch.indices else {throw PortError("Missing translucent sprite indices.")}
+                encoder.setFragmentTexture(blendTextures[previewBlend[index]-1],index:2)
+                encoder.setFragmentTexture(indices,index:3)
+                encoder.setFragmentBuffer(blendPalette,offset:0,index:3)
+            }
             let center = SIMD3(thing.x,thing.z,-thing.y)
             let left = center-right*patch.left
             // Doom's patch origins can put artwork below the object's feet.

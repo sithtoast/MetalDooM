@@ -5,23 +5,23 @@
 Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, branch
 **codex/legacy-of-rust**, based on fetched origin/main merge **afd7357**. Preserve
 `/Users/wmh/Dev/MetalDooM` and its release artifacts. Current feature version is
-**0.10.0**, final successful build **148**. This remains the same unreleased Rust
+**0.10.0**, final successful build **149**. This remains the same unreleased Rust
 feature; do not bump the minor version for each refinement.
 
-The explicit Rust preview now has **camera/weapon interpolation during Run**, **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
+The explicit Rust preview now has **normal/additive actor translucency**, **camera/weapon interpolation during Run**, **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
 plus death/restart and native completion/Continue,
 plus level MIDI, a minimal HUD, cached geometry, selective Metal updates, Run/Pause and keyboard/mouse controls,
 with one-tic world/actor/weapon/material/audio/UI presentation. Manual buttons show every
 tic too. Keep the ordinary Rust picker guard until full campaign acceptance.
 No speedrun/demo/upload work was requested; that idea remains a future aside.
 
-Read [interpolation](docs/EXTENDED_INTERPOLATION.md), [scrolling flats](docs/EXTENDED_SCROLLING.md), [save/restore](docs/EXTENDED_SAVES.md), [preview/process contract](docs/EXTENDED_PREVIEW.md),
+Read [translucency](docs/EXTENDED_TRANSLUCENCY.md), [interpolation](docs/EXTENDED_INTERPOLATION.md), [scrolling flats](docs/EXTENDED_SCROLLING.md), [save/restore](docs/EXTENDED_SAVES.md), [preview/process contract](docs/EXTENDED_PREVIEW.md),
 [campaign presentation](docs/EXTENDED_CAMPAIGN.md), [lifecycle](docs/EXTENDED_LIFECYCLE.md), [HUD/music](docs/EXTENDED_UI.md), [incremental geometry](docs/EXTENDED_MESH.md), [audio](docs/EXTENDED_AUDIO.md), [materials/cache](docs/EXTENDED_MATERIALS.md),
 [sprites](docs/EXTENDED_SPRITES.md), [geometry](docs/EXTENDED_GEOMETRY.md),
 [worker](docs/EXTENDED_ENGINE.md), [validation](docs/VALIDATION.md) and
 [roadmap](docs/LEGACY_OF_RUST.md).
 
-Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/interpolation-final" bash scripts/build.sh`.
+Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/translucency-preview" bash scripts/build.sh`.
 Launch with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
 Only the explicit option packages/signs the helper/dylib and notices. Standard
 builds remain classic. Ordered resources are id24res → Doom II → id1, base index 1;
@@ -48,6 +48,26 @@ diagnostics only. Finite steps allow natural sample tails; explicit pause stops
 voices/mixer. Closing/error cancels future work; termination reaps the child and
 removes scratch. Sound mute stops/skips voices; unmute only plays future starts.
 
+**Build 149 adds normal/additive actor translucency.** `ME_CopyBlendTables`
+brings ABI2 to 18 exports; MBL1/op8 supplies immutable PLAYPAL/normal/additive
+lookup tables once at startup. MSP3/version3 retains record sizes and adds actor
+flag16 (additive, requires translucent8). Shadow wins; unsupported per-state/
+per-object custom tables and malformed TRANMAP fail explicitly. Native sprites
+retain palette indices and blend back-to-front with depth testing, no depth writes,
+and cutouts. RGB world/shaded sprite colors are quantized to PLAYPAL before table
+lookup; this does not claim software-renderer lighting/pixel parity. Classic
+actors retain their opaque/fuzz behavior. Preserve earlier apps for their saves.
+
+Current candidate: `build/translucency-preview/MetalDooM.app`, 0.10.0/build149;
+`build/build149.log`. Host deep/strict signatures and running title verified.
+Actual MAP01 Run/Up/Right/Pause left at tic48/health100/ammo50/283actors, Music/Sound
+on; world/pistol/HUD screenshot checked. Validation details: docs/VALIDATION.md.
+Worker/protocol/all-map tests: `build/translucency-worker-validation.log`.
+Native GPU pixels: `build/translucency-metal-validation.log`; private save
+regressions: `build/translucency-save-validation.log`. Remaining work includes
+custom/wall translucency, palette powerups, fake-floor/control-sector/sky effects,
+actor/moving-surface interpolation and actual campaign/boss acceptance.
+
 **Build 148 smooths camera and weapon presentation during Run.** Basic engine
 view/weapon bob already existed; earlier notes overstated that gap. MSP2/version2
 uses header word28 bit0 to snap the camera from the engine interpolation marker,
@@ -60,7 +80,7 @@ exact. New renderers on restart/Continue/Load start without history. Actors,
 animation frames, world surfaces, HUD and audio still update at original tic timing.
 No geometry/texture uploads or simulation requests occur during interpolation.
 
-Current candidate: `build/interpolation-final/MetalDooM.app`, 0.10.0/build 148;
+Previous candidate: `build/interpolation-final/MetalDooM.app`, 0.10.0/build 148;
 `build/build148.log`. Host deep/strict signatures and plist/running title pass.
 Actual MAP01 Run/Up/Right/Pause is verified; left paused at tic202/health100/ammo50,
 Music/Sound on, with world/pistol/HUD screenshot checked. Preserve build146 and all earlier bundles/saves, plus intermediate build 147 at
@@ -316,7 +336,7 @@ pitch, Euclidean attenuation and safe unlink positions. Capture consumes no RNG.
 Missing/invalid samples, ambient/random/loop definitions and overflow fail.
 Ambient playback remains absent; sound_events is requests, not audibility.
 
-Next complete actor/moving-surface interpolation, palette/TRANMAP translucency,
+Next complete actor/moving-surface interpolation, palette powerups/custom/wall translucency,
 control-sector/fake-floor/sky effects, targeted monster/map-special parity, actual
 boss exits and remaining world presentation. Full campaign play remains unaccepted; use the
 explicit preview with bounded Restart/Continue mechanics for now.
@@ -328,7 +348,7 @@ Preserve all older candidates: `build/mesh-final` (139), `build/mesh-preview` (1
 `build/extended-milestone` (127), `build/MetalDooM.app` (126).
 The 0.9.0 build 124 release was separately notarized in a prior task (Apple request
 121f1db9-34a4-4f5f-aeb3-599a59de0727); release ZIP remains in primary checkout
-`build/releases/MetalDooM-0.9.0-build124/`. Builds 126–148 are ad-hoc signed,
+`build/releases/MetalDooM-0.9.0-build124/`. Builds 126–149 are ad-hoc signed,
 unnotarized and unpackaged. No push/publish/upload/Apple submission performed.
 
 The remaining sections are historical.
