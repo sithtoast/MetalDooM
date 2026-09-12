@@ -89,18 +89,25 @@ final class ExtendedWorker {
         return try request(operation:1,body:Data((0..<count).flatMap{_ in command}))
     }
     private func request(operation:UInt32,body:Data) throws -> ExtendedView {
-        guard identity != nil, sequence < UInt32.max else { throw PortError("Worker is not ready.") }
-        sequence += 1
-        var bytes=Data("MEQ1".utf8)
-        for value in [sequence,operation,UInt32(body.count)] { for i in 0..<4 { bytes.append(UInt8(truncatingIfNeeded:value >> (8*i))) } }
-        bytes.append(body)
-        let end=deadline()
         do {
-            try write(bytes,deadline:end)
-            let view=try receive(deadline:end)
+            let view=try decodeView(exchange(operation:operation,body:body,limit:160*1024*1024+56))
             if let geometry=view.geometry, geometry.contentSHA256 != identity { throw PortError("Worker session identity changed.") }
             return view
-        } catch { cancel(); throw error }
+        } catch {cancel();throw error}
+    }
+    func campaign() throws -> Data {
+        guard let ui=lastUI,ui.phase>=2 else {throw PortError("Campaign metadata requires a completed level")}
+        return try exchange(operation:5,body:Data(),limit:1024*1024)
+    }
+    private func exchange(operation:UInt32,body:Data,limit:Int) throws -> Data {
+        guard identity != nil,sequence<UInt32.max else {throw PortError("Worker is not ready")}
+        sequence+=1
+        var bytes=Data("MEQ1".utf8)
+        for value in [sequence,operation,UInt32(body.count)] {for i in 0..<4 {bytes.append(UInt8(truncatingIfNeeded:value>>(8*i)))}}
+        bytes.append(body)
+        let end=deadline()
+        do {try write(bytes,deadline:end);return try receiveBody(deadline:end,limit:limit)}
+        catch {cancel();throw error}
     }
     private func deadline() -> Double { ProcessInfo.processInfo.systemUptime+timeout }
     private func wait(_ fd:Int32,event:Int16,deadline:Double) throws {
@@ -147,12 +154,18 @@ final class ExtendedWorker {
         }
     }
     private func receive(deadline:Double) throws -> ExtendedView {
+        try decodeView(receiveBody(deadline:deadline,limit:160*1024*1024+56))
+    }
+    private func receiveBody(deadline:Double,limit:Int) throws -> Data {
         let header=try read(16,deadline:deadline), bytes=Bytes(data:header)
         guard header.prefix(4)==Data("MER1".utf8), UInt32(bitPattern:Int32(try bytes.i32(4)))==sequence else { throw PortError("Invalid worker reply sequence.") }
         let status=try bytes.i32(8),size=try bytes.i32(12)
-        guard (0...1).contains(status), size>=0, size<=160*1024*1024+56, status==0 || size<=2048 else { throw PortError("Invalid worker reply length/status.") }
+        guard (0...1).contains(status), size>=0, size<=limit, status==0 || size<=2048 else { throw PortError("Invalid worker reply length/status.") }
         let body=try read(size,deadline:deadline)
         guard status==0 else { throw PortError(String(decoding:body,as:UTF8.self)) }
+        return body
+    }
+    private func decodeView(_ body:Data) throws -> ExtendedView {
         let result=try ExtendedView(data:body,previousGeometry:previousGeometry)
         if let geometry=result.geometry { previousGeometry=geometry }
         lastUI=result.ui

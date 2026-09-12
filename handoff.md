@@ -5,22 +5,23 @@
 Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, branch
 **codex/legacy-of-rust**, based on fetched origin/main merge **afd7357**. Preserve
 `/Users/wmh/Dev/MetalDooM` and its release artifacts. Current feature version is
-**0.10.0**, final successful build **143**. This remains the same unreleased Rust
+**0.10.0**, final successful build **144**. This remains the same unreleased Rust
 feature; do not bump the minor version for each refinement.
 
-The explicit Rust preview now has **death/restart and native completion/Continue**,
+The explicit Rust preview now has **animated intermissions, stories, credits and custom cast**,
+plus death/restart and native completion/Continue,
 plus level MIDI, a minimal HUD, cached geometry, selective Metal updates, Run/Pause and keyboard/mouse controls,
 with one-tic world/actor/weapon/material/audio/UI presentation. Manual buttons show every
 tic too. Keep the ordinary Rust picker guard until full campaign acceptance.
 No speedrun/demo/upload work was requested; that idea remains a future aside.
 
 Read [preview/process contract](docs/EXTENDED_PREVIEW.md),
-[lifecycle](docs/EXTENDED_LIFECYCLE.md), [HUD/music](docs/EXTENDED_UI.md), [incremental geometry](docs/EXTENDED_MESH.md), [audio](docs/EXTENDED_AUDIO.md), [materials/cache](docs/EXTENDED_MATERIALS.md),
+[campaign presentation](docs/EXTENDED_CAMPAIGN.md), [lifecycle](docs/EXTENDED_LIFECYCLE.md), [HUD/music](docs/EXTENDED_UI.md), [incremental geometry](docs/EXTENDED_MESH.md), [audio](docs/EXTENDED_AUDIO.md), [materials/cache](docs/EXTENDED_MATERIALS.md),
 [sprites](docs/EXTENDED_SPRITES.md), [geometry](docs/EXTENDED_GEOMETRY.md),
 [worker](docs/EXTENDED_ENGINE.md), [validation](docs/VALIDATION.md) and
 [roadmap](docs/LEGACY_OF_RUST.md).
 
-Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/lifecycle-complete" bash scripts/build.sh`.
+Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/campaign-preview" bash scripts/build.sh`.
 Launch with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
 Only the explicit option packages/signs the helper/dylib and notices. Standard
 builds remain classic. Ordered resources are id24res → Doom II → id1, base index 1;
@@ -46,6 +47,48 @@ diagnostics only. Finite steps allow natural sample tails; explicit pause stops
 voices/mixer. Closing/error cancels future work; termination reaps the child and
 removes scratch. Sound mute stops/skips voices; unmute only plays future starts.
 
+**Build 144 adds native campaign presentation.** `ME_CopyCampaign` is the fifteenth
+private ABI2 export. MEQ1 op5 has an empty body and returns ≤1 MiB JSON after level
+completion: selected map metadata, visited levels, par, story/art/music/finale,
+patched labels and sound IDs. `DSDH_SoundLookup` inspects the mapping without
+allocating IDs. Copies do not tick, consume RNG or drain gameplay sound. The parent
+checks map/tic/next against MUI2; MVW5 and existing packet layouts are unchanged.
+
+`ExtendedCampaignSequence` and `ExtendedCampaignView` parse/render Rust's original
+XWINTER0/1 and XFINALE1 data. Counting stats → entering map (4 seconds/skip), with
+visited splats and JSON-selected arrows (23 visible/11 blank tics). E/Space/Return/F
+or Continue advances. MAP07 story → CREDIT; MAP14 story → seven-member custom cast,
+with explicit alive/death frames, flips, patched sounds/labels and nonlooping
+D_DEJAVU. Fire kills the current cast actor; death advances, alive loops; cast
+repeats after hero. TNT1A0 is transparent in interlevels and cast sequences.
+
+A separate 35 Hz native timer freezes/resumes presentation without touching world
+tics. Pause, Escape and focus loss stop music/effects; checkboxes remain independent.
+Delayed wakes add one presentation tic, with no catch-up debt. Metal pauses under
+the native cached artwork overlay. Restart/Continue discard overlay/timer/audio,
+then load fresh paused world state. No automatic episode selection or save format.
+Ordinary picker acceptance remains guarded; arbitrary ID24 presentation remains
+unsupported. Read EXTENDED_CAMPAIGN.md for schema bounds and supported conditions.
+
+Final candidate: `build/campaign-preview/MetalDooM.app`, 0.10.0/build 144,
+`build/build144.log`. Host deep/strict signatures, bundle plist and running native
+title pass. Actual MAP01 Fire1second reaches tic35/ammo48/284 actors; Restart
+returns to tic0/health100/ammo50/283 actors. Raised-window screenshot confirms the
+fresh HUD/world. The final app remains open Paused, Music/Sound on. Preserve prior143 at `build/lifecycle-complete` and all older
+candidates. Campaign validation: `build/campaign-validation.log` covers C copy
+canaries/no state or FIFO mutation, all 16 normal + 2 secret routes, art decoding,
+statistics, markers/timing, both stories/credits and all seven cast cycles, 13
+malformed JSON schema/frame/condition/sound cases and six metadata mutations per
+route. Rendered PNGs are private under `build/campaign-test`; inspected episode-map,
+stories, credits and cast readbacks. `build/campaign-native.log` exercises actual
+app source with injected fixture resources: native controls, pause/resume, normal
+Continue, death, both endings, patched cast audio and restart/close cleanup.
+`build/campaign-protocol.log` adds op5 during-play/nonempty-body rejection.
+`build/campaign-core.log` checks 15 private exports and baseline core regressions.
+`build/campaign-worker-regression.log` passes existing all-map rendering/audio,
+malformed packet and timeout/oversize/sequence/truncation cancellation checks.
+These are exit-room/presentation probes, not complete campaign or boss playthroughs.
+
 **Build 143 adds death/restart and map transitions.** ME_Advance is the fourteenth
 private ABI2 export: restart current level with reborn inventory or Continue from
 completed level. Native wrappers invoke upstream G_DoCompleted/G_DoLoadLevel/
@@ -66,10 +109,11 @@ loads a fresh native renderer/builder/audio player. Restart resets inventory and
 world to tic 0. Both begin paused with Music/Sound choices retained. Inputs and
 old audio cursors clear; closed windows suppress queued replies. Boundary effects
 may finish naturally, while music pauses. MAP07/MAP14 show Episode complete with
-no Continue. This is a text summary, not XWINTER/XFINALE/CREDIT presentation.
+no gameplay Continue. This was a text summary in build 143; build 144 replaces it
+with XWINTER/XFINALE/CREDIT presentation.
 Death freezes the death tic; full camera-fall/animation remains future work.
 
-Final candidate `build/lifecycle-complete/MetalDooM.app`, **0.10.0/build 143**,
+Previous candidate `build/lifecycle-complete/MetalDooM.app`, **0.10.0/build 143**,
 `build/build143.log`. Host deep/strict signature and plist pass; native title agrees.
 Actual MAP01 Fire 1 second ends at 35/ammo 48/284 actors; Restart returns to 0/ammo 50/
 283 actors with health 100, armor 0, Music/Sound on, Paused. Native screenshot confirms
@@ -187,7 +231,8 @@ That earlier app was left **MAP01 tic 91, health 100, ammo 47, Sound on, Paused*
 Host process identity: app PID 40471, its bundled worker PID 40500.
 Run is ready for the user; do not automatically leave combat running.
 
-Worker ABI2 now has fourteen private exports, with ME_Advance lifecycle actions.
+Worker ABI2 now has fifteen private exports, including ME_Advance lifecycle actions
+and ME_CopyCampaign presentation metadata.
 MUI2 carries HUD/music/lifecycle; existing structures and MGE1/MSP1/MMT1/MSA1 stay.
 MVW5 header56 includes UI size at52; payloads are optional MGE1 followed by required
 MSP1/MMT1/MSA1/MUI2. Old outer versions reject. `ME_EnableAudio` precedes
@@ -199,10 +244,9 @@ pitch, Euclidean attenuation and safe unlink positions. Capture consumes no RNG.
 Missing/invalid samples, ambient/random/loop definitions and overflow fail.
 Ambient playback remains absent; sound_events is requests, not audibility.
 
-Next complete animated campaign presentation, scrolling
-flats, bob/interpolation, palette/TRANMAP translucency, control-sector/fake-floor/
-sky effects, targeted monster/map-special parity, boss/secret routes, JSON
-presentation and versioned saves. Full campaign play remains unaccepted; use the
+Next complete scrolling flats, bob/interpolation, palette/TRANMAP translucency,
+control-sector/fake-floor/sky effects, targeted monster/map-special parity, actual
+boss exits, remaining JSON/world presentation and versioned saves. Full campaign play remains unaccepted; use the
 explicit preview with bounded Restart/Continue mechanics for now.
 
 Preserve all older candidates: `build/mesh-final` (139), `build/mesh-preview` (138), `build/continuous-final`
@@ -212,7 +256,7 @@ Preserve all older candidates: `build/mesh-final` (139), `build/mesh-preview` (1
 `build/extended-milestone` (127), `build/MetalDooM.app` (126).
 The 0.9.0 build 124 release was separately notarized in a prior task (Apple request
 121f1db9-34a4-4f5f-aeb3-599a59de0727); release ZIP remains in primary checkout
-`build/releases/MetalDooM-0.9.0-build124/`. Builds 126–143 are ad-hoc signed,
+`build/releases/MetalDooM-0.9.0-build124/`. Builds 126–144 are ad-hoc signed,
 unnotarized and unpackaged. No push/publish/upload/Apple submission performed.
 
 The remaining sections are historical.

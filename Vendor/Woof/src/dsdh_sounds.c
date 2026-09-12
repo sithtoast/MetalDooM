@@ -75,3 +75,12 @@ int DSDH_SoundsGetNewIndex(void)
     ++max_sfx_number;
     return DSDH_SoundTranslate(max_sfx_number);
 }
+
+// Native copied presentation: inspect a patched ID without creating a new one.
+int DSDH_SoundLookup(int sfx_number)
+{
+    if (sfx_number < 0) return -1;
+    if (sfx_number < NUMSFX) return sfx_number;
+    int *index = translate ? hashmap_get(translate, sfx_number) : NULL;
+    return index ? *index : -1;
+}

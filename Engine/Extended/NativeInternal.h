@@ -20,3 +20,5 @@ void G_NativeComplete(void);
 void G_NativeRestart(void);
 void G_NativeContinue(void);
 int ME_LevelPhase(void);
+
+size_t ME_WriteCampaign(void *out,size_t capacity);

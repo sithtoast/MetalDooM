@@ -1,15 +1,14 @@
 # Rust death, restart and map transitions — 0.10.0 build 143
 
-The explicit Rust preview now pauses at death or level completion. Restart level
-reloads the current map with fresh starting inventory. On death, E, Space or Return
-also restart. A completed level shows kills, items, secrets, elapsed time and the
-next map, with a Continue button. MAP07 and MAP14 show Episode complete and have
-no Continue action. The normal picker remains guarded pending full campaign play.
+The explicit Rust preview pauses at death; Restart reloads the current map with
+fresh starting inventory. E, Space or Return also restart after death. Completed
+levels progress through [native intermissions and finales](EXTENDED_CAMPAIGN.md)
+with Continue for normal/secret destinations and stories/credits/cast at episode
+endings. The normal picker remains guarded pending full campaign gameplay.
 
-The presentation is a native text summary over the final world view. It does not
-implement XWINTER animations, narrative intertexts, CREDIT artwork, the XFINALE1
-cast, automatic episode selection or complete boss-trigger acceptance. Death
-freezes the death tic; camera-fall/death-animation playback remains future work.
+Build 143 initially displayed a text summary. Build 144 replaces that summary with
+XWINTER animations and episode presentation. Automatic episode selection, complete
+boss-trigger acceptance and full death-camera playback remain future work.
 
 ## Engine-owned lifecycle
 

@@ -5,13 +5,12 @@ by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
 **Version 0.10.0 · experimental source preview · local builds are not notarized.**
 
-Build 143 adds [death, restart and campaign transitions](docs/EXTENDED_LIFECYCLE.md)
-to the explicit [Rust preview](docs/EXTENDED_PREVIEW.md). Restart restores a pistol
-start; Continue carries inventory to the engine-selected next map. A native
-completion summary handles normal/secret routes and both episode endings.
-Music, HUD, sound, continuous controls and cached geometry remain available.
-Animated intermissions/finale, saves and full campaign acceptance remain ahead;
-the ordinary picker still rejects Rust. See the [roadmap](docs/LEGACY_OF_RUST.md).
+Build 144 adds [animated intermissions and finales](docs/EXTENDED_CAMPAIGN.md)
+to the explicit [Rust preview](docs/EXTENDED_PREVIEW.md): original episode maps,
+visited markers, counting statistics, stories, credits and the custom cast with
+patched sounds. Pause/resume and Restart work throughout; Continue carries inventory
+to the engine-selected next map. Saves and full campaign gameplay acceptance remain
+ahead; the ordinary picker still rejects Rust. See the [roadmap](docs/LEGACY_OF_RUST.md).
 The previous 0.9.0 build 124 was separately notarized; that release is preserved.
 
 This branch adds independently switchable AO, test/torch/projectile/muzzle

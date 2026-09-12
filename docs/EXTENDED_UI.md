@@ -39,7 +39,7 @@ that Rust's finale state machine is implemented.
 
 ## Copy and wire contract
 
-Build 140 added `ME_CopyUI`; ABI 2 now has fourteen exports including ME_Advance.
+Build 140 added `ME_CopyUI`; ABI 2 now has fifteen exports including ME_Advance and ME_CopyCampaign.
 Build 143 extends the UI packet with [lifecycle state](EXTENDED_LIFECYCLE.md). Existing C structures and
 MGE1/MSP1/MMT1/MSA1 layouts are unchanged. It returns zero before initialization or
 after failure. NULL or insufficient capacity returns the required 144 bytes without

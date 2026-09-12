@@ -11,6 +11,9 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     private var audioPlayer:ExtendedSoundPlayer?
     private var soundToggle:NSButton!, musicToggle:NSButton!, runButton:NSButton!, restartButton:NSButton!, continueButton:NSButton!
     private var levelUI:ExtendedUI?, changingLevel=false
+    private var campaign:ExtendedCampaignSequence?,campaignView:ExtendedCampaignView?
+    private var campaignSound:SoundPlayer?,campaignTimer:Timer?,campaignRunning=false
+    private var campaignTrack=""
     private let completion=NSTextField(wrappingLabelWithString:"")
     private var musicPlayer:MusicPlayer?,musicGeneration=0
     private var clock=ExtendedPlaybackClock(), wake:DispatchWorkItem?
@@ -40,6 +43,10 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
                 if !event.isARepeat,event.modifierFlags.intersection([.command,.option,.control]).isEmpty,
                    [14,49,36].contains(Int(event.keyCode)),self.levelUI?.phase==1 {
                     self.changeLevel(restart:true);return nil
+                }
+                if !event.isARepeat,event.modifierFlags.intersection([.command,.option,.control]).isEmpty,
+                   [14,49,36,3].contains(Int(event.keyCode)),self.campaign != nil {
+                    self.continueLevel();return nil
                 }
                 return event
             }
@@ -100,6 +107,10 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         updateControls();musicPlayer?.update(active:true);schedule()
     }
     @objc private func toggleRunning() {
+        if campaign != nil {
+            if campaignRunning {pause()} else {do {try setCampaignRunning(true)} catch {failed(error)}}
+            return
+        }
         if clock.running { pause();return }
         guard ready,!stopped,!changingLevel,levelUI?.playing==true,!clock.busy else { return }
         manualTag=nil;view.releaseMouse();turnHeld=0
@@ -109,17 +120,29 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     }
     private func pause(preserveEffects:Bool=false) {
         clock.pause();wake?.cancel();wake=nil;playbackGeneration+=1
+        campaignTimer?.invalidate();campaignTimer=nil;campaignRunning=false
+        campaignSound?.stopAll();try? campaignSound?.setActive(false)
         view?.inputBlocked=true;view?.releaseMouse();turnHeld=0
         if !preserveEffects {audioPlayer?.stop()};musicPlayer?.update(active:false);updateControls()
     }
     private func updateControls() {
         let available=ready && !closed && !stopped && !changingLevel,playing=levelUI?.playing==true
         buttons.forEach{$0.isEnabled=available && playing && !clock.busy}
-        runButton?.title=clock.running ? "Pause":"Run"
-        runButton?.isEnabled=available && playing && (clock.running || !clock.inFlight)
+        runButton?.title=(clock.running || campaignRunning) ? "Pause":"Run"
+        runButton?.isEnabled=available && (playing || campaign != nil) && (clock.running || !clock.inFlight)
         restartButton?.isEnabled=available && !clock.inFlight
-        continueButton?.isHidden=levelUI?.phase != 2
-        continueButton?.isEnabled=available && !clock.busy
+        continueButton?.isHidden=campaign == nil || campaign?.stage == .art
+        if let campaign {
+            switch campaign.stage {
+            case .statistics:continueButton?.title=campaign.statistics.stage==10 ? "Continue":"Show totals"
+            case .entering:continueButton?.title="Enter \(String(format:"MAP%02d",campaign.metadata.nextMap))"
+            case .story:continueButton?.title=campaign.visibleCharacters<campaign.metadata.story.count ? "Show story":"Continue"
+            case .cast:continueButton?.title=campaign.dead ? "Cast roll call":"Fire"
+            case .art,.complete:break
+            }
+        }
+        continueButton?.isEnabled=available && !clock.busy && campaign?.dead != true
+        if campaign != nil {mode.stringValue=campaignRunning ? "Intermission · E / Space / Return / F to advance":"Intermission paused";return}
         mode.stringValue=changingLevel ? "Loading level…":stopped ? "Stopped":levelUI?.phase==1 ? "You died":levelUI?.phase==2 ? "Level complete":levelUI?.phase==3 ? "Episode complete":clock.running ? (manualTag == nil ? "Running · 35 tics/s target":"Stepping") : clock.inFlight ? "Pausing…":"Paused"
     }
     private func schedule() {
@@ -159,13 +182,15 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
                 guard let sceneBuilder else { throw PortError("Preview resources unavailable.") }
                 let state=try worker.tick(forward:input.0,side:input.1,turn:input.2,buttons:input.3,count:1)
                 let scene=try sceneBuilder.prepare(state)
+                let presentation=state.ui.phase>=2 ? try ExtendedCampaignSequence(metadata:ExtendedCampaign(data:worker.campaign(),ui:state.ui),ui:state.ui,wad:scene.resources):nil
                 DispatchQueue.main.async { [weak self] in
                     guard let self,!self.closed,!self.stopped else { return }
                     do {
                         try self.display(scene,audible:self.playbackGeneration==token)
                         self.clock.finish()
                         if !scene.view.ui.playing {self.pause(preserveEffects:true)}
-                        self.musicPlayer?.update(active:self.clock.busy);self.updateControls();self.schedule()
+                        if let presentation {try self.beginCampaign(presentation,wad:scene.resources,running:self.playbackGeneration==token+1)}
+                        self.musicPlayer?.update(active:self.clock.busy || self.campaignRunning);self.updateControls();self.schedule()
                     } catch { self.failed(error) }
                 }
             } catch { DispatchQueue.main.async { [weak self] in self?.failed(error) } }
@@ -200,10 +225,71 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         status.stringValue="Tic \(scene.view.tic) · \(scene.geometry.triangleCount.formatted()) triangles · Sky \(scene.view.sky) · Health \(scene.view.health) · Ammo \(scene.view.presentation.ammo) · \(scene.view.presentation.actors.count) actors"
     }
     @objc private func restartLevel() {changeLevel(restart:true)}
-    @objc private func continueLevel() {changeLevel(restart:false)}
+    @objc private func continueLevel() {
+        guard let campaign,!changingLevel,!closed,!stopped else {return}
+        campaign.press()
+        do {try updateCampaign()} catch {failed(error)}
+    }
+    private func beginCampaign(_ sequence:ExtendedCampaignSequence,wad:WAD,running:Bool) throws {
+        let overlay=try ExtendedCampaignView(sequence:sequence,wad:wad)
+        overlay.frame=view.bounds;overlay.autoresizingMask=[.width,.height]
+        view.addSubview(overlay);campaignView=overlay;campaign=sequence
+        // Completed worlds are frozen; MTKView does not need to redraw under art.
+        view.isPaused=true;completion.isHidden=true
+        campaignSound=try SoundPlayer(wad:wad,onlyLumps:[],voiceCount:4)
+        var sounds=Set(sequence.metadata.sounds.values.filter{["DSPISTOL","DSBAREXP","DSSGCOCK"].contains($0)})
+        // Resolve even BEX-renamed intermission cues and every custom cast cue.
+        for id in [1,3,82] {if let name=sequence.metadata.sounds[String(id)] {sounds.insert(name)}}
+        if let finale=sequence.finale {
+            for actor in finale.castrollcall.castanims {
+                for id in [actor.alertsound]+(actor.aliveframes+actor.deathframes).map(\.sound) {
+                    if let name=sequence.metadata.sounds[String(id)] {sounds.insert(name)}
+                }
+            }
+        }
+        try campaignSound?.prepare(lumps:Set(sounds.compactMap{name in wad.lumps.lastIndex{$0.name==name}}),wad:wad)
+        campaignTrack="";try updateCampaign();try setCampaignRunning(running && NSApp.isActive)
+    }
+    private func setCampaignRunning(_ running:Bool) throws {
+        guard campaign != nil,!closed,!stopped,!changingLevel else {return}
+        campaignTimer?.invalidate();campaignTimer=nil;campaignRunning=running
+        try campaignSound?.setActive(running && soundToggle.state == .on)
+        musicPlayer?.update(active:running)
+        if running {
+            // A delayed UI wake advances one presentation tic; no catch-up debt.
+            let timer=Timer(timeInterval:1.0/35,repeats:true) { [weak self] _ in
+                guard let self,self.campaignRunning else {return}
+                self.campaign?.tick()
+                do {try self.updateCampaign()} catch {self.failed(error)}
+            }
+            campaignTimer=timer;RunLoop.main.add(timer,forMode:.common)
+        }
+        updateControls()
+    }
+    private func updateCampaign() throws {
+        guard let campaign,let wad=sceneBuilder?.resources else {return}
+        if campaign.stage == .complete {changeLevel(restart:false);return}
+        let track=campaign.music
+        if campaignTrack != track.0 {
+            try musicPlayer?.select(track.0);musicPlayer?.looping=track.1
+            campaignTrack=track.0;musicPlayer?.update(active:campaignRunning)
+        }
+        musicPlayer?.update(active:campaignRunning)
+        let sounds=campaign.drainSounds()
+        if campaignRunning && soundToggle.state == .on {
+            for (channel,name) in sounds.enumerated() {
+                guard let lump=wad.lumps.lastIndex(where:{$0.name==name}) else {throw PortError("Missing presentation sound")}
+                var event=MD_SoundEvent();event.lump=Int32(lump);event.channel=Int32(channel%4);event.volume=1;event.pan=0
+                campaignSound?.play(event)
+            }
+        }
+        campaignView?.needsDisplay=true;updateControls()
+    }
     private func changeLevel(restart:Bool) {
         guard ready,!closed,!stopped,!changingLevel,!clock.inFlight, restart || levelUI?.phase==2 else {return}
-        pause();changingLevel=true;updateControls()
+        pause();changingLevel=true
+        campaignView?.removeFromSuperview();campaignView=nil;campaign=nil;campaignSound=nil;campaignTrack=""
+        view.isPaused=false;updateControls()
         queue.async { [self] in
             do {
                 guard let resources=sceneBuilder?.resources else {throw PortError("Missing session resources")}
@@ -229,8 +315,12 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     }
     func applicationDidResignActive(_ notification:Notification) { pause() }
     func windowDidResignKey(_ notification:Notification) { pause() }
-    @objc private func toggleMusic() { musicPlayer?.enabled=musicToggle.state == .on;musicPlayer?.update(active:clock.busy) }
-    @objc private func toggleSound() { audioPlayer?.muted=soundToggle.state != .on }
+    @objc private func toggleMusic() { musicPlayer?.enabled=musicToggle.state == .on;musicPlayer?.update(active:clock.busy || campaignRunning) }
+    @objc private func toggleSound() {
+        audioPlayer?.muted=soundToggle.state != .on
+        if soundToggle.state != .on {campaignSound?.stopAll()}
+        do {try campaignSound?.setActive(campaignRunning && soundToggle.state == .on)} catch {failed(error)}
+    }
     private func failed(_ error:Error) {
         guard !closed else { return }
         changingLevel=false;stopped=true;pause();worker.cancel();status.stringValue="Preview stopped: \(error)"

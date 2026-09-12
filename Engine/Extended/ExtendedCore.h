@@ -79,3 +79,6 @@ ME_API size_t ME_CopyUI(void *out,size_t capacity);
 /* 0: restart current level with fresh inventory; 1: continue completed level.
  * Returns a fresh tic-zero world. Does not reinitialize the session/resources. */
 ME_API int ME_Advance(uint32_t action);
+
+// Boundary-only JSON, at most 1 MiB. Size queries/short buffers never write.
+ME_API size_t ME_CopyCampaign(void *out,size_t capacity);

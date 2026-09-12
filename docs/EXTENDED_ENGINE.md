@@ -1,6 +1,6 @@
 # Experimental extended simulation worker
 
-The **0.10.0 build 143** development milestone includes copied geometry, sprite
+The **0.10.0 build 144** development milestone includes copied geometry, sprite
 frames, material animations, sound events, HUD and level music, explicit session planning, three Rust-required ID24 fields, an explicit
 [native preview](EXTENDED_PREVIEW.md), and headless tests with the actual Rust
 patch/resources. The normal app still uses Chocolate Doom; its Rust rejection
@@ -55,13 +55,16 @@ Profiles are explicit development choices:
   The copied session still reports the declared ID24 requirement. This profile
   does **not** advertise full ID24 conformance or silently relabel it as MBF21.
 
-The dylib exports exactly fourteen `ME_` functions, keeping both engine and helper
+The dylib exports exactly fifteen `ME_` functions, keeping both engine and helper
 symbols private. One `ME_Tick` consumes one 35 Hz command. Movement, attack/use
 and validated weapon-change bits are accepted; special command bits and invalid
 weapon indices fail. Player/actor snapshots copy values, messages and selected
 UMAPINFO fields (name, routes, finale and boss-action count); no engine pointers
-escape. Normal and secret exits present a native summary; explicit Continue loads the
-selected map with upstream inventory carryover. Episode endings have no Continue.
+escape. Normal and secret exits present native intermissions; explicit Continue loads the
+selected map with upstream inventory carryover. Episode endings progress through
+stories and credits/custom cast without loading another gameplay map.
+`ME_CopyCampaign` copies bounded, read-only JSON after completion; see
+[the campaign presentation contract](EXTENDED_CAMPAIGN.md).
 
 ## Process lifetime and presentation
 
@@ -81,8 +84,8 @@ for native playback; non-opted-in probes retain only the request count. The
 [UI adapter](EXTENDED_UI.md) copies player inventory and music selection for native
 HUD/MIDI presentation. Ambient sound requests fail. UMAPINFO is parsed before map setup, including Rust's
 boss-action overrides; episode hooks preserve the simulation flag without adding
-a menu. Routes execute through the [lifecycle adapter](EXTENDED_LIFECYCLE.md); animated
-intermission/finale presentation remains unimplemented.
+a menu. Routes execute through the [lifecycle adapter](EXTENDED_LIFECYCLE.md); native
+intermissions/finales use the [campaign adapter](EXTENDED_CAMPAIGN.md).
 
 ## ID24 fields and validation
 
@@ -163,7 +166,8 @@ Build 140 adds the thirteenth export, `ME_CopyUI`, carrying authoritative HUD an
 music selection in MUI1/MVW5. Native Apple MIDI and a minimal HUD are connected.
 Build 143 adds `ME_Advance`, MUI2 lifecycle state, death/restart, engine-owned
 normal/secret routing and a native completion summary. All route probes pass.
-Next: animated campaign presentation and targeted monster/map-special parity.
-Actual boss exits, JSON presentation, full playthroughs and versioned saves remain
+Build 144 adds ME_CopyCampaign and native animated intermissions, stories, credits
+and custom cast. Next: targeted monster/map-special parity and remaining world
+presentation. Actual boss exits, full playthroughs and versioned saves remain
 acceptance gates. Keep the ordinary GUI Rust guard until native campaign
 play is validated.

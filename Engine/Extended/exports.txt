@@ -12,3 +12,4 @@ _ME_EnableAudio
 _ME_CopyAudio
 _ME_CopyUI
 _ME_Advance
+_ME_CopyCampaign

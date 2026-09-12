@@ -1,4 +1,4 @@
-# Rust native preview — 0.10.0 build 143
+# Rust native preview — 0.10.0 build 144
 
 An explicit development preview now starts the extended simulation in a separate
 child process and draws its copied geometry with the existing native Metal world
@@ -7,10 +7,10 @@ It uses the actual ordered id24res → Doom II → id1 resources,
 checks their session fingerprint and reads the UMAPINFO sky selection.
 
 This is a **continuous development preview**, not full Rust campaign support.
-Native minimal HUD and level MIDI are connected; full Boom/ID24 presentation,
-animated intermission/finale presentation and saves remain ahead.
-Death, Restart, native completion summaries and Continue are connected; see
-[lifecycle behavior](EXTENDED_LIFECYCLE.md).
+Native HUD, MIDI, intermissions, episode stories/credits and custom cast are
+connected; full Boom/ID24 world presentation, saves and gameplay acceptance remain
+ahead. Death, Restart and Continue are connected; see
+[lifecycle behavior](EXTENDED_LIFECYCLE.md) and [campaign presentation](EXTENDED_CAMPAIGN.md).
 The ordinary WAD picker still rejects Rust gameplay. Run and manual controls advance real
 simulation; displayed health/ammo are simulation state. No speedrun/upload work.
 
@@ -19,8 +19,8 @@ simulation; displayed health/ammo are simulation state. No speedrun/upload work.
 The helper is packaged only with the explicit development build option:
 
 ```sh
-METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/lifecycle-complete" bash scripts/build.sh
-open -n "$PWD/build/lifecycle-complete/MetalDooM.app" --args \
+METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/campaign-preview" bash scripts/build.sh
+open -n "$PWD/build/campaign-preview/MetalDooM.app" --args \
   --rust-preview "/path/to/Ultimate Doom/rerelease" --map MAP01
 ```
 
@@ -90,13 +90,21 @@ falls from 210.57 to 20.56 ms; native load averages 3.39 ms in a separate check.
 See [incremental geometry](EXTENDED_MESH.md) for invalidation, exact pixel parity,
 measurement boundaries and remaining costs. This is not full campaign acceptance.
 
+Build 144 presents [native intermissions and finales](EXTENDED_CAMPAIGN.md) using
+worker-selected metadata and original artwork. A separate 35 Hz presentation
+clock supports counting stats, entering markers, stories, credits and the custom
+cast without ticking the simulation. Pause/Restart also work during presentation.
+
 ## Process and protocol
 
 Worker ABI 2 has additive `ME_CopyView`, `ME_CopyPresentation`, `ME_CopyMaterials`, `ME_EnableAudio` and
 `ME_CopyAudio`, plus `ME_CopyUI`, bringing the
-private export count to fourteen with `ME_Advance`. No existing structure layout changes. `Engine/Worker/main.c` links only
+private export count to fifteen with `ME_Advance` and `ME_CopyCampaign`. No existing structure layout changes. `Engine/Worker/main.c` links only
 the isolated dylib; the Swift app never loads it. `scripts/build-extended-worker.sh`
 produces both beside each other, using an executable-relative dylib path.
+
+MEQ1 op5 (empty body) returns bounded campaign JSON at completion; see
+[the campaign contract](EXTENDED_CAMPAIGN.md). View packet layouts stay unchanged.
 
 The child accepts cache directory, map, base index, profile, skill and ordered WAD
 paths as separate arguments. Engine stdout is redirected to the diagnostic log;

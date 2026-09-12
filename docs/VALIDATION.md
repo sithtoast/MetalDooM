@@ -1,5 +1,47 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 144: Native Rust intermissions and finales
+
+Final candidate: `build/campaign-preview/MetalDooM.app`; `build/build144.log`.
+Host deep/strict signature verification passes for app, helper and dylib; bundled
+plist and native window title both report **0.10.0/build 144**. Actual MAP01 Fire
+1 second completes at tic35/ammo48/284 actors. Restart returns to tic0/health100/
+ammo50/283 actors, Paused, Sound/Music on. Raising the native window confirms the
+refreshed Metal world/HUD; the app remains open in that fresh paused state.
+
+- `build/campaign-validation.log`: C metadata size/short-buffer/full-copy canaries,
+  deterministic repeated JSON, unchanged simulation snapshot/RNG and undrained
+  gameplay audio FIFO. All sixteen normal and both secret exits with original
+  campaign metadata in small test rooms. Correct names/pictures, visited markers,
+  statistics completion, selected arrow directions, 23/11 blink timing and 140-tic
+  entering duration. Both stories, CREDIT, all seven custom cast alive/death
+  cycles and looping back to Ghoul. D_DM2INT/D_SHORES/D_DEJAVU selection and the
+  declared nonlooping finale flag. Six malformed metadata mutations per route and
+  thirteen malformed interlevel/finale schema/frame/condition/sound cases reject.
+- `build/campaign-test/*.png`: native AppKit bitmap readbacks, including secret
+  entering maps, both story screens, credits and each cast member. Inspected
+  orientation, palette, original pixel aspect, patch anchoring and legibility.
+  Rust's TNT1A0 transparent sentinel is handled for both interlevels and cast.
+- `build/campaign-native.log`: actual app controller with injected fixture stack,
+  native statistics/entering controls, independent presentation pause/resume,
+  Continue to paused MAP02, death/restart, MAP07 story/credits and MAP14 story/cast,
+  patched cast effects scheduled through Core Audio, correct MIDI selections,
+  repeated restart/step and close during pending world replacement.
+- `build/campaign-protocol.log`: framed request validation, including op5 during
+  play and nonempty op5 rejection. Existing view/command packet versions remain.
+- `build/campaign-worker-regression.log`: existing all-map worker/sprite/material
+  and sound tests, malformed packets, no replay after geometry requests, and
+  timeout/oversized/wrong-sequence/truncated-reply cancellation checks pass.
+- `build/campaign-core.log`: exactly fifteen private exports, native dependencies,
+  repeatable ticks, patched combat, Boom conveyor and explicit rejection cases.
+
+No full campaign or boss-kill playthrough is claimed by these exit-room fixtures.
+Nonlooping finale music is checked as declared/selected; no new duration/pitch
+measurement is claimed. Full death-camera playback, broader ID24 presentation,
+extended save/restore and ordinary picker acceptance remain pending. Older app
+bundles and the notarized 0.9.0/build124 release are preserved. No game data or
+release package is committed, and nothing is pushed or uploaded.
+
 ## 2026-09-12 — 0.10.0 build 143: Death/restart and native campaign transitions
 
 Final candidate `build/lifecycle-complete/MetalDooM.app`, **0.10.0/build 143**,

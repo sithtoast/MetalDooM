@@ -275,3 +275,9 @@ int ME_Advance(uint32_t action) {
     } else I_Error("Invalid level lifecycle action");
     entered=0;return 1;
 }
+
+size_t ME_CopyCampaign(void *out,size_t capacity) {
+    if(!ready || failed)return 0;
+    entered=1;if(setjmp(error_boundary)){entered=0;return 0;}
+    size_t result=ME_WriteCampaign(out,capacity);entered=0;return result;
+}

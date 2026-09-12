@@ -4,6 +4,20 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust intermissions and finales (build 144)
+
+- Show original Rust episode maps, counting statistics, visited markers and
+  blinking destination arrows before Continue loads the next map.
+- Present both episode stories, the first episode's credits, and the custom
+  seven-member finale cast with original frames, patched sounds and music.
+- Pause/resume presentation independently of gameplay; Restart clears the artwork
+  and returns to a fresh paused world. Keep Music/Sound choices independent.
+- Validate all sixteen normal and two secret routes, both endings, all cast cycles,
+  native controls/audio, malformed metadata/JSON and copied-state boundaries.
+- Keep this refinement on 0.10.0. Local build 144 is ad-hoc signed, unnotarized;
+  saves, full boss/campaign playthroughs and ordinary Rust picker acceptance remain
+  pending. Preserve older bundles; no WAD data, release package or upload is added.
+
 ## 0.10.0 refinement — Rust restart and campaign transitions (build 143)
 
 - Add a death panel with Restart level and E/Space/Return restart. Restart restores

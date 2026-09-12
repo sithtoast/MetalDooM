@@ -74,6 +74,14 @@ int main(int argc,char **argv) {
             return fail(expected,"Invalid request header, sequence or length");
         if(fread(payload,1,length,stdin)!=length)return fail(seq,"Truncated request body");
         if(op==3 && !length)return send_frame(seq,0,"",0)?0:1;
+        if(op==5 && !length) {
+            size_t size=ME_CopyCampaign(NULL,0);
+            if(!size || size>1024*1024)return fail(seq,"Campaign metadata requires a completed level");
+            void *body=malloc(size);if(!body)return fail(seq,"Campaign allocation failed");
+            if(ME_CopyCampaign(body,size)!=size){free(body);return fail(seq,"Cannot copy campaign");}
+            int sent=send_frame(seq,0,body,size);free(body);if(!sent)return 1;
+            expected++;continue;
+        }
         if(op==1 && length && length%6==0) {
             for(uint32_t i=0;i<length;i+=6) {
                 if(payload[i+5])return fail(seq,"Nonzero reserved command byte");

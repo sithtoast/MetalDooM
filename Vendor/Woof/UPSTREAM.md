@@ -50,5 +50,9 @@ Local changes from the pin:
   autosaves. The parent supplies the completion UI; general G_Ticker dispatch is
   still excluded. See docs/EXTENDED_LIFECYCLE.md.
 
+- `dsdh_sounds.c`, `dsdh_main.h`: add a read-only external sound-ID lookup for
+  copied campaign metadata. Unlike DSDH_SoundTranslate it never allocates an ID
+  or changes the sound table. See docs/EXTENDED_CAMPAIGN.md.
+
 Native integration, limitations and reproduction: `docs/EXTENDED_ENGINE.md`.
 Future upstream updates must reapply/review this list and rerun the worker suite.

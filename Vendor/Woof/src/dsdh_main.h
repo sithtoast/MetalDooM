@@ -23,6 +23,7 @@ int DSDH_ThingTranslate(int thing_number);
 int DSDH_MobjInfoGetNewIndex(void);
 
 int DSDH_SoundTranslate(int sfx_number);
+int DSDH_SoundLookup(int sfx_number);
 int DSDH_SoundsGetNewIndex(void);
 
 int DSDH_SpriteTranslate(int sprite_number);
