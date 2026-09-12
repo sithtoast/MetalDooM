@@ -16,3 +16,7 @@ size_t ME_WriteAudio(void *out,size_t capacity);
 
 void ME_StartLevelMusic(void);
 size_t ME_WriteUI(void *out,size_t capacity);
+void G_NativeComplete(void);
+void G_NativeRestart(void);
+void G_NativeContinue(void);
+int ME_LevelPhase(void);

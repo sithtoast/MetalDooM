@@ -1,4 +1,4 @@
-# Rust native preview — 0.10.0 build 140
+# Rust native preview — 0.10.0 build 143
 
 An explicit development preview now starts the extended simulation in a separate
 child process and draws its copied geometry with the existing native Metal world
@@ -8,7 +8,9 @@ checks their session fingerprint and reads the UMAPINFO sky selection.
 
 This is a **continuous development preview**, not full Rust campaign support.
 Native minimal HUD and level MIDI are connected; full Boom/ID24 presentation,
-intermission/finale flow, restart and saves remain ahead.
+animated intermission/finale presentation and saves remain ahead.
+Death, Restart, native completion summaries and Continue are connected; see
+[lifecycle behavior](EXTENDED_LIFECYCLE.md).
 The ordinary WAD picker still rejects Rust gameplay. Run and manual controls advance real
 simulation; displayed health/ammo are simulation state. No speedrun/upload work.
 
@@ -17,8 +19,8 @@ simulation; displayed health/ammo are simulation state. No speedrun/upload work.
 The helper is packaged only with the explicit development build option:
 
 ```sh
-METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/ui-preview" bash scripts/build.sh
-open -n "$PWD/build/ui-preview/MetalDooM.app" --args \
+METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/lifecycle-complete" bash scripts/build.sh
+open -n "$PWD/build/lifecycle-complete/MetalDooM.app" --args \
   --rust-preview "/path/to/Ultimate Doom/rerelease" --map MAP01
 ```
 
@@ -92,7 +94,7 @@ measurement boundaries and remaining costs. This is not full campaign acceptance
 
 Worker ABI 2 has additive `ME_CopyView`, `ME_CopyPresentation`, `ME_CopyMaterials`, `ME_EnableAudio` and
 `ME_CopyAudio`, plus `ME_CopyUI`, bringing the
-private export count to thirteen. No existing structure layout changes. `Engine/Worker/main.c` links only
+private export count to fourteen with `ME_Advance`. No existing structure layout changes. `Engine/Worker/main.c` links only
 the isolated dylib; the Swift app never loads it. `scripts/build-extended-worker.sh`
 produces both beside each other, using an executable-relative dylib path.
 
@@ -109,7 +111,9 @@ paths. Every request/reply header is 16 bytes, little-endian:
 | 12–15 | Body length | Body length |
 
 Operations: 1 ticks (1–35 six-byte commands); 2 geometry (empty body); 3 graceful
-quit (empty body/reply). Commands carry signed forward/side bytes, signed LE16
+quit (empty body/reply); 4 lifecycle action (u32: 0 restart, 1 continue).
+Lifecycle replies force complete geometry at tic zero. Tick batches stop early
+at death/completion. Commands carry signed forward/side bytes, signed LE16
 turn, button byte, reserved zero byte. Invalid sequence, length, operation, reserved
 byte or command terminates the session with a bounded error reply.
 
@@ -117,13 +121,14 @@ Startup and geometry replies carry an `MVW5` body: magic, tic, fixed x/y/eye-z,
 unsigned Doom angle, signed health, eight-byte sky name, geometry byte count,
 sprite byte count, material byte count, audio byte count, UI byte count (56 bytes total), then optional [MGE1](EXTENDED_GEOMETRY.md),
 required [MSP1](EXTENDED_SPRITES.md), [MMT1](EXTENDED_MATERIALS.md) and
-[MSA1](EXTENDED_AUDIO.md) and [MUI1](EXTENDED_UI.md). Tick replies
+[MSA1](EXTENDED_AUDIO.md) and [MUI2](EXTENDED_LIFECYCLE.md). Tick replies
 include geometry when changed and always include sprite/material/UI state and drained sound events. Old body versions reject. Swift checks envelope size/
 sequence/status, view/geometry/sprite/material/audio/UI tic agreement, map identity and stable content identity. Maximum reply
 is 160 MiB + 56 bytes; errors are at most 2048 bytes. Startup/requests have a
 30-second deadline and run on one serial background queue; cancellation terminates
 the owned child and interrupts reads. EOF/truncation and protocol errors stop the
-session. No restart-in-process or save contract is implied.
+session. Level restart/continue use the existing process and resource session;
+there is no reinitialization or save contract.
 
 ## Validation
 
@@ -133,7 +138,7 @@ cancellation and bad-reply/timeout handling. All sixteen actual Rust maps resolv
 materials/skies and actor/weapon frames at startup and tic 35. Tests cover eight
 rotations/mirroring, actual Incinerator/Blade firing-frame decoding, complete-copy
 canaries and nine malformed sprite packets. Wrong resource base identity rejects.
-The MBF21/Rust suite passes with thirteen private exports. Audio checks add
+The MBF21/Rust suite passes with fourteen private exports. Audio checks add
 FIFO canaries/drain/overflow, left/right sources, thirteen malformed audio/order
 packets and byte-identical simulation snapshots over 200 tics with capture off/on.
 Build 140 worker/core logs: `build/ui140-worker.log`, `build/ui140-core.log`.

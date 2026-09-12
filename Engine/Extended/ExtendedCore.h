@@ -5,7 +5,7 @@
 #define ME_ABI_VERSION 2
 #define ME_API __attribute__((visibility("default")))
 /* Experimental single-session, single-thread worker ABI. All structures are
- * copied values. No Woof pointers/types cross this boundary. No unload/restart
+ * copied values. No Woof pointers/types cross this boundary. No unload/reinitialization
  * or save contract yet: terminate the worker to reclaim a session (also after
  * an error). This core is NOT selected by the MetalDooM gameplay UI. */
 enum { ME_PROFILE_MBF21 = 0, ME_PROFILE_RUST_PROBE = 1 };
@@ -74,5 +74,8 @@ ME_API int ME_EnableAudio(void);
 /* MSA1 FIFO: NULL/undersized queries preserve events; a complete copy drains. */
 ME_API size_t ME_CopyAudio(void *out,size_t capacity);
 
-/* MUI1 HUD/music presentation; complete-copy semantics, no state drain. */
+/* MUI2 HUD/music/lifecycle presentation; complete-copy semantics, no state drain. */
 ME_API size_t ME_CopyUI(void *out,size_t capacity);
+/* 0: restart current level with fresh inventory; 1: continue completed level.
+ * Returns a fresh tic-zero world. Does not reinitialize the session/resources. */
+ME_API int ME_Advance(uint32_t action);

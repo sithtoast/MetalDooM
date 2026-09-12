@@ -4,6 +4,7 @@
 #include "doomstat.h"
 #include "d_items.h"
 #include "g_umapinfo.h"
+#include "g_game.h"
 #include "sounds.h"
 #include "s_sound.h"
 #include "s_musinfo.h"
@@ -42,17 +43,22 @@ void ME_StartLevelMusic(void) {
 }
 static void word(unsigned char **p,uint32_t v){for(int i=0;i<4;i++)*(*p)++=(unsigned char)(v>>(8*i));}
 size_t ME_WriteUI(void *out,size_t capacity) {
-    const size_t size=92;if(!out || capacity<size)return size;
+    const size_t size=144;if(!out || capacity<size)return size;
     player_t *player=&players[0];unsigned char *p=out;
     uint32_t keys=0,weapons=0;
     for(int i=0;i<NUMCARDS;i++)if(player->cards[i])keys |= 1u<<i;
     for(int i=0;i<NUMWEAPONS;i++)if(player->weaponowned[i])weapons |= 1u<<i;
     int ammo=weaponinfo[player->readyweapon].ammo;
-    memcpy(p,"MUI1",4);p+=4;word(&p,1);word(&p,leveltime);
+    memcpy(p,"MUI2",4);p+=4;word(&p,2);word(&p,leveltime);
     word(&p,player->health);word(&p,player->armorpoints);word(&p,player->readyweapon);
     word(&p,ammo==am_noammo ? -1:player->ammo[ammo]);word(&p,keys);word(&p,weapons);
     for(int i=0;i<NUMAMMO;i++)word(&p,player->ammo[i]);
     for(int i=0;i<NUMAMMO;i++)word(&p,player->maxammo[i]);
     memcpy(p,track,8);p+=8;word(&p,looped);word(&p,generation);word(&p,ammo==am_noammo ? -1:ammo);word(&p,0);
+    int phase=ME_LevelPhase();
+    word(&p,phase);word(&p,gamemap);word(&p,phase==2 ? wminfo.next+1:0);
+    word(&p,player->killcount);word(&p,totalkills);word(&p,player->itemcount);word(&p,totalitems);
+    word(&p,player->secretcount);word(&p,totalsecret);word(&p,leveltime);
+    word(&p,phase>=2 && secretexit);word(&p,0);word(&p,0);
     return size;
 }

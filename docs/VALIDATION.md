@@ -1,5 +1,58 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 143: Death/restart and native campaign transitions
+
+Final candidate `build/lifecycle-complete/MetalDooM.app`, **0.10.0/build 143**,
+`build/build143.log`; host deep/strict signature and bundled plist pass, and running
+CUA title agrees. Preserve intermediate 141 (`build/lifecycle-preview`) and 142
+(`build/lifecycle-final`), the previous 140, and the primary notarized 124 release.
+This remains the same unreleased 0.10.0 Rust feature refinement.
+
+Passed logs under build/:
+
+- `lifecycle-validation.log`: original rooms with real normal/secret exit switches,
+  using unmodified Rust UMAPINFO. All 16 normal routes and both secret routes pass;
+  MAP02→15→03, MAP10→16→11 and MAP07/MAP14 endings are explicit. Pickups establish
+  health 200/armor 100/shotgun/ammo/key state; Continue preserves inventory and clears
+  keys, loads full new-map geometry at tic 0 and resets counters. Repeated Restart
+  restores health 100/armor 0/pistol 50 and identical initial world bytes. A real
+  damaging floor causes death at 129; batches stop and Restart restores tic 0.
+  Invalid Continue during play rejects.
+- Secret-route tests exposed native bootstrap's missing haswolflevels flag; set
+  from MAP31 presence exactly as upstream d_main does. Normal-route testing also
+  caught upstream default-on autosave; the native Continue wrapper disables it.
+  These fixes are in final143. No save format or files are introduced.
+- `lifecycle-native.log`: same AppKit/Metal preview source with original fixture
+  paths/helper injected only in test copies. Real completion/death panels disable
+  gameplay and expose appropriate actions. Continue updates map/geometry/HUD/music
+  to MAP02/D_SHORES, paused at0. Repeated restart/step resets HUD, input, music and
+  sound sequencing. Closing during a queued replacement drains the worker and
+  suppresses its eventual UI reply. The initial test's immediate Use was correctly
+  ignored by upstream spawn debounce; test now advances release tics before Use.
+- `lifecycle-worker.log`: current wire/copy/cancellation/deadline tests and all 16
+  map resources, sprites/materials, audio FIFO/order/RNG regression checks. Adds
+  invalid lifecycle action and malformed action-length requests.
+- `lifecycle-ui.log`: all 16 map music/HUD selections, native MIDI PCM and lifecycle,
+  inventory/copy canaries,24 malformed MUI2 packets and view/tic mismatch. Native
+  music PCM peak 0.07998366; physical speaker audibility is unverified.
+- `lifecycle-core-regression.log`: fourteen private exports, native dependencies,
+  MBF21 movement/combat/conveyor/rejections, session/ID24 fields, all 16 real Rust
+  map startups and actual Rust weapon/fuel pickup probes.
+
+Signed native143 MAP01: Fire1second finishes at 35, ammo 48 and 284 actors. Clicking
+Restart level returns to0, ammo 50 and 283 actors with health 100/armor 0 and the initial
+world/camera/pistol HUD. Music/Sound remain enabled and playback stays Paused.
+The running screenshot verifies the controls and reset presentation. Death and
+completion UI are exercised in the native fixture harness; full actual-map exits
+and boss kills are not inferred from these route tests.
+
+No classic simulation, rendering or music implementation changed in this milestone;
+build 140's native classic/GPU evidence remains recorded below. The lifecycle adapter
+reuses the same extended simulation routines, without general G_Ticker demo/save/UI
+dispatch. Full camera-fall/death animation, XWINTER/XFINALE/CREDIT presentation,
+actual boss-trigger/campaign playthroughs and versioned saves remain ahead. No push
+or release packaging. Contract: EXTENDED_LIFECYCLE.md.
+
 ## 2026-09-12 — 0.10.0 build 140: Rust HUD and native level MIDI
 
 Final candidate `build/ui-preview/MetalDooM.app`, **0.10.0/build 140**,

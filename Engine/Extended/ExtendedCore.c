@@ -106,6 +106,8 @@ int ME_Init(const ME_Config *config)
         if (!W_AddPath(path)) I_Error("Cannot add WAD: %s", path);
     }
     W_InitMultipleFiles();
+    /* Match upstream startup: commercial secret exits depend on MAP31 presence. */
+    haswolflevels = W_CheckNumForName("MAP31") >= 0;
     ValidateTable("ANIMATED", 23, 0);
     ValidateTable("SWITCHES", 20, 18);
     for (int i = 0; i < numlumps; i++)
@@ -130,7 +132,7 @@ int ME_Tick(const ME_Command *command)
     if (!ready || failed || !command) return 0;
     entered = 1;
     if (setjmp(error_boundary)) { entered = 0; return 0; }
-    if (gameaction != ga_nothing) I_Error("Level transition requires a future campaign adapter");
+    if (ME_LevelPhase() != 0 || gameaction != ga_nothing) I_Error("Level is paused at a lifecycle boundary");
     memset(&players[0].cmd, 0, sizeof(players[0].cmd));
     players[0].cmd.forwardmove = command->forward_move;
     players[0].cmd.sidemove = command->side_move;
@@ -141,6 +143,7 @@ int ME_Tick(const ME_Command *command)
         I_Error("Invalid worker command buttons");
     players[0].cmd.buttons = command->buttons;
     P_Ticker(); gametic++; ME_AudioTick();
+    if (gameaction == ga_completed) G_NativeComplete();
     entered = 0;
     return 1;
 }
@@ -155,7 +158,7 @@ int ME_CopySnapshot(ME_Snapshot *out)
     out->ready_weapon = p->readyweapon;
     for (int i = 0; i < 4; i++) out->ammo[i] = p->ammo[i];
     out->weapon_state = p->psprites[0].state ? (int)(p->psprites[0].state - states) : 0;
-    out->pending_exit = gameaction != ga_nothing;
+    out->pending_exit = ME_LevelPhase() >= 2;
     out->sound_events = sound_events;
     snprintf(out->message, sizeof(out->message), "%s", p->message ? p->message : "");
     if (gamemapinfo) {
@@ -251,4 +254,24 @@ size_t ME_CopyUI(void *out,size_t capacity) {
     if(!ready || failed)return 0;
     entered=1;if(setjmp(error_boundary)){entered=0;return 0;}
     size_t result=ME_WriteUI(out,capacity);entered=0;return result;
+}
+
+int ME_LevelPhase(void) {
+    if (gamestate == GS_INTERMISSION || gameaction == ga_victory) {
+        unsigned flags=gamemapinfo ? gamemapinfo->flags:0;
+        if (gameaction == ga_victory || (!secretexit && (flags & (MapInfo_EndGame | MapInfo_EndGameCustomFinale)))) return 3;
+        return 2;
+    }
+    return players[0].playerstate != PST_LIVE || players[0].health<=0 ? 1:0;
+}
+int ME_Advance(uint32_t action) {
+    if(!ready || failed)return 0;
+    entered=1;if(setjmp(error_boundary)){entered=0;return 0;}
+    if(action==0)G_NativeRestart();
+    else if(action==1 && ME_LevelPhase()==2) {
+        int limit=ME_CurrentSession()->profile==ME_PROFILE_RUST_PROBE ? 16:32;
+        if(wminfo.nextep!=0 || wminfo.next<0 || wminfo.next>=limit)I_Error("Next map is outside this campaign");
+        G_NativeContinue();
+    } else I_Error("Invalid level lifecycle action");
+    entered=0;return 1;
 }

@@ -1,9 +1,9 @@
-# Rust sound effects preview — build 140
+# Rust sound effects preview — build 143
 
 The Rust development preview plays sound effects from the worker's actual gameplay
 calls, including pistol fire, Rust weapon charge/fire/impact, pickups, switches
 and moving sectors. The Sound checkbox starts enabled; turning it off stops
-current voices and suppresses new starts. Level music uses the separate [MUI1 adapter](EXTENDED_UI.md).
+current voices and suppresses new starts. Level music uses the separate [UI adapter](EXTENDED_UI.md).
 
 ## Engine adapter and capture
 
@@ -48,10 +48,10 @@ Only starts carry a name; stop parameters are zero. Events retain FIFO order,
 including ties, and their tics cannot exceed the packet tic. Updates may occur
 at the end of a tick batch. Swift validates these constraints and exact lengths.
 
-ABI 2 now has thirteen private exports; existing struct/MGE1/MSP1/MMT1 layouts are
+ABI 2 now has fourteen private exports; existing struct/MGE1/MSP1/MMT1 layouts are
 unchanged. The MEQ1/MER1 envelope is unchanged. The MVW5 view header has 56 bytes,
 with audio byte count at offset 48 and UI byte count at offset 52. Payload order is
-optional MGE1, required MSP1, required MMT1, required MSA1, required MUI1. Aggregate payload stays
+optional MGE1, required MSP1, required MMT1, required MSA1, required MUI2. Aggregate payload stays
 within 160 MiB. All snapshot tics must agree. Geometry queries do not replay audio
 already consumed by a tick reply; protocol versions are intentionally strict.
 
@@ -104,3 +104,9 @@ final native controls and remaining limits.
 Build 137 adds native checks for one-tic scene/PCM delivery at the same exact
 pistol tics 39/53/67, duplicate rejection, a silent in-flight reply after pause,
 and subsequent mute/unmute/resume (`build/continuous136-audio-validation.log`).
+
+Build 143 creates a fresh native sound player after level restart/continue so the
+new tic-zero sequence cannot collide with the previous map's audio cursor. Music
+is prepared paused for the new level. Death/completion stops scheduling and pauses
+music while letting boundary effects finish; explicit Pause/restart stops voices.
+See EXTENDED_LIFECYCLE.md.

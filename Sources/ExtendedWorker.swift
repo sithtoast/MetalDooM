@@ -12,7 +12,7 @@ struct ExtendedView {
         let bytes=Bytes(data:data); try bytes.check(0,56)
         guard data.prefix(4) == Data("MVW5".utf8) else { throw PortError("Invalid worker view header.") }
         let size=try bytes.i32(36), spriteSize=try bytes.i32(40), materialSize=try bytes.i32(44),audioSize=try bytes.i32(48),uiSize=try bytes.i32(52)
-        guard size >= 0, spriteSize>=32, materialSize>=16, audioSize>=16,uiSize==92, data.count == 56+size+spriteSize+materialSize+audioSize+uiSize else { throw PortError("Invalid worker state lengths.") }
+        guard size >= 0, spriteSize>=32, materialSize>=16, audioSize>=16,uiSize==144, data.count == 56+size+spriteSize+materialSize+audioSize+uiSize else { throw PortError("Invalid worker state lengths.") }
         tic=try bytes.i32(4); health=try bytes.i32(24)
         guard tic >= 0 else { throw PortError("Invalid worker tic.") }
         x=Float(try bytes.i32(8))/65536; y=Float(try bytes.i32(12))/65536; eyeZ=Float(try bytes.i32(16))/65536
@@ -24,6 +24,7 @@ struct ExtendedView {
         materials=try ExtendedMaterials(data:Data(data[(56+size+spriteSize)..<(56+size+spriteSize+materialSize)]))
         audio=try ExtendedAudio(data:Data(data[(56+size+spriteSize+materialSize)..<(56+size+spriteSize+materialSize+audioSize)]))
         ui=try ExtendedUI(data:Data(data.suffix(uiSize)))
+        guard geometry == nil || geometry?.map.name == String(format:"MAP%02d",ui.map) else {throw PortError("Worker HUD/map disagree")}
         guard ui.tic==tic,ui.health==health,ui.weapon==presentation.readyWeapon,ui.readyAmmo==presentation.ammo else { throw PortError("Worker HUD/view disagree") }
         guard audio.tic==tic else { throw PortError("Worker audio/view tics differ.") }
         guard materials.tic==tic else { throw PortError("Worker material/view tics differ.") }
@@ -42,6 +43,7 @@ final class ExtendedWorker {
     private var scratch:URL?, log:FileHandle?
     private var closed=false
     private var previousGeometry:ExtendedGeometry?
+    private var lastUI:ExtendedUI?
     private(set) var identity:String?
     private let timeout:Double
     init(timeout:Double=30) { self.timeout=max(0.1,min(120,timeout)) }
@@ -69,6 +71,15 @@ final class ExtendedWorker {
             identity=geometry.contentSHA256
             return view
         } catch { cancel(); throw error }
+    }
+    func advance(restart:Bool) throws -> ExtendedView {
+        guard let prior=lastUI,restart || prior.phase==2 else {throw PortError("No completed level to continue")}
+        previousGeometry=nil
+        do {
+            let state=try request(operation:4,body:Data([restart ? 0:1,0,0,0]))
+            guard state.tic==0,state.ui.playing,state.geometry != nil,state.ui.map==(restart ? prior.map:prior.nextMap) else {throw PortError("Invalid new level snapshot")}
+            return state
+        } catch {cancel();throw error}
     }
     func geometry() throws -> ExtendedView { try request(operation:2,body:Data()) }
     func tick(forward:Int8=0,side:Int8=0,turn:Int16=0,buttons:UInt8=0,count:Int=1) throws -> ExtendedView {
@@ -144,6 +155,7 @@ final class ExtendedWorker {
         guard status==0 else { throw PortError(String(decoding:body,as:UTF8.self)) }
         let result=try ExtendedView(data:body,previousGeometry:previousGeometry)
         if let geometry=result.geometry { previousGeometry=geometry }
+        lastUI=result.ui
         return result
     }
     func cancel() {

@@ -18,7 +18,8 @@ struct ExtendedScene {
 
 /// Reuses CPU meshes and decoded resources across updates of one fixed session.
 final class ExtendedSceneBuilder {
-    private let resources:WAD, art:Art, heights:[String:Float]
+    let resources:WAD
+    private let art:Art, heights:[String:Float]
     private var mesh:ExtendedMesh?
     private var copied:ExtendedGeometry?, geometry:Geometry?
     private var images:[MaterialKey:PixelImage]=[:], indices:[String:Int]=[:], patches:[Int:PatchImage]=[:]

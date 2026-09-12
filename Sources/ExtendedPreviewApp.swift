@@ -9,7 +9,9 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     private let queue=DispatchQueue(label:"MetalDooM.extended-preview")
     private let worker=ExtendedWorker()
     private var audioPlayer:ExtendedSoundPlayer?
-    private var soundToggle:NSButton!, musicToggle:NSButton!, runButton:NSButton!
+    private var soundToggle:NSButton!, musicToggle:NSButton!, runButton:NSButton!, restartButton:NSButton!, continueButton:NSButton!
+    private var levelUI:ExtendedUI?, changingLevel=false
+    private let completion=NSTextField(wrappingLabelWithString:"")
     private var musicPlayer:MusicPlayer?,musicGeneration=0
     private var clock=ExtendedPlaybackClock(), wake:DispatchWorkItem?
     private var playbackGeneration=0, manualTag:Int?, ready=false, stopped=false
@@ -33,8 +35,13 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             // Manual buttons deliberately block gameplay input, but Escape must
             // still interrupt their finite sequence (including button focus).
             keyMonitor=NSEvent.addLocalMonitorForEvents(matching:.keyDown) { [weak self] event in
-                guard let self,event.window==self.window,event.keyCode==53 else { return event }
-                self.pause();return nil
+                guard let self,event.window==self.window else { return event }
+                if event.keyCode==53 {self.pause();return nil}
+                if !event.isARepeat,event.modifierFlags.intersection([.command,.option,.control]).isEmpty,
+                   [14,49,36].contains(Int(event.keyCode)),self.levelUI?.phase==1 {
+                    self.changeLevel(restart:true);return nil
+                }
+                return event
             }
             view=GameView(frame:.zero,device:MTLCreateSystemDefaultDevice())
             view.colorPixelFormat = .bgra8Unorm;view.depthStencilPixelFormat = .depth32Float
@@ -54,10 +61,14 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             musicToggle.state = .on;controls.addArrangedSubview(musicToggle)
             runButton=NSButton(title:"Run",target:self,action:#selector(toggleRunning))
             runButton.isEnabled=false
-            let transport=NSStackView(views:[runButton,mode]);transport.spacing=12
+            restartButton=NSButton(title:"Restart level",target:self,action:#selector(restartLevel))
+            continueButton=NSButton(title:"Continue",target:self,action:#selector(continueLevel))
+            restartButton.isEnabled=false;continueButton.isHidden=true
+            let transport=NSStackView(views:[runButton,restartButton,continueButton,mode]);transport.spacing=12
+            completion.isHidden=true;completion.font=NSFont.systemFont(ofSize:16,weight:.semibold)
             let caption=NSTextField(labelWithString:"WASD move · Arrows turn/move · Shift run · E use · F fire · 1–7 weapon · Click to aim · Esc pause")
             caption.textColor = .secondaryLabelColor
-            let stack=NSStackView(views:[transport,controls,caption,status,view]);stack.orientation = .vertical;stack.alignment = .leading;stack.spacing=8
+            let stack=NSStackView(views:[transport,controls,caption,completion,status,view]);stack.orientation = .vertical;stack.alignment = .leading;stack.spacing=8
             stack.translatesAutoresizingMaskIntoConstraints=false;view.translatesAutoresizingMaskIntoConstraints=false
             let content=NSView();window.contentView=content;content.addSubview(stack)
             NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo:content.leadingAnchor,constant:12),stack.trailingAnchor.constraint(equalTo:content.trailingAnchor,constant:-12),stack.topAnchor.constraint(equalTo:content.topAnchor,constant:12),stack.bottomAnchor.constraint(equalTo:content.bottomAnchor,constant:-12),view.widthAnchor.constraint(equalTo:stack.widthAnchor),view.heightAnchor.constraint(greaterThanOrEqualToConstant:300)])
@@ -83,30 +94,33 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         }
     }
     @objc private func step(_ sender:NSButton) {
-        guard ready,!stopped,!clock.busy else { return }
+        guard ready,!stopped,!changingLevel,levelUI?.playing==true,!clock.busy else { return }
         manualTag=sender.tag
         clock.start(now:ProcessInfo.processInfo.systemUptime,steps:sender.tag<=2 ? 8:(sender.tag==5 || sender.tag==8) ? 35:1)
         updateControls();musicPlayer?.update(active:true);schedule()
     }
     @objc private func toggleRunning() {
         if clock.running { pause();return }
-        guard ready,!stopped,!clock.busy else { return }
+        guard ready,!stopped,!changingLevel,levelUI?.playing==true,!clock.busy else { return }
         manualTag=nil;view.releaseMouse();turnHeld=0
         clock.start(now:ProcessInfo.processInfo.systemUptime)
         view.inputBlocked=false;window.makeFirstResponder(view)
         updateControls();musicPlayer?.update(active:true);schedule()
     }
-    private func pause() {
+    private func pause(preserveEffects:Bool=false) {
         clock.pause();wake?.cancel();wake=nil;playbackGeneration+=1
         view?.inputBlocked=true;view?.releaseMouse();turnHeld=0
-        audioPlayer?.stop();musicPlayer?.update(active:false);updateControls()
+        if !preserveEffects {audioPlayer?.stop()};musicPlayer?.update(active:false);updateControls()
     }
     private func updateControls() {
-        let available=ready && !closed && !stopped
-        buttons.forEach{$0.isEnabled=available && !clock.busy}
+        let available=ready && !closed && !stopped && !changingLevel,playing=levelUI?.playing==true
+        buttons.forEach{$0.isEnabled=available && playing && !clock.busy}
         runButton?.title=clock.running ? "Pause":"Run"
-        runButton?.isEnabled=available && (clock.running || !clock.inFlight)
-        mode.stringValue=stopped ? "Stopped":clock.running ? (manualTag == nil ? "Running · 35 tics/s target":"Stepping") : clock.inFlight ? "Pausing…":"Paused"
+        runButton?.isEnabled=available && playing && (clock.running || !clock.inFlight)
+        restartButton?.isEnabled=available && !clock.inFlight
+        continueButton?.isHidden=levelUI?.phase != 2
+        continueButton?.isEnabled=available && !clock.busy
+        mode.stringValue=changingLevel ? "Loading level…":stopped ? "Stopped":levelUI?.phase==1 ? "You died":levelUI?.phase==2 ? "Level complete":levelUI?.phase==3 ? "Episode complete":clock.running ? (manualTag == nil ? "Running · 35 tics/s target":"Stepping") : clock.inFlight ? "Pausing…":"Paused"
     }
     private func schedule() {
         guard clock.running,!closed,!stopped else { return }
@@ -149,7 +163,9 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
                     guard let self,!self.closed,!self.stopped else { return }
                     do {
                         try self.display(scene,audible:self.playbackGeneration==token)
-                        self.clock.finish();self.musicPlayer?.update(active:self.clock.busy);self.updateControls();self.schedule()
+                        self.clock.finish()
+                        if !scene.view.ui.playing {self.pause(preserveEffects:true)}
+                        self.musicPlayer?.update(active:self.clock.busy);self.updateControls();self.schedule()
                     } catch { self.failed(error) }
                 }
             } catch { DispatchQueue.main.async { [weak self] in self?.failed(error) } }
@@ -162,7 +178,16 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     }
     private func display(_ scene:ExtendedScene,audible:Bool) throws {
         try renderer.loadExtendedPreview(scene)
-        let ui=scene.view.ui
+        let ui=scene.view.ui;levelUI=ui
+        window.title="\(appTitle) — Rust world preview — \(String(format:"MAP%02d",ui.map))"
+        completion.isHidden=ui.playing
+        if ui.phase==1 {completion.stringValue="You died. Restart level, or press E, Space or Return."}
+        else if ui.phase>=2 {
+            let seconds=ui.levelTics/35
+            let heading=ui.phase==3 ? "Episode complete": "\(ui.secretExit ? "Secret exit" : "Level complete") → \(String(format:"MAP%02d",ui.nextMap))"
+            completion.stringValue="\(heading)   ·   Kills \(ui.kills)/\(ui.totalKills)   Items \(ui.items)/\(ui.totalItems)   Secrets \(ui.secrets)/\(ui.totalSecrets)   Time \(seconds/60):\(String(format:"%02d",seconds%60))"
+            continueButton.title="Continue to \(String(format:"MAP%02d",ui.nextMap))"
+        }
         if ui.musicGeneration != musicGeneration {
             if musicPlayer==nil { musicPlayer=try MusicPlayer(wad:scene.resources,map:scene.copiedGeometry.map.name,track:ui.music,backend:"apple") }
             else { try musicPlayer?.select(ui.music) }
@@ -174,13 +199,41 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         try audioPlayer?.present(scene.view.audio,audible:audible)
         status.stringValue="Tic \(scene.view.tic) · \(scene.geometry.triangleCount.formatted()) triangles · Sky \(scene.view.sky) · Health \(scene.view.health) · Ammo \(scene.view.presentation.ammo) · \(scene.view.presentation.actors.count) actors"
     }
+    @objc private func restartLevel() {changeLevel(restart:true)}
+    @objc private func continueLevel() {changeLevel(restart:false)}
+    private func changeLevel(restart:Bool) {
+        guard ready,!closed,!stopped,!changingLevel,!clock.inFlight, restart || levelUI?.phase==2 else {return}
+        pause();changingLevel=true;updateControls()
+        queue.async { [self] in
+            do {
+                guard let resources=sceneBuilder?.resources else {throw PortError("Missing session resources")}
+                let state=try worker.advance(restart:restart)
+                let builder=try ExtendedSceneBuilder(resources:resources)
+                let scene=try builder.prepare(state);sceneBuilder=builder
+                DispatchQueue.main.async { [weak self] in
+                    guard let self,!self.closed,!self.stopped else {return}
+                    do {
+                        // New world/tic-zero snapshots must not reuse old mesh, sprite,
+                        // audio sequence or input state. Resource identity stays fixed.
+                        let renderer=try Renderer(view:self.view)
+                        renderer.onError={ [weak self] in self?.failed($0) }
+                        self.renderer=renderer;self.view.delegate=renderer
+                        self.audioPlayer=nil;self.musicPlayer=nil;self.musicGeneration=0
+                        self.clock=ExtendedPlaybackClock();self.manualTag=nil
+                        self.changingLevel=false
+                        self.presentInitial(scene)
+                    } catch {self.failed(error)}
+                }
+            } catch {DispatchQueue.main.async { [weak self] in self?.failed(error) }}
+        }
+    }
     func applicationDidResignActive(_ notification:Notification) { pause() }
     func windowDidResignKey(_ notification:Notification) { pause() }
     @objc private func toggleMusic() { musicPlayer?.enabled=musicToggle.state == .on;musicPlayer?.update(active:clock.busy) }
     @objc private func toggleSound() { audioPlayer?.muted=soundToggle.state != .on }
     private func failed(_ error:Error) {
         guard !closed else { return }
-        stopped=true;pause();worker.cancel();status.stringValue="Preview stopped: \(error)"
+        changingLevel=false;stopped=true;pause();worker.cancel();status.stringValue="Preview stopped: \(error)"
     }
     func windowWillClose(_ notification:Notification) { shutdown() }
     func applicationWillTerminate(_ notification:Notification) { shutdown() }

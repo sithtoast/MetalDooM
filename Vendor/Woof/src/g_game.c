@@ -5796,3 +5796,20 @@ void G_BindWeapVariables(void)
 // Lee's Jan 19 sources
 //
 //----------------------------------------------------------------------------
+
+/* MetalDooM: narrow native lifecycle entry points. Keep upstream completion,
+ * inventory cleanup, RNG and level setup in this process; the parent presents
+ * the intermission instead of driving G_Ticker's demo/save/UI dispatch. */
+void G_NativeComplete(void) { G_DoCompleted(); }
+void G_NativeRestart(void)
+{
+    players[consoleplayer].playerstate = PST_REBORN;
+    gameaction = ga_loadlevel;
+    G_DoLoadLevel(false);
+}
+void G_NativeContinue(void)
+{
+    autosave = false; /* Native extended saves have no accepted format yet. */
+    if (secretexit) players[consoleplayer].didsecret = true;
+    G_DoWorldDone();
+}

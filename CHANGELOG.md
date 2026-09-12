@@ -4,6 +4,25 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust restart and campaign transitions (build 143)
+
+- Add a death panel with Restart level and E/Space/Return restart. Restart restores
+  the current world, starting health, pistol and ammo; new levels begin paused.
+- Add native completion statistics and Continue, preserving engine-owned inventory
+  across normal/secret routes and clearing keys. End MAP07/MAP14 explicitly rather
+  than falling through into another episode or Doom II's defaults.
+- Use upstream completion/load routines inside the same worker. Initialize the
+  upstream secret-exit availability flag and explicitly disable unsupported autosaves.
+  Extend copied UI with bounded lifecycle state; reset native scene/audio/input
+  state on each level load and suppress replies after closing.
+- Pass all 16 normal/two secret route probes, secret returns, both episode endings,
+  actual pickup carryover and damaging-floor death/restart. Pass native app panel,
+  map/music change, repeated restart and close-during-load checks, plus worker,
+  fourteen-export core, all-map HUD/MIDI and 24 malformed UI regressions.
+- Verify signed 0.10.0/build 143 native MAP01 firing and reset to tic 0/ammo 50. Preserve
+  intermediate 141/142 and older previews. Animated intermissions/finale, actual
+  boss playthroughs and extended saves remain ahead. No push or release package.
+
 ## 0.10.0 refinement — Rust HUD and level music (build 140)
 
 - Add native minimal health, armor, keys, weapon and ammo display from copied

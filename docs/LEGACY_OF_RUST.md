@@ -1,6 +1,6 @@
 # Legacy of Rust development and ID24 evidence
 
-Status: **0.10.0 build 140 continuous native preview with cached geometry, keyboard/mouse controls, HUD, level music and sound; full Rust campaign support remains pending.**
+Status: **0.10.0 build 143 continuous native preview with restart, normal/secret transitions, native completion summaries, HUD, music and sound; full Rust campaign support remains pending.**
 First campaign acceptance remains fully playable bundled single-player Rust.
 Multiplayer and the online add-on catalog are outside scope. General ID24
 conformance is a separate target and must never be inferred from this campaign.
@@ -147,8 +147,10 @@ before resource/game initialization, not guessed separately by Swift and C.
    with measured MAP13 CPU improvement and exact GPU parity. Build 135 adds native
    [sound effects](EXTENDED_AUDIO.md). Build 140 adds [native HUD and level MIDI](EXTENDED_UI.md).
    Full presentation and campaign gameplay remain required. Validate targeted combat/map behavior, not just startup.
-4. **Campaign and persistence:** episodes, boss/secret routes, native interlevel
-   animations and finale, music and extended saves. Test each route and restore
+4. **Campaign and persistence:** build 143 adds death/restart and all normal/secret
+   route probes, inventory carryover and native completion/episode-end summaries
+   ([details](EXTENDED_LIFECYCLE.md)). Complete actual boss exits, native interlevel
+   animations and finale, and extended saves. Test each route and restore
    during projectiles, charge attacks, moving sectors, switches and transitions.
 5. **Playable Rust acceptance:** native play from both episode starts, combat,
    pickups, hazards, secrets, boss exits, endings and mid-campaign saves; record

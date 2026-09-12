@@ -1,4 +1,4 @@
-# Rust HUD and level music — 0.10.0 build 140
+# Rust HUD and level music — 0.10.0 build 143
 
 The explicit Rust preview now draws a native minimal HUD from copied extended
 player state and plays the worker-selected level track through Apple's MIDI
@@ -39,18 +39,21 @@ that Rust's finale state machine is implemented.
 
 ## Copy and wire contract
 
-ABI 2 adds `ME_CopyUI` as its thirteenth private export. Existing C structures and
+Build 140 added `ME_CopyUI`; ABI 2 now has fourteen exports including ME_Advance.
+Build 143 extends the UI packet with [lifecycle state](EXTENDED_LIFECYCLE.md). Existing C structures and
 MGE1/MSP1/MMT1/MSA1 layouts are unchanged. It returns zero before initialization or
-after failure. NULL or insufficient capacity returns the required 92 bytes without
-writing; a full copy writes exactly 92 bytes and never drains state or ticks the
-simulation. One initialized session per worker remains the lifetime rule.
+after failure. NULL or insufficient capacity returns the required 144 bytes without
+writing; a full copy writes exactly 144 bytes and never drains state or ticks the
+simulation. One initialized resource session per worker remains the lifetime rule; level
+restart/continue can now replace the world within it.
 
-All integers in MUI1 are little-endian 32-bit values:
+MUI2 is version 2. Its original fields keep these offsets; all integers are
+little-endian 32-bit values:
 
 | Offset | Value |
 | ---: | --- |
-| 0 | Magic MUI1 |
-| 4 | Version 1 |
+| 0 | Magic MUI2 |
+| 4 | Version 2 |
 | 8 | Simulation tic |
 | 12, 16 | Signed health and armor |
 | 20, 24 | Ready weapon index and ready ammo count; -1 for no ammo |
@@ -60,9 +63,10 @@ All integers in MUI1 are little-endian 32-bit values:
 | 68 | Eight-byte zero-padded music resource name |
 | 76, 80 | Loop flag 0/1 and positive music generation |
 | 84, 88 | Ammo type -1..3, reserved zero |
+| 92–140 | Lifecycle phase, maps, counters, time, secret-exit flag and reserved zeros; see EXTENDED_LIFECYCLE.md |
 
 MVW5 extends the outer header to 56 bytes, adding UI byte count at offset 52.
-Payload order is optional MGE1, then required MSP1, MMT1, MSA1 and MUI1. All tics
+Payload order is optional MGE1, then required MSP1, MMT1, MSA1 and MUI2. All tics
 must agree; HUD health must agree with the view and ready weapon/ammo with MSP1.
 The Swift decoder also checks sizes, version, reserved bytes, bit ranges, inventory
 values, ammo-type/count agreement, and printable padded music names. Old outer
@@ -79,7 +83,7 @@ First run `scripts/test-extended-worker.sh original-doom2.wad rerelease-director
 then `scripts/test-extended-ui.sh original-doom2.wad rerelease-directory` with native
 Core Audio access. Tests cover all sixteen authoritative map tracks and MIDI
 durations, stable selection after 35 tics, initial HUD state, armor/two-key pickups,
-complete-copy canaries, sixteen malformed MUI1 packets and inconsistent view tics.
+complete-copy canaries, twenty-four malformed MUI2 packets and inconsistent view tics.
 A short original MIDI fixture exercises real mixer PCM, nonloop/loop completion,
 pause/resume, independent enablement and unchanged classic backend preference.
 PCM proves generated output; physical speaker audibility is unverified.

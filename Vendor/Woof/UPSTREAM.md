@@ -45,5 +45,10 @@ Local changes from the pin:
   resources precede it. The native worker also invokes upstream UMAPINFO parsing
   and preserves its episode flag without a presentation frontend.
 
+- `g_game.c`: add three narrow native wrappers around upstream completion,
+  restart/load and world-done routines. The Continue wrapper disables unsupported
+  autosaves. The parent supplies the completion UI; general G_Ticker dispatch is
+  still excluded. See docs/EXTENDED_LIFECYCLE.md.
+
 Native integration, limitations and reproduction: `docs/EXTENDED_ENGINE.md`.
 Future upstream updates must reapply/review this list and rerun the worker suite.

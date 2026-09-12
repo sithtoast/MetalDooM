@@ -90,3 +90,8 @@ void S_StopAmbientSounds(void){}
 // Episode menu hooks retain the simulation flag; the worker has no menu.
 void MN_ClearEpisodes(void) { EpiCustom = true; }
 void MN_AddEpisode(const char *map, const char *gfx, const char *txt, char key) { EpiCustom = true; }
+// The parent presents copied intermission statistics. Optional stat dumping and
+// autosaves are disabled by the native Continue wrapper.
+void WI_Start(wbstartstruct_t *info) {}
+void StatCopy(const struct wbstartstruct_s *info) {}
+void M_SaveAutoSave(void) { I_Error("Extended autosaves are not implemented"); }

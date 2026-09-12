@@ -27,7 +27,7 @@ static int state(uint32_t seq,int force_geometry) {
     if(size<120 || size>160*1024*1024)return 0;
     unsigned char *geometry=malloc(size);if(!geometry)return 0;
     if(ME_CopyGeometry(geometry,size)!=size){free(geometry);return 0;}
-    // A worker owns one fixed map. Ignore tic/player fields; compare counts,
+    // Within a level, ignore tic/player fields; compare counts,
     // content identity and every geometry value exactly, without hash collisions.
     int changed=force_geometry || previous_size!=size || !previous_geometry ||
         memcmp(geometry+28,previous_geometry+28,size-28);
@@ -80,9 +80,13 @@ int main(int argc,char **argv) {
                 ME_Command c={.forward_move=(int8_t)payload[i],.side_move=(int8_t)payload[i+1],
                     .angle_turn=(int16_t)((uint16_t)payload[i+2]|(uint16_t)payload[i+3]<<8),.buttons=payload[i+4]};
                 if(!ME_Tick(&c)){char error[2048];ME_CopyError(error,sizeof(error));return fail(seq,error);}
+                ME_Snapshot snapshot;if(!ME_CopySnapshot(&snapshot))return fail(seq,"Cannot copy lifecycle state");
+                if(snapshot.health<=0 || snapshot.pending_exit)break;
             }
+        } else if(op==4 && length==4) {
+            if(!ME_Advance(get(payload))){char error[2048];ME_CopyError(error,sizeof(error));return fail(seq,error);}
         } else if(op!=2 || length) return fail(seq,"Invalid request operation/body");
-        if(!state(seq,op==2)){char e[2048];ME_CopyError(e,sizeof(e));return fail(seq,e[0]?e:"Cannot copy presentation");}
+        if(!state(seq,op==2 || op==4)){char e[2048];ME_CopyError(e,sizeof(e));return fail(seq,e[0]?e:"Cannot copy presentation");}
         expected++;
     }
 }

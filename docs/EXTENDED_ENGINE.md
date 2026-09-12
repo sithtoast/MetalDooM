@@ -1,6 +1,6 @@
 # Experimental extended simulation worker
 
-The **0.10.0 build 140** development milestone includes copied geometry, sprite
+The **0.10.0 build 143** development milestone includes copied geometry, sprite
 frames, material animations, sound events, HUD and level music, explicit session planning, three Rust-required ID24 fields, an explicit
 [native preview](EXTENDED_PREVIEW.md), and headless tests with the actual Rust
 patch/resources. The normal app still uses Chocolate Doom; its Rust rejection
@@ -55,19 +55,21 @@ Profiles are explicit development choices:
   The copied session still reports the declared ID24 requirement. This profile
   does **not** advertise full ID24 conformance or silently relabel it as MBF21.
 
-The dylib exports exactly thirteen `ME_` functions, keeping both engine and helper
+The dylib exports exactly fourteen `ME_` functions, keeping both engine and helper
 symbols private. One `ME_Tick` consumes one 35 Hz command. Movement, attack/use
 and validated weapon-change bits are accepted; special command bits and invalid
 weapon indices fail. Player/actor snapshots copy values, messages and selected
 UMAPINFO fields (name, routes, finale and boss-action count); no engine pointers
-escape. Normal and secret exits still stop at the transition boundary.
+escape. Normal and secret exits present a native summary; explicit Continue loads the
+selected map with upstream inventory carryover. Episode endings have no Continue.
 
 ## Process lifetime and presentation
 
 Use a **dedicated single-thread process, one session per process**. Initialization
 can be attempted once. Fatal engine errors stay inside the guarded C call and
 invalidate the session; terminate the worker after completion/error to reclaim
-its allocations. There is no teardown/restart API or extended save format yet.
+its allocations. Level restart/continue now use ME_Advance within that session. There is no
+second initialization, teardown/reinitialization API or extended save format.
 The separate [preview worker protocol](EXTENDED_PREVIEW.md) now carries copied
 views/geometry, named actor/weapon frames and material translations/sound events and HUD/music selection. Do not load the dylib into the Swift app process.
 
@@ -79,8 +81,8 @@ for native playback; non-opted-in probes retain only the request count. The
 [UI adapter](EXTENDED_UI.md) copies player inventory and music selection for native
 HUD/MIDI presentation. Ambient sound requests fail. UMAPINFO is parsed before map setup, including Rust's
 boss-action overrides; episode hooks preserve the simulation flag without adding
-a menu. Routes/finale metadata are copied, but their execution/presentation is
-not implemented by this worker.
+a menu. Routes execute through the [lifecycle adapter](EXTENDED_LIFECYCLE.md); animated
+intermission/finale presentation remains unimplemented.
 
 ## ID24 fields and validation
 
@@ -159,7 +161,9 @@ roughly tenfold MAP13 CPU improvement and exact native pixel comparisons. Engine
 source and protocol remain unchanged.
 Build 140 adds the thirteenth export, `ME_CopyUI`, carrying authoritative HUD and
 music selection in MUI1/MVW5. Native Apple MIDI and a minimal HUD are connected.
-Next: death/restart, campaign presentation and targeted monster/map-special parity.
-Campaign transitions, boss/secret exits, JSON presentation and versioned saves
-remain acceptance gates. Keep the ordinary GUI Rust guard until native campaign
+Build 143 adds `ME_Advance`, MUI2 lifecycle state, death/restart, engine-owned
+normal/secret routing and a native completion summary. All route probes pass.
+Next: animated campaign presentation and targeted monster/map-special parity.
+Actual boss exits, JSON presentation, full playthroughs and versioned saves remain
+acceptance gates. Keep the ordinary GUI Rust guard until native campaign
 play is validated.

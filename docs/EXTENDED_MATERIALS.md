@@ -30,13 +30,14 @@ keys, nonidentity records and agreement with the view's tic.
 ## MVW5 and geometry reuse
 
 The framed MEQ1/MER1 envelope is unchanged. The current view body is MVW5 with a
-56-byte header: MMT1 count at byte 44, MSA1 audio count at byte 48, MUI1 at byte 52. Payloads are
-optional MGE1, required MSP1/MMT1/MSA1/MUI1, in that order, with exact length/tic checks.
+56-byte header: MMT1 count at byte 44, MSA1 audio count at byte 48, MUI2 at byte 52. Payloads are
+optional MGE1, required MSP1/MMT1/MSA1/MUI2, in that order, with exact length/tic checks.
 Build 133 originally introduced MMT1 through MVW3; build 135 added audio/MVW4; build 140 adds HUD/music through MUI1/MVW5.
 
-Startup and explicit geometry requests return full geometry. Tick requests also
+Startup, explicit geometry requests and lifecycle actions return full geometry.
+Build 143 replaces the scene builder and native caches on restart/continue. Tick requests also
 copy current geometry in the worker, but send it only if geometry values changed.
-A worker owns one fixed map; comparison excludes the tic/player fields and checks
+Within a level, comparison excludes the tic/player fields and checks
 counts, content identity and every geometry record byte exactly. There is no hash
 collision risk. Camera-only or animation-only changes therefore omit MGE1;
 sector heights, light levels, offsets and switch textures still invalidate it.
