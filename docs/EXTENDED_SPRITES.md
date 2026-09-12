@@ -61,8 +61,8 @@ This copies simulation psprite offsets; presentation bob/interpolation is pendin
 Translucent metadata is carried but sprites still render opaque. Per-state
 TRANMAPs, fixed-colormap palette effects, corpse mirroring enhancements,
 control-sector lighting and fake-floor clipping are not yet adapted. The preview
-has health/ammo text but no gameplay HUD; build 135 adds [sound effects](EXTENDED_AUDIO.md). Build 133 [reuses unchanged scenes](EXTENDED_MATERIALS.md), but any geometry change
-still rebuilds the whole mesh. Build 137 adds a continuous clock and per-tic audio;
+has health/ammo text but no gameplay HUD; build 135 adds [sound effects](EXTENDED_AUDIO.md). Build 139 [updates affected geometry and materials](EXTENDED_MESH.md) while
+retaining unchanged Metal buffers. Build 137 adds a continuous clock and per-tic audio;
 large-map performance and presentation interpolation remain pending.
 
 `scripts/test-extended-worker.sh` checks complete-copy canaries, nine malformed

@@ -4,6 +4,24 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Faster Rust geometry updates (build 139)
+
+- Cache static BSP clipping, stitched flat triangles and wall edges. Rebuild only
+  affected linedef/sector chunks, assemble changed materials, and retain unchanged
+  Metal buffers. Reuse validated wire topology after exact byte comparisons;
+  topology changes still validate/rebuild. Preserve moving heights, lighting,
+  wall offsets, pegging, texture and sky updates.
+- Reduce MAP13 worker/CPU preparation from 210.57 to 20.56 ms per tic mean in the
+  140-tic check (24.03 ms p95). Native scene loading averages 3.39 ms separately;
+  large-map continuous play no longer rebuilds the complete mesh each tic.
+- Pass old-algorithm CPU parity across 32 Doom II/16 Rust maps, dynamic changes,
+  malformed cached snapshots, full worker regressions, and 21 exact native GPU
+  pixel comparisons. Stabilize nearly coincident T-junction selection; the frozen
+  CPU oracle normalizes only sub-micro-unit zeros from its unordered-set noise.
+- Verify signed 0.10.0/build 139 on native MAP13: 508,713 triangles, exact 35-tic
+  stepping, Run/Use/Fire and Escape pause. Preserve intermediate build 138 and
+  previous previews. Same unreleased 0.10.0; no push/package or campaign claim.
+
 ## 0.10.0 refinement — Continuous Rust preview (build 137)
 
 - Add Run/Pause, WASD/arrows, Shift running, mouse aiming, E use, F fire and 1–7

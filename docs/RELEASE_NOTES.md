@@ -5,7 +5,7 @@ Requires Apple Silicon and macOS 14 or later. This is an early preview.
 
 ## Install
 
-The current local development app is **0.10.0 build 137**, ad-hoc signed and
+The current local development app is **0.10.0 build 139**, ad-hoc signed and
 unnotarized. No new release package was produced. The previous **0.9.0 build 124**
 distribution was separately Developer ID signed, accepted by Apple and stapled.
 GitHub workflow assets remain unnotarized. For unnotarized previews, macOS may
@@ -16,19 +16,20 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.10.0 — Rust development foundations
 
-Final successful local build: **137**.
+Final successful local build: **139**.
 
-Build 137 adds continuous Run/Pause, WASD/arrow movement, mouse aiming, keyboard
-fire/use and weapon selection to the explicit Rust preview. Scenes and sounds
-advance together one tic at a time, targeting 35 tics/s with one worker request
-in flight. Manual buttons now show intermediate frames too. Escape, focus loss
-and minimizing pause playback, release input and stop sounds.
+Build 139 caches static BSP clipping/stitching and updates only affected wall/sector
+chunks and material buffers. Exact comparisons reuse validated copied topology;
+changed static geometry still decodes/validates and rebuilds. MAP13's 140-tic
+worker/CPU preparation sample improves from 210.57 ms to 20.56 ms mean (24.03 ms
+p95). Native scene upload averages 3.39 ms in a separate Metal check.
 
-Pacing/cancellation and native synchronized PCM tests pass, including actual Rust
-weapons and switch sounds. MAP01/MAP16 update costs fit the simulation budget in
-local CPU checks; MAP13's full geometry rebuilds average 211 ms per tic and still
-need optimization. Music, full presentation, campaign progression and saves
-remain ahead. The ordinary picker still rejects Rust.
+All 21 native GPU comparisons match the old full meshes pixel-for-pixel. CPU
+parity covers all 32 Doom II and 16 Rust maps, plus moving MAP16 geometry, lights,
+wall offsets, materials and sky changes. Continuous Run/Pause, keyboard/mouse and
+tic-aligned sound remain available. Timing samples do not establish sustained
+full-rate campaign play; music, HUD, full ID24 presentation, progression and saves
+remain ahead. The ordinary picker still rejects Rust. See EXTENDED_MESH.md.
 
 ANIMATED and SWITCHES now drive engine material animation and native switch
 texture preload, including pairs without SW1/SW2 names. SIGIL II's flame sequence

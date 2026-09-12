@@ -88,7 +88,7 @@ import Foundation
             let opened=try worker.tick(count:35)
             guard pressed.geometry != nil,opened.geometry != nil else { throw PortError("Moving geometry was omitted.") }
             _=try builder.prepare(pressed);let final=try builder.prepare(opened)
-            guard final.copiedGeometry.map.sectors.map({[$0.floor,$0.ceiling]}) != initial.copiedGeometry.map.sectors.map({[$0.floor,$0.ceiling]}),builder.meshBuilds==4 else { throw PortError("Moving geometry was not rebuilt.") }
+            guard final.copiedGeometry.map.sectors.map({[$0.floor,$0.ceiling]}) != initial.copiedGeometry.map.sectors.map({[$0.floor,$0.ceiling]}),builder.meshBuilds==1 else { throw PortError("Moving geometry did not reuse static topology.") }
             print("PASS MAP16 switch/moving sector invalidates cached geometry")
             worker.cancel()
         }

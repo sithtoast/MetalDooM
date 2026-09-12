@@ -1,4 +1,4 @@
-# Rust native preview — 0.10.0 build 137
+# Rust native preview — 0.10.0 build 139
 
 An explicit development preview now starts the extended simulation in a separate
 child process and draws its copied geometry with the existing native Metal world
@@ -16,8 +16,8 @@ simulation; displayed health/ammo are simulation state. No speedrun/upload work.
 The helper is packaged only with the explicit development build option:
 
 ```sh
-METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/continuous-final" bash scripts/build.sh
-open -n "$PWD/build/continuous-final/MetalDooM.app" --args \
+METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/mesh-final" bash scripts/build.sh
+open -n "$PWD/build/mesh-final/MetalDooM.app" --args \
   --rust-preview "/path/to/Ultimate Doom/rerelease" --map MAP01
 ```
 
@@ -79,11 +79,11 @@ Current
 physical floors/ceilings, side offsets and switch texture identities are copied;
 control-sector lighting, fake floors, sky transfers, translucency still need their full presentation adapters. Wall/flat animation
 uses the worker's current translation tables. See [materials and caching](EXTENDED_MATERIALS.md).
-Unchanged scenes reuse meshes, but any geometry change rebuilds the whole mesh.
-A 140-tic worker/CPU preparation sample averages 12.52 ms on MAP01, 210.57 ms
-on MAP13 and 4.27 ms on MAP16; each changed geometry every tic. MAP13 cannot sustain
-35 tics/s with this strategy. These timings exclude native Metal upload/drawing;
-finer topology/material/light updates are the next performance milestone.
+Build 139 caches static clipping/stitching, updates affected wall/sector chunks,
+and retains unchanged Metal material buffers. MAP13's 140-tic worker/CPU mean
+falls from 210.57 to 20.56 ms; native load averages 3.39 ms in a separate check.
+See [incremental geometry](EXTENDED_MESH.md) for invalidation, exact pixel parity,
+measurement boundaries and remaining costs. This is not full campaign acceptance.
 
 ## Process and protocol
 
@@ -152,3 +152,8 @@ The final candidate is left paused on MAP01 with Sound on. Native audio regressi
 still cover both Rust weapons, pickups, switches and a device-output tap; physical
 speaker audibility remains unverified. Music, full presentation, campaign/save
 acceptance and large-map performance remain work ahead.
+
+Build 139 adds cached geometry decoding, static topology and partial material
+updates. All 21 reference GPU comparisons pass; all-map/worker regressions pass.
+The final signed candidate is `build/mesh-final/MetalDooM.app`, left paused on
+MAP13 tic 280/health 100/ammo 49 with Sound enabled. See EXTENDED_MESH.md.

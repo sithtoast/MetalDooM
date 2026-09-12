@@ -1,6 +1,6 @@
 # Experimental extended simulation worker
 
-The **0.10.0 build 137** development milestone includes copied geometry, sprite
+The **0.10.0 build 139** development milestone includes copied geometry, sprite
 frames, material animations and sound events, explicit session planning, three Rust-required ID24 fields, an explicit
 [native preview](EXTENDED_PREVIEW.md), and headless tests with the actual Rust
 patch/resources. The normal app still uses Chocolate Doom; its Rust rejection
@@ -153,7 +153,10 @@ See [audio limits](EXTENDED_AUDIO.md).
 
 Build 137 adds continuous one-tic scene/audio playback in the parent with keyboard
 controls and pause handling; worker/protocol remain unchanged.
-Next: partial moving-world updates (especially MAP13), music and targeted real-monster/map-special parity.
+Build 139 adds [partial geometry/material updates](EXTENDED_MESH.md), with a
+roughly tenfold MAP13 CPU improvement and exact native pixel comparisons. Engine
+source and protocol remain unchanged.
+Next: music/HUD and targeted real-monster/map-special parity.
 Campaign transitions, boss/secret exits, JSON presentation and versioned saves
 remain acceptance gates. Keep the ordinary GUI Rust guard until native campaign
 play is validated.

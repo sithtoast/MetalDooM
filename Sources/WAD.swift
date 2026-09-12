@@ -236,18 +236,18 @@ struct WAD {
     }
 }
 
-struct Sector {
+struct Sector: Equatable {
     let floor: Float, ceiling: Float, light: Float
     let floorTexture: String, ceilingTexture: String
 }
-struct Side {
+struct Side: Equatable {
     let sector: Int, x: Float, y: Float
     let upper: String, lower: String, middle: String
 }
-struct Line { let a: Int, b: Int, flags: Int, front: Int, back: Int }
-struct Seg { let a: Int, b: Int, line: Int, side: Int }
-struct Leaf { let count: Int, first: Int; var sector: Int? = nil }
-struct Node {
+struct Line: Equatable { let a: Int, b: Int, flags: Int, front: Int, back: Int }
+struct Seg: Equatable { let a: Int, b: Int, line: Int, side: Int }
+struct Leaf: Equatable { let count: Int, first: Int; var sector: Int? = nil }
+struct Node: Equatable {
     static let leafBit = 0x80000000
     static func classicChild(_ child: Int) -> Int { child & 0x8000 != 0 ? leafBit | (child & 0x7fff) : child }
     let origin: SIMD2<Float>, direction: SIMD2<Float>; let right: Int, left: Int }
@@ -297,6 +297,13 @@ struct DoomMap {
         self.name=name; self.points=points; self.lines=lines; self.sides=sides; self.sectors=sectors
         self.segs=segs; self.leaves=leaves; self.nodes=nodes; self.start=start; self.angle=angle
         try validate()
+    }
+    /// Reuse already validated static geometry after an exact wire-byte match.
+    init(copying map:DoomMap,sides:[Side],sectors:[Sector],start:SIMD2<Float>,angle:Float) throws {
+        guard sides.count==map.sides.count,sectors.count==map.sectors.count,
+              sides.allSatisfy({sectors.indices.contains($0.sector)}) else { throw PortError("Invalid dynamic map references.") }
+        name=map.name;points=map.points;lines=map.lines;segs=map.segs;leaves=map.leaves;nodes=map.nodes
+        self.sides=sides;self.sectors=sectors;self.start=start;self.angle=angle
     }
     func validate() throws {
         guard !points.isEmpty, !sectors.isEmpty, !leaves.isEmpty else { throw PortError("Empty map geometry.") }

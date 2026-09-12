@@ -12,7 +12,7 @@ xcrun clang -std=c11 -Wall -Wextra -Werror -arch arm64 -mmacosx-version-min=14.0
 xcrun swiftc -swift-version 5 -O -target arm64-apple-macosx14.0 \
   -module-cache-path "$PROJECT_DIR/build/module-cache" \
   "$PROJECT_DIR/Sources/WAD.swift" "$PROJECT_DIR/Sources/Geometry.swift" "$PROJECT_DIR/Sources/ExtendedGeometry.swift" \
-  "$PROJECT_DIR/Tests/ExtendedGeometryValidation.swift" -o "$OUT/validate-geometry"
+  "$PROJECT_DIR/Tests/ReferenceGeometry.swift" "$PROJECT_DIR/Tests/ExtendedGeometryValidation.swift" -o "$OUT/validate-geometry"
 for ((map=1;map<=32;map++)); do
   name="$(printf 'MAP%02d' "$map")"
   "$OUT/export-geometry" "$OUT/cache" "$map" 0 0 "$GEOMETRY/classic-$name.mge" "$1" > "$GEOMETRY/classic-$name.log" 2>&1

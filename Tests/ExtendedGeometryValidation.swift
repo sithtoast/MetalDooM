@@ -2,12 +2,31 @@ import Foundation
 import simd
 
 @main struct ExtendedGeometryValidation {
+    // The frozen algorithm builds a Set then sorts by a single axis. Its
+    // equivalent T-junction choices can differ by ~1e-15 near zero between runs.
+    // Normalize only sub-micro-unit zero coordinates for the byte comparison.
+    static func canonical(_ input:[WorldVertex])->[WorldVertex] {
+        input.map { v in
+            var v=v
+            for i in 0..<4 { if abs(v.position[i])<0.000001 { v.position[i]=0 };if abs(v.uvLight[i])<0.000001 { v.uvLight[i]=0 } }
+            return v
+        }
+    }
+    static func parity(_ map:DoomMap) throws {
+        let actual=try Geometry(map:map),reference=try ReferenceGeometry(map:map)
+        guard actual.batches.map(\.material)==reference.batches.map(\.material) else { throw PortError("Reference materials differ") }
+        for (a,b) in zip(actual.batches,reference.batches) {
+            guard canonical(a.vertices).withUnsafeBytes({Data($0)})==canonical(b.vertices).withUnsafeBytes({Data($0)}) else { throw PortError("Classic/reference vertices differ") }
+        }
+        guard canonical(actual.skyVertices).withUnsafeBytes({Data($0)})==canonical(reference.skyVertices).withUnsafeBytes({Data($0)}) else { throw PortError("Reference sky differs") }
+    }
     static func main() throws {
         let original=try WAD(url:URL(fileURLWithPath:CommandLine.arguments[1]))
         let directory=URL(fileURLWithPath:CommandLine.arguments[2])
         for number in 1...32 {
             let name=String(format:"MAP%02d",number)
             let classic=try DoomMap(wad:original,name:name)
+            try parity(classic)
             let copied=try ExtendedGeometry(data:Data(contentsOf:directory.appendingPathComponent("classic-\(name).mge"))).map
             guard classic.points.count == copied.points.count, classic.nodes.count == copied.nodes.count,
                   classic.lines.count == copied.lines.count, classic.segs.count == copied.segs.count,
@@ -30,6 +49,7 @@ import simd
             let name=String(format:"MAP%02d",number)
             let data=try Data(contentsOf:directory.appendingPathComponent("rust-\(name).mge"))
             let snapshot=try ExtendedGeometry(data:data), map=snapshot.map
+            try parity(map)
             let geometry=try Geometry(map:map)
             guard geometry.triangleCount > 0, snapshot.tic == 0 else { throw PortError("Empty Rust geometry.") }
             for batch in geometry.batches {
@@ -60,6 +80,9 @@ import simd
                 for bad in cases {
                     var rejected=false
                     do { _=try ExtendedGeometry(data:bad) } catch { rejected=true }
+                    var cachedRejected=false
+                    do { _=try ExtendedGeometry(data:bad,previous:snapshot) } catch { cachedRejected=true }
+                    guard cachedRejected else { throw PortError("Cached malformed geometry accepted.") }
                     guard rejected else { throw PortError("Malformed copied geometry accepted.") }
                 }
                 print("PASS \(cases.count) malformed snapshot boundaries")

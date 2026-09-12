@@ -48,7 +48,7 @@ import Foundation
             try check(last.tic==140 && last.presentation.ammo<50 && !startTics.isEmpty,"Continuous fire failed")
             if map==16 { try check(changes>0,"Moving world never updated") }
             let sorted=elapsed.sorted(),mean=elapsed.reduce(0,+)/Double(elapsed.count)
-            print(String(format:"PASS MAP%02d: 140 consecutive scene/audio tics, %d geometry updates, %d mesh builds; worker + CPU preparation mean %.2f ms, p95 %.2f ms, max %.2f ms",map,changes,builder.meshBuilds,mean,sorted[Int(Double(sorted.count-1)*0.95)],sorted.last!))
+            print(String(format:"PASS MAP%02d: 140 consecutive scene/audio tics, %d geometry updates, %d topology builds; worker + CPU preparation mean %.2f ms, p95 %.2f ms, max %.2f ms",map,changes,builder.meshBuilds,mean,sorted[Int(Double(sorted.count-1)*0.95)],sorted.last!))
         }
     }
 }

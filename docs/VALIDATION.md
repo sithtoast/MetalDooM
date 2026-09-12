@@ -1,5 +1,64 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 139: Incremental geometry and Metal reuse
+
+Final candidate `build/mesh-final/MetalDooM.app`, **0.10.0/build 139**,
+`build/build139.log`; host deep/strict signature and bundled plist pass. Preserve
+intermediate 138 (`build/mesh-preview`) and prior 137. The semantic version remains
+0.10.0 as another refinement of the unreleased Rust feature.
+
+The first profile separated MAP13's roughly 37 ms worker/decode cost from 183 ms
+mesh construction. The first three tics changed 13 sector lights and 920 side
+UV offsets, with no floor/ceiling movement. Cached wire decoding, static clipping/
+stitching, affected line/sector chunks and selective material uploads address
+those costs without reducing the triangle set. Full static mutation invalidates
+and rebuilds the cache. New details are in EXTENDED_MESH.md.
+
+Final 140-tic worker/CPU means/p95/max (`build/mesh139-performance.log`):
+
+| Map | Old mean | New mean | New p95 | New maximum |
+| --- | ---: | ---: | ---: | ---: |
+| MAP01 | 12.52 ms | 2.12 ms | 2.69 ms | 4.52 ms |
+| MAP13 | 210.57 ms | 20.56 ms | 24.03 ms | 28.16 ms |
+| MAP16 | 4.27 ms | 0.87 ms | 1.06 ms | 2.33 ms |
+
+All 140 tics per map change geometry; static topology builds once. MAP13 improves
+about 10.2×. The earlier prototype measured 17.64 ms; final measurement includes
+the live preview open. These CPU samples exclude Metal and do not prove sustained
+35-tic/s full campaign play. Full wire copies and whole changed-material buffers
+remain possible future optimization targets.
+
+Passed checks:
+
+- `mesh139-geometry.log`: 32 Doom II + 16 Rust maps compared with a frozen build-137
+  full-mesh implementation, MAP13 XNOD export parity, fourteen malformed cases
+  with and without cached decode. The baseline Set/single-axis sort can produce
+  ~1e-15 near-zero differences between identical runs; CPU comparison normalizes
+  only sub-micro-unit zeros. The new algorithm uses deterministic tie breaks.
+- `mesh139-parity.log`: six sampled tics each on MAP01/13/16 match reference
+  triangle/UV/light/sky multisets; synthetic height, pegging/offset/material/sky/
+  light changes and restoration; cached invalid names/references reject; static
+  mutation rebuilds; unchanged explicit geometry request changes no materials.
+- `mesh139-metal.log`: Metal API validation enabled, **21 exact GPU image matches**
+  to unmodified reference meshes at 640×400. Unchanged GPU buffers preserve object
+  identity. Native scene load means: MAP01 0.40 ms, MAP13 3.39 ms (max 4.15), MAP16
+  0.18 ms. MAP13 retains 6,130 of 7,776 observed material buffers. No in-flight
+  buffer mutation is used: changed materials get fresh buffers.
+- `mesh139-worker.log`: complete worker/protocol, all sixteen scene/material/
+  sprite/weapon, audio/copy/queue and malformed/deadline regressions pass.
+- `mesh139-classic.log`: synthetic malformed WAD checks, original Ultimate Doom
+  nine-map geometry/material checks and 483 sprite/HUD patches pass.
+
+Native CUA build 139 MAP13: initial 508,713 triangles, 1,412 actors, health 100;
+Step displays tic 12 then exactly 35; Run/E/F reaches 46/ammo 49; Escape pauses at
+280 with geometry retained. Raised screenshot shows the rendered corridor/pistol.
+Final app is left there, Sound enabled. One short observed continuous interval
+advanced 234 tics over about 7.7 seconds including tool overhead; this is not an
+instrumented sustained-rate benchmark. Prior preview instances are preserved.
+
+Music/HUD, full presentation, campaign/restart/save acceptance and ordinary picker
+support remain unchanged. No push, packaging, data upload or speedrun work.
+
 ## 2026-09-12 — 0.10.0 build 137: Continuous Rust scene/audio playback
 
 Final candidate: `build/continuous-final/MetalDooM.app`, **0.10.0/build 137**,

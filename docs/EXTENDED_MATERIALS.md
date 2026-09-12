@@ -1,4 +1,4 @@
-# Rust material animation and scene reuse — build 133
+# Rust material animation and scene reuse — build 139
 
 The preview now draws the engine's current wall/flat animation translations.
 It retains decoded images, sprite patches, GPU textures and unchanged meshes
@@ -27,12 +27,12 @@ frame offsets and the phase calculated by `P_UpdateSpecials` before the simulati
 tic increments. Swift checks lengths, versions, count, names, namespaces, duplicate
 keys, nonidentity records and agreement with the view's tic.
 
-## MVW3 and geometry reuse
+## MVW4 and geometry reuse
 
-The framed MEQ1/MER1 envelope is unchanged. The view body is MVW3 with a 48-byte
-header: prior fields through byte 43, then MMT1 byte count u32 at byte 44. Payloads
-are optional MGE1, required MSP1, required MMT1, in that order. Their counts must
-sum exactly to the body length. Maximum payload is 160 MiB plus the header.
+The framed MEQ1/MER1 envelope is unchanged. The current view body is MVW4 with a
+52-byte header: MMT1 count at byte 44, MSA1 audio count at byte 48. Payloads are
+optional MGE1, required MSP1/MMT1/MSA1, in that order, with exact length/tic checks.
+Build 133 originally introduced MMT1 through MVW3; build 135 added audio/MVW4.
 
 Startup and explicit geometry requests return full geometry. Tick requests also
 copy current geometry in the worker, but send it only if geometry values changed.
@@ -42,13 +42,11 @@ collision risk. Camera-only or animation-only changes therefore omit MGE1;
 sector heights, light levels, offsets and switch textures still invalidate it.
 
 The queue-confined `ExtendedSceneBuilder` retains the last valid geometry and
-CPU mesh. An update without geometry requires an existing scene. An update with
-geometry rebuilds it, rejecting a different content identity/map. Decoded images
-and sprite patches are cached across updates; only missing resources decode.
-The renderer uploads each material texture once per session, rebuilds vertex/sky
-buffers only for geometry updates and resolves the current material mapping at
-draw time. The ordinary classic renderer keeps its existing engine translation
-path. The UI now prepares the tick reply directly, eliminating its second request.
+cached topology/chunks. A geometry update rejects a different map/content identity;
+build 139 reuses static clipping/stitching and replaces affected line/sector chunks.
+Only changed materials replace Metal vertex buffers; textures and sprite patches
+remain cached, and current animation translations resolve at draw time. See the
+[invalidation contract and performance evidence](EXTENDED_MESH.md).
 
 ## Validation and limits
 
@@ -59,10 +57,9 @@ stable decode counters on a repeated snapshot. MAP16's starting switch verifies
 that moving geometry is sent and rebuilt. All sixteen real Rust maps pass initial
 and tic-35 scene/actor/weapon preparation through the cache.
 
-This removes redundant work on unchanged scenes, but is not a continuous-play
-performance claim. Worker geometry comparison is still linear in map size, and
-any geometry change rebuilds the whole mesh. Partial sector updates, scrolling
-flat offsets, control-sector effects, sky definitions, palette/translucency, music,
-campaign transitions and saves remain work ahead. Build 137 adds continuous playback; build 135 added native
-[sound effects](EXTENDED_AUDIO.md) via MVW4. See VALIDATION.md for final
-native checks and logs.
+Build 139 validates partial updates against the old full meshes, including 21 exact
+GPU pixel comparisons. MAP13 worker/CPU mean improves from 210.57 to 20.56 ms per
+tic in the final local sample. Full MGE1 copy/comparison remains linear; changed
+materials still assemble/upload complete material buffers. Scrolling flat offsets,
+control-sector effects, sky definitions, palette/translucency, music, campaign
+transitions and saves remain ahead. See EXTENDED_MESH.md and VALIDATION.md.

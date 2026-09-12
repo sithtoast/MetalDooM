@@ -8,7 +8,10 @@ struct ExtendedGeometry {
     let map: DoomMap
     let tic: Int
     let contentSHA256: String
-    init(data: Data) throws {
+    let data:Data
+    let reusedTopology:Bool
+    init(data: Data, previous:ExtendedGeometry?=nil) throws {
+        self.data=data
         let bytes=Bytes(data:data)
         try bytes.check(0,120)
         guard data.prefix(4) == Data("MGE1".utf8), try bytes.i32(4) == 1 else {
@@ -38,6 +41,32 @@ struct ExtendedGeometry {
                   raw.dropFirst(visible.count).allSatisfy({$0 == 0}) else { throw PortError("Invalid geometry material name.") }
             return String(decoding:visible,as:UTF8.self).uppercased()
         }
+        var offsets=[120]
+        for i in 0..<7 { offsets.append(offsets.last!+counts[i]*strides[i]) }
+        if let previous,previous.data.count==data.count {
+            func equal(_ offset:Int,_ length:Int)->Bool {
+                data.withUnsafeBytes { current in previous.data.withUnsafeBytes { old in
+                    memcmp(current.baseAddress!+offset,old.baseAddress!+offset,length)==0
+                } }
+            }
+            // Identity/counts plus all immutable vertex/line/seg/leaf/node bytes
+            // must match. Header tic/player fields are intentionally excluded.
+            if equal(12,4),equal(28,92),equal(offsets[0],offsets[2]-offsets[0]),
+               equal(offsets[4],data.count-offsets[4]) {
+                var sides=previous.map.sides,sectors=previous.map.sectors
+                for i in sides.indices {
+                    let p=offsets[2]+i*36
+                    if !equal(p,36) { sides[i]=try Side(sector:bytes.i32(p),x:fixed(p+4),y:fixed(p+8),upper:name(p+12),lower:name(p+20),middle:name(p+28)) }
+                }
+                for i in sectors.indices {
+                    let p=offsets[3]+i*28
+                    if !equal(p,28) { sectors[i]=try Sector(floor:fixed(p),ceiling:fixed(p+4),light:Float(bytes.i32(p+8)).clamped(0,255)/255,floorTexture:name(p+12),ceilingTexture:name(p+20)) }
+                }
+                map=try DoomMap(copying:previous.map,sides:sides,sectors:sectors,start:SIMD2(fixed(16),fixed(20)),angle:Float(unsigned(24))*2 * .pi/4294967296)
+                reusedTopology=true;return
+            }
+        }
+        reusedTopology=false
         var cursor=120
         func records(_ kind: Int) -> [Int] {
             let start=cursor; cursor += counts[kind]*strides[kind]

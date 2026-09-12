@@ -7,7 +7,7 @@ struct ExtendedView {
     let presentation: ExtendedPresentation
     let materials: ExtendedMaterials
     let audio: ExtendedAudio
-    init(data: Data) throws {
+    init(data: Data,previousGeometry:ExtendedGeometry?=nil) throws {
         let bytes=Bytes(data:data); try bytes.check(0,52)
         guard data.prefix(4) == Data("MVW4".utf8) else { throw PortError("Invalid worker view header.") }
         let size=try bytes.i32(36), spriteSize=try bytes.i32(40), materialSize=try bytes.i32(44),audioSize=try bytes.i32(48)
@@ -18,7 +18,7 @@ struct ExtendedView {
         angle=Float(UInt32(bitPattern:Int32(try bytes.i32(20)))) * 2 * .pi/4294967296
         sky=try bytes.name(28)
         guard !sky.isEmpty, data[28..<36].prefix(while:{$0 != 0}).allSatisfy({(33...126).contains($0)}) else { throw PortError("Invalid worker sky.") }
-        geometry=size == 0 ? nil:try ExtendedGeometry(data:Data(data[52..<52+size]))
+        geometry=size == 0 ? nil:try ExtendedGeometry(data:Data(data[52..<52+size]),previous:previousGeometry)
         presentation=try ExtendedPresentation(data:Data(data[(52+size)..<(52+size+spriteSize)]))
         materials=try ExtendedMaterials(data:Data(data[(52+size+spriteSize)..<(52+size+spriteSize+materialSize)]))
         audio=try ExtendedAudio(data:Data(data[(52+size+spriteSize+materialSize)...]))
@@ -38,6 +38,7 @@ final class ExtendedWorker {
     private var cancelled=false, sequence:UInt32=0
     private var scratch:URL?, log:FileHandle?
     private var closed=false
+    private var previousGeometry:ExtendedGeometry?
     private(set) var identity:String?
     private let timeout:Double
     init(timeout:Double=30) { self.timeout=max(0.1,min(120,timeout)) }
@@ -138,7 +139,9 @@ final class ExtendedWorker {
         guard (0...1).contains(status), size>=0, size<=160*1024*1024+52, status==0 || size<=2048 else { throw PortError("Invalid worker reply length/status.") }
         let body=try read(size,deadline:deadline)
         guard status==0 else { throw PortError(String(decoding:body,as:UTF8.self)) }
-        return try ExtendedView(data:body)
+        let result=try ExtendedView(data:body,previousGeometry:previousGeometry)
+        if let geometry=result.geometry { previousGeometry=geometry }
+        return result
     }
     func cancel() {
         lock.lock();cancelled=true

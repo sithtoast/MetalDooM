@@ -91,3 +91,11 @@ frame-time, moving-sector visual parity or full campaign acceptance is claimed.
 Build 131 connects these values to an explicit [native world preview](EXTENDED_PREVIEW.md)
 through a separate process. The format above is unchanged; live actor/audio and
 full presentation acceptance remain pending.
+
+## Build 139 cache refinement
+
+Wire MGE1 remains unchanged. The Swift decoder can reuse already validated static
+arrays after exact byte matches, decoding differing side/sector records and still
+checking names/references. Static mutation falls back to full validation. The
+scene builder reuses BSP clipping/stitching and updates affected surfaces and
+Metal materials. See [cache invariants and parity tests](EXTENDED_MESH.md).

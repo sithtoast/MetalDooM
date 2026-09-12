@@ -545,8 +545,14 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         for (key,image) in scene.images where textures[key]==nil { textures[key]=try texture(image) }
         if scene.geometryChanged {
-            batches=try makeBatches(scene.geometry,textures:textures)
-            try uploadSkyGeometry(scene.geometry)
+            let previous=Dictionary(uniqueKeysWithValues:batches.map{($0.material,$0)})
+            batches=try scene.geometry.batches.map { batch in
+                if !scene.changedMaterials.contains(batch.material),let cached=previous[batch.material] { return cached }
+                guard let texture=textures[batch.material],
+                      let buffer=device.makeBuffer(bytes:batch.vertices,length:batch.vertices.count*MemoryLayout<WorldVertex>.stride,options:.storageModeShared) else { throw PortError("Cannot update preview material: \(batch.material.name)") }
+                return GPUBatch(vertices:buffer,texture:texture,material:batch.material,count:batch.vertices.count)
+            }
+            if scene.changedMaterials.contains(MaterialKey(name:"F_SKY1",flat:true)) { try uploadSkyGeometry(scene.geometry) }
             map=scene.copiedGeometry.map
         }
         sky=textures[MaterialKey(name:scene.view.sky,flat:false)]
