@@ -52,15 +52,8 @@
 // Animating textures and planes
 // There is another anim_t used in wi_stuff, unrelated.
 //
-typedef struct
-{
-    boolean	istexture;
-    int		picnum;
-    int		basepic;
-    int		numpics;
-    int		speed;
-    
-} anim_t;
+#include "ResourceTables.h"
+typedef MD_EngineAnim anim_t;
 
 //
 //      source animation definition
@@ -124,7 +117,8 @@ animdef_t		animdefs[] =
     {-1,        "",             "",             0},
 };
 
-anim_t		anims[MAXANIMS];
+static anim_t vanilla_anims[MAXANIMS];
+anim_t *anims = vanilla_anims;
 anim_t*		lastanim;
 
 
@@ -148,7 +142,8 @@ void P_InitPicAnims (void)
 
     
     //	Init animation
-    lastanim = anims;
+    if (MD_LoadAnimations()) return;
+    lastanim = anims = vanilla_anims;
     for (i=0 ; animdefs[i].istexture != -1 ; i++)
     {
         const char *startname, *endname;

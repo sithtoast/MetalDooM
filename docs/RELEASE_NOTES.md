@@ -1,19 +1,31 @@
-# MetalDooM 0.9.0 — Apple Silicon preview
+# MetalDooM 0.10.0 — Apple Silicon preview
 
 A native Metal source port for classic Doom, powered by Chocolate Doom.
 Requires Apple Silicon and macOS 14 or later. This is an early preview.
 
 ## Install
 
-Download the macOS arm64 **unnotarized** ZIP, extract it, and drag MetalDooM.app to
-Applications. Release packaging uses Developer ID signing; local source builds
-are ad-hoc signed. Neither is notarized by this workflow. If macOS blocks it, use System Settings → Privacy & Security → Open Anyway
-and confirm. See INSTALL.md inside the ZIP.
+The current local development app is **0.10.0 build 126**, ad-hoc signed and
+unnotarized. No new release package was produced. The previous **0.9.0 build 124**
+distribution was separately Developer ID signed, accepted by Apple and stapled.
+GitHub workflow assets remain unnotarized. For unnotarized previews, macOS may
+require System Settings → Privacy & Security → Open Anyway. See INSTALL.md.
 
 Supply your own Doom/Ultimate Doom, Doom II, TNT or Plutonia IWAD. Standard SIGIL
 Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
-## New in 0.9.0
+## New in 0.10.0 — resource-table foundation
+
+Final successful local build: **126**.
+
+ANIMATED and SWITCHES now drive engine material animation and native switch
+texture preload, including pairs without SW1/SW2 names. SIGIL II's flame sequence
+uses its WAD table. Animation and pressed-button timing survive save/load.
+Classic built-in tables remain the fallback. Existing add-on acceptance is
+unchanged; **Legacy of Rust is not playable yet**. See docs/LEGACY_OF_RUST.md for
+installed-data evidence, engine evaluation and the remaining milestones.
+
+## Previous 0.9.0 release
 
 Final local build: **124**.
 

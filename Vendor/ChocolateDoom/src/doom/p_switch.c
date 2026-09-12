@@ -34,6 +34,7 @@
 // State.
 #include "doomstat.h"
 #include "r_state.h"
+#include "ResourceTables.h"
 
 
 //
@@ -88,7 +89,8 @@ switchlist_t alphSwitchList[] =
     {"SW1SKULL",	"SW2SKULL",	3},
 };
 
-int		switchlist[MAXSWITCHES * 2];
+static int vanilla_switchlist[MAXSWITCHES * 2];
+int *switchlist = vanilla_switchlist;
 int		numswitches;
 button_t        buttonlist[MAXBUTTONS];
 
@@ -117,6 +119,8 @@ void P_InitSwitchList(void)
             break;
     }
 
+    if (MD_LoadSwitches(episode)) return;
+    switchlist = vanilla_switchlist;
     slindex = 0;
 
     for (i = 0; i < arrlen(alphSwitchList); i++)

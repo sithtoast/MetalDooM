@@ -77,6 +77,7 @@ int MD_TestKeyDoor(int key, float *x, float *y, float *angle, int *sector);
 
 // Animation source frames, and their current engine translation. Indexes are copied IDs.
 typedef struct { int index, flat; char name[9]; } MD_Material;
+int MD_CopySwitchMaterials(MD_Material *output, int capacity);
 int MD_CopyAnimatedMaterials(MD_Material *output, int capacity);
 int MD_TranslatedMaterial(int index, int flat);
 

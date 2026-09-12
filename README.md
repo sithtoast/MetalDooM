@@ -3,7 +3,12 @@
 Classic Doom on Apple Silicon, with native Metal rendering and gameplay powered
 by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
-**Version 0.9.0 · experimental source preview · not notarized.**
+**Version 0.10.0 · experimental source preview · local builds are not notarized.**
+
+Build 126 starts the Legacy of Rust development series with data-driven animation
+and switch tables. Rust itself remains unsupported; see the
+[audit and implementation milestones](docs/LEGACY_OF_RUST.md).
+The previous 0.9.0 build 124 was separately notarized; that release is preserved.
 
 This branch adds independently switchable AO, test/torch/projectile/muzzle
 lighting, sprite light reception, hard/soft world shadows, emissive surface

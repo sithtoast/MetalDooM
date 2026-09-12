@@ -10,7 +10,7 @@ while IFS= read -r SOURCE || [[ -n "$SOURCE" ]]; do
     -include "$PROJECT_DIR/Engine/NativeHeaders.h" -I"$PROJECT_DIR/Engine" -I"$ENGINE_DIR" -I"$ENGINE_DIR/doom" -I"$PROJECT_DIR/Vendor/ChocolateDoom/opl" \
     -c "$ENGINE_DIR/$SOURCE" -o "$OBJECT_DIR/${SOURCE//\//_}.o"
 done < "$PROJECT_DIR/Engine/sources.txt"
-for SOURCE in Bridge Platform OPLMusic; do
+for SOURCE in Bridge Platform OPLMusic ResourceTables; do
   xcrun clang -std=gnu11 -O2 -fwrapv -fno-strict-aliasing -arch arm64 -mmacosx-version-min=14.0 \
     ${MD_ENGINE_TEST_FLAGS:-} -include "$PROJECT_DIR/Engine/NativeHeaders.h" -I"$PROJECT_DIR/Engine" -I"$ENGINE_DIR" -I"$ENGINE_DIR/doom" -I"$PROJECT_DIR/Vendor/ChocolateDoom/opl" \
     -c "$PROJECT_DIR/Engine/$SOURCE.c" -o "$OBJECT_DIR/$SOURCE.o"

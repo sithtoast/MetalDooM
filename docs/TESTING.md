@@ -148,3 +148,17 @@ and Embers & Projectile Trails. Test sprite reception with an existing light,
 surface illumination with self-emission off, shadow softness with shadows on,
 and particles with all light sources switched off. Watch large liquids, monsters
 near colored torches, moving rockets, pause/resume and map/save transitions.
+
+## Rust resource-table foundation
+
+`bash scripts/test-resource-tables.sh ULTIMATE_DOOM.wad DOOM2.wad` checks packed
+tables and saved phase/button timing. Optional `RUST_BASE=DOOM2.wad` and
+`RUST_TEXTURES=id1-tex.wad` add the actual installed Rust resource-table check.
+The generated combined IWAD has only base maps and resource art; it cannot test
+Rust gameplay. Outputs are temporary and must never be committed.
+
+For native GPU validation, first run
+`python3 Tests/make_resource_fixture.py ULTIMATE_DOOM.wad build/resource-native-fixtures`,
+then `AO_RESOURCES=1 bash scripts/test-ambient-occlusion.sh build/resource-native-fixtures/preview.wad`.
+It checks nonstandard switch preload, animated pixels, pause and save restoration.
+Native GPU access requires permitted host execution.

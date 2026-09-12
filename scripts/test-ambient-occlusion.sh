@@ -26,6 +26,7 @@ renderer=renderer.replace('percent:hudSizePercent,style:hudStyle,portrait:minima
 (output/'Renderer.swift').write_text(renderer+"""
 // Test-only bridge in this copied source file; not part of app builds.
 extension Renderer {
+    func validationHasTexture(_ name:String) -> Bool { textures[MaterialKey(name:name,flat:false)] != nil }
     func validationHUD(_ state:MD_HUD) { hud=state }
     func validationLightPhase(_ tics:Int32) { hud.levelTics=tics }
     var validationWorldShader: String { worldShader }
@@ -46,6 +47,9 @@ extension Renderer {
 if os.environ.get('AO_RESOLUTION') == '1':
     setup=(root/'Tests/AmbientOcclusionValidation.swift').read_text().split('func measure(')[0]
     (output/'main.swift').write_text(source+'\n'+setup+(root/'Tests/ResolutionValidation.swift').read_text())
+if os.environ.get('AO_RESOURCES') == '1':
+    setup=(root/'Tests/AmbientOcclusionValidation.swift').read_text().split('func measure(')[0]
+    (output/'main.swift').write_text(source+'\n'+setup+(root/'Tests/ResourceMetalValidation.swift').read_text())
 if os.environ.get('AO_PROFILE') == '1' or os.environ.get('AO_LIVE') == '1':
     setup=(root/'Tests/AmbientOcclusionValidation.swift').read_text().split('func frame()')[0]
     (output/'main.swift').write_text(source+'\n'+setup+(root/('Tests/EffectsLiveValidation.swift' if os.environ.get('AO_LIVE') == '1' else 'Tests/EffectsProfile.swift')).read_text())

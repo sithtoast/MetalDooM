@@ -1,12 +1,55 @@
-# MetalDooM handoff — 2026-09-11
+# MetalDooM handoff — 2026-09-12
 
 ## Where to resume
 
-Active checkout: `/Users/wmh/Dev/MetalDooM`, branch **codex/resolution-kex**,
-branched from main `bb6f707`. This change is a local **0.9.0** feature milestone.
-`Info.plist` remains the semantic-version source; latest successful app build is
-**124**. Recheck git status/log and running app before continuing. Nothing was
-pushed and the existing v0.8.0 tag was not moved.
+Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, branch
+**codex/legacy-of-rust**, based on fetched origin/main merge **afd7357** (includes
+6171c87 and completed 0.9.0 build 124). Preserve `/Users/wmh/Dev/MetalDooM` and its
+release artifacts. The previous resolution/KEX branch description is historical.
+
+Current feature version is **0.10.0**, successful build **126**, with the first
+Rust development milestone complete: generic bounded ANIMATED/SWITCHES loading,
+shared engine animation layout, actual switch-pair Metal preload, and tests.
+SIGIL II uses its actual animation table. **Legacy of Rust is not playable yet**;
+its existing rejection guard remains unchanged. No general ID24 support claim.
+
+Read [Legacy of Rust evidence and milestones](docs/LEGACY_OF_RUST.md) next. The
+installed id1 GAMECONF is version 1.2. Specified baseline is id24res → Doom II →
+id1; sibling resource/weapon/music packs are not additive dependencies. MAP99 is
+a hidden test block, leaving fourteen main maps and two secrets. MAP13 needs
+XNOD. Audit evidence is in `build/rust-audit.json`, reproducible with
+`scripts/audit-rust.py`. The audit reads private installed files without copying
+payloads into source control.
+
+Next: establish an extended simulation adapter using source-reviewed Boom/MBF21
+modules (Woof starting point; Rum and Raisin/ID24 reference for ID24 details),
+validate the native seam before a broad import, and implement extensible patched
+data/actions, Rust physics/combat/weapons and XNOD. Then progression, JSON
+interlevels/finale/skies/HUD and versioned saves. Complete native Rust playability
+is the first campaign acceptance target; general ID24 conformance stays separate.
+Multiplayer and online add-on catalogs remain excluded.
+
+Validation: original Ultimate Doom and KEX Doom II resource fixtures pass dynamic
+41-animation/85+ pair storage, precedence, 4/32 rates, game scope, arbitrary names,
+short/full terminators, malformed rejection and cross-map phase/button saves.
+Actual Rust resource-only fixture passes all 49 animations/85 pairs and 4/8/32
+rates. NRFTL/Master Levels/SIGIL II pass all 39 maps and existing combat, music,
+routing and saves; standard SIGIL and classic presentation tests pass.
+Native Metal/effects suite passes; focused GPU test changes 626,964 bytes after
+four tics, preserves paused pixels, preloads a non-SW pair absent from geometry,
+and restores exact saved animation pixels. Logs live under `build/` (see
+`docs/VALIDATION.md`). Native build 126 was inspected on the private original-map
+animation fixture; its menu title/footer show 0.10.0/build 126. The validation
+preview is left paused. No manual Rust playthrough was attempted.
+
+The **0.9.0 build 124** release was notarized by the user in the preceding task:
+Apple accepted `121f1db9-34a4-4f5f-aeb3-599a59de0727`; stapler, codesign and
+Gatekeeper were verified in the host context. ZIP location remains the primary
+checkout's `build/releases/MetalDooM-0.9.0-build124/`. This is prior-task evidence.
+Build 126 is ad-hoc signed, unnotarized, and unpackaged. GitHub workflow outputs
+remain unnotarized. No push, publish, upload or Apple submission was performed.
+
+The remaining sections are historical and describe earlier branches/previews.
 
 ## Latest refinement — Optional Minimal HUD portrait (build 124)
 

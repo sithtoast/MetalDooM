@@ -21,7 +21,8 @@ The three recognized PWADs are identified by full SHA-256 in `Sources/WAD.swift`
 Different or edited editions remain rejected until assessed. Runtime text, names,
 skies and music are read from each identified file's UMAPINFO; the engine implements
 its routes, boss rules and other gameplay changes explicitly. SIGIL II's SWITCHES
-matches vanilla; ANIMATED adds one flame-wall sequence. None of these three WADs
+matches vanilla; ANIMATED adds one flame-wall sequence. Since 0.10.0 those packed
+tables are interpreted directly rather than represented by a flame special case. None of these three WADs
 contains linedef specials above vanilla's 141. The engine still runs classic Doom
 simulation; multiplayer and the online add-on catalog are outside the requested scope.
 
@@ -42,11 +43,12 @@ Inventory read from the user's installed rerelease directory on 2026-09-11:
 | id24res.wad | 530 resource lumps, no maps | Audit ID24 base resources against the engine implementation |
 | iddm1.wad | 26 map blocks, id24 executable, extended patches | Deathmatch pack: excluded from the requested single-player scope |
 
-`id1.wad` GAMECONF has null pwadfiles/dehfiles, so its filename family must not be
-assumed to be one additive load list. Its advertised 16 playable levels and the
-17 directory map blocks also need reconciliation. Do not relax rejection guards
-or claim complete KEX/ID24 support based on opening a map. Legacy of Rust is the
-next substantial engine compatibility project.
+The 2026-09-12 [Rust audit](LEGACY_OF_RUST.md) resolves the map count and
+resource precedence: MAP99 is a hidden test map; the campaign comprises fourteen
+main maps plus two secrets. The specified baseline is id24res → Doom II → id1;
+the id1 sibling family is not an additive dependency list. MAP13 also requires
+XNOD. Version 0.10.0 implements the shared resource-table foundation; Legacy of
+Rust remains rejected until its simulation and campaign milestones pass.
 
 ## Validation boundary
 

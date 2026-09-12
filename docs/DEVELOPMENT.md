@@ -33,7 +33,7 @@ GAMECONF load directives, ID24, or Legacy of Rust.
 increments it and sets the app's `CFBundleVersion`. The version/build appear in the
 window title and About window; About includes a UTC build timestamp. Failed builds
 preserve the previous app and counter. Concurrent builds are rejected. Marketing
-version `0.9.0` is maintained separately in `Info.plist`. Commit `BUILD_NUMBER` with
+version `0.10.0` is maintained separately in `Info.plist`. Commit `BUILD_NUMBER` with
 releases; independent checkouts do not share a global numbering sequence.
 
 ## Implemented

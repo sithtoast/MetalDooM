@@ -1,5 +1,59 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 126: Rust resource foundation
+
+The isolated `codex/legacy-of-rust` branch starts at main merge afd7357. This is
+the first resource milestone, not playable Rust or general ID24 support.
+
+- Read-only audit: `python3 scripts/audit-rust.py RERELEASE_DIRECTORY` produced
+  `build/rust-audit.json`. Hashes, sibling comparisons, MAP99 classification,
+  XNOD MAP13 and engine requirements are recorded in `LEGACY_OF_RUST.md`.
+- `test-resource-tables.sh` passed on original Ultimate Doom and rerelease Doom II:
+  absent/default and empty/replacement tables, last-lump precedence, 41 animations,
+  85/86 active pairs, game scopes, absent resources, arbitrary pair names, copied
+  output capacity, 4/32-tic phases, original button activation, cross-map save
+  restoration and reset on the exact remaining tic. Thirteen malformed cases per
+  base return ordinary errors: zero/negative/swirl rates, bad kinds/cycles/endpoints,
+  truncation, absent terminators, invalid names and switch scopes. One-byte and
+  four-byte ANIMATED terminators also pass. Log: `build/resource-tables-results.txt`.
+- With `RUST_BASE` and `RUST_TEXTURES` pointing to Doom II and installed id1-tex,
+  the same script generates a private resource-only IWAD. All actual 49 animations,
+  85 switch pairs, four-frame NUKAGE and 4/8/32 rates initialize/tick successfully.
+  This fixture uses classic base maps and has no Rust actors, patches or maps;
+  it does not establish Rust gameplay compatibility.
+- `test-kex-campaign.sh` passes all 9 NRFTL, 21 Master Levels and 9 SIGIL II maps,
+  including resource/music decoding, boss rules, normal/secret routes and saves.
+  Logs: `build/kex-*.wad.txt`. SIGIL II exercises its real four-byte ANIMATED
+  terminator and flame definition; no hardcoded flame table remains.
+- `test-stack.sh` passes all nine standard SIGIL maps plus ordered override/save
+  identities and namespace/partial-map guards (`build/stack-results.txt`).
+  `test-presentation.sh` passes classic animation/face/save checks
+  (`build/presentation-results.txt`).
+- Native `test-ambient-occlusion.sh` passes the full existing Metal/effects suite,
+  including masked geometry, all optional effects, HUD isolation, exact classic
+  restoration, HDR/SDR transitions, save/load, resize, map replacement and shutdown.
+  Evidence: `build/resource-metal-validation/results.txt` and image captures.
+- `AO_RESOURCES=1 test-ambient-occlusion.sh build/resource-native-fixtures/preview.wad`
+  passes a focused native GPU test. A non-SW1/SW2 switch counterpart absent from
+  sidedef geometry is preloaded; paused frames match; four tics change 626,964
+  readback bytes; save/load restores identical animation pixels. Captures/save/log:
+  `build/resource-specific-metal/`. Fixture generator: `Tests/make_resource_fixture.py`.
+- Full native build 126 succeeds; bundle and live native title/menu footer both
+  show 0.10.0/build 126. CUA inspected the private E1M1 fixture's rendered walls,
+  floor, HUD and pause menu. Preview remains paused in the isolated worktree.
+
+The initial fixture wrongly named BRNBIG (and assumed a flame frame count); direct
+texture-directory inspection corrected it to shared STARTAN2/STARTAN3 and the
+three actual FIREWALA/FIREWALB/FIREWALL frames. The first reader required a full
+ANIMATED terminator and failed SIGIL II; support for its short marker fixed that
+regression before build 126. Sandboxed icon generation failed; the native host
+build succeeded. Neither issue is being reported as a passing intermediate build.
+
+No full Rust campaign run, extended engine build, ID24 conformance, new Apple
+notarization or distribution package was completed. Original classic archive
+format is unchanged; extended simulation saves remain a later milestone.
+
+
 Historical results below describe the indicated builds, not complete compatibility guarantees.
 See [TESTING.md](TESTING.md) for current tester instructions.
 

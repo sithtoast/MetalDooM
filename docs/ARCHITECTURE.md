@@ -235,8 +235,8 @@ and copies translated texture/flat IDs. Metal preloads those frames at map load 
 selects the current translated texture when drawing each batch, preserving geometry
 and UVs. P_UpdateSpecials owns the 8-tic animation clock; pause freezes it. Save
 restoration rebuilds translation tables from the saved level time without ticking
-thinkers or advancing gameplay. The private animation layout is mirrored only in
-Bridge.c against the pinned upstream revision; no engine pointers escape to Swift.
+thinkers or advancing gameplay. The animation layout is shared through Engine/ResourceTables.h; no engine
+pointers escape to Swift.
 
 ## Attract mode and cheats
 
@@ -361,6 +361,18 @@ power-ups; ray failure clears both enable flags and restores classic rendering. 
 ## Resolution and campaign profiles (0.9.0)
 
 See [world composition and scaling](RESOLUTION.md) and [campaign profiles](KEX_SUPPORT.md).
-The bridge registers SIGIL II's flame animation in the existing bounded animation table;
-normal engine ticks and save restoration drive it. Profile routing and boss overrides
+SIGIL II uses its ANIMATED resource table; normal engine ticks and save restoration
+drive it. Profile routing and boss overrides
 are per-process and keep the base engine behavior when no profile is configured.
+
+## Resource tables and extended-engine direction (0.10.0)
+
+Engine/ResourceTables.c decodes packed little-endian ANIMATED/SWITCHES, replacing
+built-in tables only when a corresponding lump exists. Tables allocate within the
+zone with a 65,536-record input budget and required termination. Unknown animation
+starts and missing switch pairs are skipped; invalid cycles, names, rates and
+records fail through the C error boundary. No arbitrary mod acceptance is enabled.
+The bridge enumerates all switch materials, allowing Metal to preload pairs whose
+names do not follow SW1/SW2. Animation timing and button archives use the existing
+engine paths. See [Rust/ID24 evidence and milestones](LEGACY_OF_RUST.md) for the
+extended simulation boundary, XNOD requirement and remaining save/ABI work.

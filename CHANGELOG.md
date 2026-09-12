@@ -4,6 +4,22 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 — Rust resource-table foundation (build 126)
+
+- Read bounded Boom ANIMATED/SWITCHES tables, with dynamic storage, replacement
+  precedence, namespace-aware flat lookup and per-sequence timing. SIGIL II now
+  uses its actual flame animation definition instead of a campaign special case.
+- Preload native Metal switch textures from the engine's pairs, including names
+  without SW1/SW2 prefixes; preserve animation phase and timed buttons across saves.
+- Audit the installed Rust resources, resolve its sixteen campaign maps plus the
+  hidden MAP99 test block, and document engine/ID24 milestones and MAP13 XNOD.
+  Legacy of Rust remains unsupported; existing add-on guards remain in force.
+- Validate all 49 Rust resource animations/85 switch pairs in a private resource
+  fixture, all 39 existing KEX maps, classic/SIGIL regressions, native Metal
+  animation/save pixels and the running 0.10.0 build 126 preview.
+- Preserve the separately notarized 0.9.0 build 124 release; build 126 is local,
+  ad-hoc signed and unnotarized. No release upload or publishing.
+
 ## 0.9.0 refinement — Optional Minimal HUD portrait (build 124)
 
 - Add a remembered Doomguy portrait toggle under Options → HUD and View →

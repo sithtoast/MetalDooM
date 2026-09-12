@@ -19,3 +19,13 @@ LGPL-2.1-or-later; its license is in opl/COPYING.LESSER. Engine/OPLMusic.c
 adapts the unmodified src/i_oplmusic.c sequencer to bounded offline PCM
 rendering with the base/stack GENMIDI bank. Core Audio handles playback.
 No SDL audio or hardware OPL access is used.
+
+0.10.0 local integration: p_spec.c shares the animation layout from
+Engine/ResourceTables.h and allows a dynamically allocated ANIMATED table;
+p_switch.c accepts the dynamic SWITCHES table through the same module. Absent
+lumps retain the original built-in tables. Original ticker and switch/button
+activation logic remain unchanged. Engine/ResourceTables.c implements bounded
+packed decoding; Woof's p_spec.c/p_switch.c at acd1c7f84fdd0fae92d1c58643c14364a131c75a
+were consulted for Boom replacement, missing-resource and episode semantics.
+The prior 0.9.0 p_enemy.c A_BossDeath integration delegates recognized campaign
+boss overrides to Bridge.c; other campaigns retain upstream behavior.

@@ -1,3 +1,4 @@
+#include "ResourceTables.h"
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "Bridge.h"
 #include <math.h>
@@ -80,7 +81,7 @@ static char lastMessage[128];
 static int messageSerial;
 static int monstersEnabled = 1;
 static void RefreshAnimations(void);
-static void ConfigureCampaignAnimations(void);
+
 static void RevealMap(void);
 static int weaponGrinTicks;
 static byte *nativeDemo;
@@ -385,7 +386,7 @@ int MD_LoadSkill(const char *path, int episode, int map, int skill) {
         gamemode = gamemission != doom ? commercial : W_CheckNumForName("E4M1") >= 0 ? retail : W_CheckNumForName("E2M1") >= 0 ? registered : shareware;
         gameversion = finalDoom ? exe_final : gamemode == retail ? exe_ultimate : exe_doom_1_9;
         if(campaignProfile==3) mobjinfo[MT_SPIDER].spawnhealth=9000;
-        R_InitData(); CacheTextureNames(); P_Init(); ConfigureCampaignAnimations();
+        R_InitData(); CacheTextureNames(); P_Init();
         strcpy(loadedPath,path); initialized = 1;
     }
     if(!CampaignAllowsMap(episode,map)) { snprintf(errorText,sizeof(errorText),"Map is outside the active campaign.");guarded=0;return 0; }
@@ -661,17 +662,6 @@ int MD_TestKeyDoor(int key, float *x, float *y, float *angle, int *sector) {
 }
 #endif
 
-// Layout from pinned p_spec.c; no engine-owned pointers cross the bridge.
-typedef struct { boolean istexture; int picnum,basepic,numpics,speed; } MD_EngineAnim;
-extern MD_EngineAnim anims[], *lastanim;
-static void ConfigureCampaignAnimations(void) {
-    if(campaignProfile!=3) return;
-    // The validated SIGIL II ANIMATED adds this one sequence to vanilla's table.
-    // Its SWITCHES table matches vanilla; no general Boom parser is enabled.
-    int first=R_TextureNumForName("FLMWAL01"),last=R_TextureNumForName("FLMWAL03");
-    if(last-first!=2 || lastanim-anims>=32) I_Error("Invalid SIGIL II flame animation");
-    *lastanim++=(MD_EngineAnim){true,last,first,3,8};
-}
 int MD_CopyAnimatedMaterials(MD_Material *output,int capacity) {
     if (!loaded || poisoned) return 0;
     int count=0;
@@ -681,6 +671,15 @@ int MD_CopyAnimatedMaterials(MD_Material *output,int capacity) {
             memcpy(m->name,a->istexture ? textureNames[i] : lumpinfo[firstflat+i]->name,8);
         }
         ++count;
+    }
+    return count;
+}
+int MD_CopySwitchMaterials(MD_Material *output,int capacity) {
+    if (!loaded || poisoned) return 0;
+    int count = numswitches * 2;
+    for (int i=0; output && i<count && i<capacity; ++i) {
+        MD_Material *m=&output[i]; memset(m,0,sizeof(*m));
+        m->index=switchlist[i]; memcpy(m->name,textureNames[m->index],8);
     }
     return count;
 }

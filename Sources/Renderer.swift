@@ -430,10 +430,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         for side in map.sides {
             for name in [side.upper,side.lower,side.middle] where name != "-" && !name.isEmpty {
                 materials.insert(MaterialKey(name:name,flat:false))
-                if name.hasPrefix("SW1") || name.hasPrefix("SW2") {
-                    let alternate = (name.hasPrefix("SW1") ? "SW2" : "SW1")+name.dropFirst(3)
-                    if art.definitions[alternate] != nil { materials.insert(MaterialKey(name:alternate,flat:false)) }
-                }
+
             }
         }
         var cached: [MaterialKey:MTLTexture] = [:], missing: [String] = []
@@ -485,6 +482,14 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         if let demo, MD_StartDemo(demo)==0 { throw PortError(String(cString:MD_LastError())) }
         guard MD_SectorCount() == map.sectors.count else { engineReady = false; throw PortError("Engine and Metal sector counts differ.") }
+        // Cache the authoritative engine switch pairs, including names without
+        // SW1/SW2 prefixes. The same table drives use and saved button restoration.
+        var switchFrames=Array(repeating:MD_Material(),count:Int(MD_CopySwitchMaterials(nil,0)))
+        _ = MD_CopySwitchMaterials(&switchFrames,Int32(switchFrames.count))
+        for var frame in switchFrames {
+            let frameName=withUnsafePointer(to:&frame.name) { $0.withMemoryRebound(to:CChar.self,capacity:9) { String(cString:$0) } }
+            try cacheMaterial(MaterialKey(name:frameName,flat:false))
+        }
         var animationIDs: [MaterialKey:Int32]=[:], walls: [Int32:MTLTexture]=[:], flats: [Int32:MTLTexture]=[:]
         var frames=Array(repeating:MD_Material(),count:Int(MD_CopyAnimatedMaterials(nil,0)))
         _ = MD_CopyAnimatedMaterials(&frames,Int32(frames.count))
