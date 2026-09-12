@@ -33,16 +33,17 @@ static int state(uint32_t seq,int force_geometry) {
         memcmp(geometry+28,previous_geometry+28,size-28);
     free(previous_geometry);previous_geometry=geometry;previous_size=size;
     if(!changed)size=0;
-    size_t presentation=ME_CopyPresentation(NULL,0),materials=ME_CopyMaterials(NULL,0);
-    if(!presentation || !materials || size+presentation+materials>160*1024*1024)return 0;
-    unsigned char *body=calloc(1,48+size+presentation+materials);if(!body)return 0;
-    memcpy(body,"MVW3",4);put(body+4,view.tic);put(body+8,view.x);put(body+12,view.y);
+    size_t presentation=ME_CopyPresentation(NULL,0),materials=ME_CopyMaterials(NULL,0),audio=ME_CopyAudio(NULL,0);
+    if(!presentation || !materials || !audio || size+presentation+materials+audio>160*1024*1024)return 0;
+    unsigned char *body=calloc(1,52+size+presentation+materials+audio);if(!body)return 0;
+    memcpy(body,"MVW4",4);put(body+4,view.tic);put(body+8,view.x);put(body+12,view.y);
     put(body+16,view.eye_z);put(body+20,view.angle);put(body+24,view.health);
-    memcpy(body+28,view.sky,8);put(body+36,(uint32_t)size);put(body+40,(uint32_t)presentation);put(body+44,(uint32_t)materials);
-    if(size)memcpy(body+48,geometry,size);
-    if(ME_CopyPresentation(body+48+size,presentation)!=presentation ||
-       ME_CopyMaterials(body+48+size+presentation,materials)!=materials){free(body);return 0;}
-    int result=send_frame(seq,0,body,48+size+presentation+materials);free(body);return result;
+    memcpy(body+28,view.sky,8);put(body+36,(uint32_t)size);put(body+40,(uint32_t)presentation);put(body+44,(uint32_t)materials);put(body+48,(uint32_t)audio);
+    if(size)memcpy(body+52,geometry,size);
+    if(ME_CopyPresentation(body+52+size,presentation)!=presentation ||
+       ME_CopyMaterials(body+52+size+presentation,materials)!=materials ||
+       ME_CopyAudio(body+52+size+presentation+materials,audio)!=audio){free(body);return 0;}
+    int result=send_frame(seq,0,body,52+size+presentation+materials+audio);free(body);return result;
 }
 static unsigned number(const char *s) {
     char *end;errno=0;unsigned long v=strtoul(s,&end,10);
@@ -58,6 +59,7 @@ int main(int argc,char **argv) {
     ME_Config config={.abi_version=ME_ABI_VERSION,.cache_directory=argv[1],.map=number(argv[2]),
         .base_wad_index=number(argv[3]),.profile=number(argv[4]),.skill=number(argv[5]),
         .random_seed=1993,.wad_count=(uint32_t)(argc-6),.wad_paths=(const char *const *)argv+6};
+    if(!ME_EnableAudio())return fail(0,"Cannot enable sound capture");
     if(!ME_Init(&config)){char error[2048];ME_CopyError(error,sizeof(error));return fail(0,error);}
     if(!state(0,1)){char e[2048];ME_CopyError(e,sizeof(e));return fail(0,e[0]?e:"Cannot copy initial presentation");}
     uint32_t expected=1;

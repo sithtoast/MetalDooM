@@ -4,6 +4,23 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust sound effects preview (build 135)
+
+- Play actual worker sound effects through native AVAudioEngine voices: firing,
+  Rust weapon charge/impact, pickups, switches and moving sectors. Add a Sound
+  toggle that stops/suppresses voices; retain copied timing within manual batches.
+  Controls wait for playback's event timeline before accepting the next command.
+- Add opt-in bounded sound capture, named start/stop/position updates, separate
+  origin/singularity channels, stereo attenuation, and draining MSA1 state in MVW4.
+  Keep existing ABI structures and default headless behavior unchanged.
+- Validate queue/copy/error boundaries, left/right channels, unchanged simulation
+  with capture on/off, all 16 scenes and prior combat/ID24 regressions. Native PCM
+  tests pass for both Rust weapons, pickups, switches, mute/stop and classic audio;
+  a native device tap measures output. Physical speaker audibility is unverified.
+- Build and inspect final 0.10.0/build 135 with native Sound controls and MAP16
+  switch/firing updates. Preserve intermediate 134 and earlier preview bundles.
+  Music, pitch variation, ambient loops and full Rust play remain ahead. No push.
+
 ## 0.10.0 refinement — Rust material animation and scene reuse (build 133)
 
 - Show wall/flat animation frames from the worker's authoritative translation

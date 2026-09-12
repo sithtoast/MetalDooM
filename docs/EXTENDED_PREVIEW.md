@@ -1,4 +1,4 @@
-# Rust native preview — 0.10.0 build 133
+# Rust native preview — 0.10.0 build 135
 
 An explicit development preview now starts the extended simulation in a separate
 child process and draws its copied geometry with the existing native Metal world
@@ -6,7 +6,7 @@ and sky pipelines, with copied actor/weapon frames through the sprite renderer.
 It uses the actual ordered id24res → Doom II → id1 resources,
 checks their session fingerprint and reads the UMAPINFO sky selection.
 
-This is a **manual simulation preview**, not playable Rust support. HUD, audio,
+This is a **manual simulation preview**, not playable Rust support. HUD, music,
 full Boom/ID24 presentation are not connected.
 The ordinary WAD picker still rejects Rust gameplay. Manual controls advance real
 simulation; displayed health/ammo are simulation state. No speedrun/upload work.
@@ -16,8 +16,8 @@ simulation; displayed health/ammo are simulation state. No speedrun/upload work.
 The helper is packaged only with the explicit development build option:
 
 ```sh
-METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/material-preview" bash scripts/build.sh
-open -n "$PWD/build/material-preview/MetalDooM.app" --args \
+METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/audio-final" bash scripts/build.sh
+open -n "$PWD/build/audio-final/MetalDooM.app" --args \
   --rust-preview "/path/to/Ultimate Doom/rerelease" --map MAP01
 ```
 
@@ -33,7 +33,9 @@ tic; Use submits one use tic; Fire submits one attack tic; Fire 1 second submits
 raising: use Step 1 second to advance it. Each action uses its tick reply, which carries sprite/material state and
 geometry only when world values change. The background scene builder reuses
 unchanged meshes and decoded resources; Metal uploads new textures only.
-There is no automatic simulation clock. Closing the preview cancels its child,
+Sound events play at their copied 35 Hz offsets after each manual batch; controls
+wait for its event timeline to finish. Sound toggles explicit voice mute. Sample
+tails finish naturally while simulation is stopped. There is no automatic simulation clock. Closing the preview cancels its child,
 drains the serial queue, reaps the process and removes its private scratch/log
 folder before completing app termination. Existing app instances are unaffected.
 
@@ -66,8 +68,9 @@ This is not a measured real-time update strategy, especially for MAP13.
 
 ## Process and protocol
 
-Worker ABI 2 has additive `ME_CopyView`, `ME_CopyPresentation` and `ME_CopyMaterials`, bringing the
-private export count to ten. No existing structure layout changes. `Engine/Worker/main.c` links only
+Worker ABI 2 has additive `ME_CopyView`, `ME_CopyPresentation`, `ME_CopyMaterials`, `ME_EnableAudio` and
+`ME_CopyAudio`, bringing the
+private export count to twelve. No existing structure layout changes. `Engine/Worker/main.c` links only
 the isolated dylib; the Swift app never loads it. `scripts/build-extended-worker.sh`
 produces both beside each other, using an executable-relative dylib path.
 
@@ -88,13 +91,14 @@ quit (empty body/reply). Commands carry signed forward/side bytes, signed LE16
 turn, button byte, reserved zero byte. Invalid sequence, length, operation, reserved
 byte or command terminates the session with a bounded error reply.
 
-Startup and geometry replies carry an `MVW3` body: magic, tic, fixed x/y/eye-z,
+Startup and geometry replies carry an `MVW4` body: magic, tic, fixed x/y/eye-z,
 unsigned Doom angle, signed health, eight-byte sky name, geometry byte count,
-sprite byte count, material byte count (48 bytes total), then optional [MGE1](EXTENDED_GEOMETRY.md),
-required [MSP1](EXTENDED_SPRITES.md) and [MMT1](EXTENDED_MATERIALS.md). Tick replies
-include geometry when changed and always include sprite/material state. Old body versions reject. Swift checks envelope size/
-sequence/status, view/geometry/sprite/material tic agreement, map identity and stable content identity. Maximum reply
-is 160 MiB + 48 bytes; errors are at most 2048 bytes. Startup/requests have a
+sprite byte count, material byte count, audio byte count (52 bytes total), then optional [MGE1](EXTENDED_GEOMETRY.md),
+required [MSP1](EXTENDED_SPRITES.md), [MMT1](EXTENDED_MATERIALS.md) and
+[MSA1](EXTENDED_AUDIO.md). Tick replies
+include geometry when changed and always include sprite/material state and drained sound events. Old body versions reject. Swift checks envelope size/
+sequence/status, view/geometry/sprite/material/audio tic agreement, map identity and stable content identity. Maximum reply
+is 160 MiB + 52 bytes; errors are at most 2048 bytes. Startup/requests have a
 30-second deadline and run on one serial background queue; cancellation terminates
 the owned child and interrupts reads. EOF/truncation and protocol errors stop the
 session. No restart-in-process or save contract is implied.
@@ -107,17 +111,19 @@ cancellation and bad-reply/timeout handling. All sixteen actual Rust maps resolv
 materials/skies and actor/weapon frames at startup and tic 35. Tests cover eight
 rotations/mirroring, actual Incinerator/Blade firing-frame decoding, complete-copy
 canaries and nine malformed sprite packets. Wrong resource base identity rejects.
-The previous MBF21/Rust suite and classic Doom II geometry/material/sprite suite
-also pass. Build 133 adds 65 exact animation phases with one static-room mesh
-build, cache counters, moving MAP16 geometry, ten malformed material packets and
-material/view tic mismatch checks. Logs: `build/material133-validation.log`,
-`build/rust133-validation.log`, `build/classic133-validation.log`.
+The previous MBF21/Rust suite passes with twelve private exports. Audio checks add
+FIFO canaries/drain/overflow, left/right sources, thirteen malformed audio/order
+packets and byte-identical simulation snapshots over 200 tics with capture off/on.
+Worker logs: `build/audio134-worker-validation.log`, `build/rust134-validation.log`;
+final build 135 only refines the parent's explicit voice mute. Native audio checks
+are in `build/audio135-native-validation.log`, with classic PCM regression in
+`build/classic135-audio-validation.log`. See [audio details](EXTENDED_AUDIO.md).
 
-Native build 133 verifies MAP01 console animation at fixed camera positions
-(tics 0/35/70/105), classic MAP01 rendering, and MAP16's starting switch opening
-after Step → Use → Step (tics 35→36→71). The final preview is left on MAP16.
-The spawn use latch needs a released tic before a new press. Prior build 132
-pistol/muzzle-flash checks remain recorded in VALIDATION.md. New Rust guns have
-automated frame-decoding evidence only. Full gameplay, all moving-sector visuals
-and real-time frame rates remain unverified. Next: finer geometry updates, audio
-and remaining map/campaign/save acceptance.
+Native build 135 verifies its Sound toggle, MAP16 switch opening after Step → Use
+→ Step (35→36→71), muted firing to tic 106/ammo 47, controls waiting for playback
+and becoming available again. The final preview is left on MAP16 with Sound on.
+Native mixer tests render both actual Rust weapons, pickups, switch/movement sounds,
+stereo, mute and stop; a device-output tap measures nonzero PCM. Physical speaker
+audibility is unverified. Prior animation/pistol checks remain in VALIDATION.md.
+Music, full presentation, continuous gameplay and campaign/save acceptance remain
+work ahead. Audio audition is deliberately separate from a real-time simulation clock.

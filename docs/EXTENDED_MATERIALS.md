@@ -62,6 +62,7 @@ and tic-35 scene/actor/weapon preparation through the cache.
 This removes redundant work on unchanged scenes, but is not a continuous-play
 performance claim. Worker geometry comparison is still linear in map size, and
 any geometry change rebuilds the whole mesh. Partial sector updates, scrolling
-flat offsets, control-sector effects, sky definitions, palette/translucency, audio,
-campaign transitions and saves remain work ahead. See VALIDATION.md for final
+flat offsets, control-sector effects, sky definitions, palette/translucency, music,
+campaign transitions and saves remain work ahead. Build 135 adds native
+[sound effects](EXTENDED_AUDIO.md) via MVW4. See VALIDATION.md for final
 native checks and logs.

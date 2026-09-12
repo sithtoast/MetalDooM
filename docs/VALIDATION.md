@@ -1,5 +1,51 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 135: Rust sound effects and native playback
+
+`scripts/test-extended-worker.sh` passes the previous 16-map scene/sprite/material/
+weapon/transport checks plus MSA1 FIFO canaries, undersized-query preservation,
+complete-copy drain, explicit 4096-event overflow, no replay on geometry requests,
+independent left/right pistol channels, and thirteen malformed audio/order packets.
+Two processes produce byte-identical player/actor snapshots across 200 combat tics
+with capture disabled/enabled. `scripts/test-rust-worker.sh` passes all prior
+MBF21/session/ID24/map/weapon checks with twelve private exports. Logs:
+`build/audio134-worker-validation.log`, `build/rust134-validation.log`; the worker
+code is unchanged in final 135, which refines parent-side explicit mute.
+
+Native `scripts/test-extended-audio.sh` passes (`build/audio135-native-validation.log`):
+
+- Three pistol starts at exact tics 39/53/67 after attack begins at 35, including
+  the upstream four-tic wind-up. Native PCM is nonzero and bounded; stereo energy
+  follows left/right pan, explicit mute prevents playback, and stop clears a voice.
+  Cancelling a scheduled batch suppresses pending start/completion callbacks and
+  leaves the mixer paused.
+- Actual Incinerator events render DSINCBRN, DSINCFI1–2, DSINCHT1–3 and DSWPNUP.
+  Full-charge Blade events render DSHETCHG, DSHETSHT, DSHETXPL, DSITEMUP and DSWPNUP.
+- Actual MAP16 switch/movement events render DSSWTCHN and DSSTNMOV.
+- A short live pistol produces device-output tap peak **0.49497473** while the
+  AVAudioEngine is running. This proves output data, not physical speaker audibility.
+
+An intermediate gain-only mute check returned peak 0.6746114 despite the offline
+mixer reporting outputVolume=0. Final mute explicitly stops voices and suppresses
+new starts, so it does not rely on that gain behavior. Existing classic/menu PCM,
+pause/resume and malformed-DMX regression passes in the native host context
+(`build/classic135-audio-validation.log`, pistol peak 0.49468824).
+
+Final app: `build/audio-final/MetalDooM.app`, **0.10.0/build 135**;
+`build/build135.log`. Host deep/strict signature verification covers app/helper/
+dylib, and bundled plist/CUA title agree. CUA verifies Sound on, MAP16 Step → Use
+→ Step (35→36→71), Sound off, firing to 106/ammo 47, and controls disabled during
+batch playback then restored. Sound is left on. Raise the preview before visual
+inspection: an occluded Metal window can retain its previous rendered surface.
+Intermediate 134's separate bundle is preserved; only its test instance was closed.
+
+Playback presents the completed scene then auditions the batch's timed events;
+sound tails finish naturally while simulation is stopped. Normal pitch, simplified
+channel priority/attenuation and DMX-only samples are explicit limits. Music,
+ambient loops, alternate sound formats, synchronized continuous play, full
+presentation and campaign/save acceptance remain ahead. No game data, generated
+bundles or fixtures are committed; no upload or distribution package was produced.
+
 ## 2026-09-12 — 0.10.0 build 133: Rust material animation and scene reuse
 
 `scripts/test-extended-worker.sh original-doom2.wad /path/to/rerelease` passes

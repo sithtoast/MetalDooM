@@ -151,11 +151,33 @@ import Foundation
                 guard rejected else { throw PortError("Malformed material snapshot accepted.") }
             }
             var view=try Data(contentsOf:executable.deletingLastPathComponent().appendingPathComponent("initial-view.mvw"))
-            let b=Bytes(data:view),offset=48+(try b.i32(36))+(try b.i32(40))+8
+            let b=Bytes(data:view),offset=52+(try b.i32(36))+(try b.i32(40))+8
             view.replaceSubrange(offset..<offset+4,with:words([1]))
             var rejected=false;do { _=try ExtendedView(data:view) } catch { rejected=true }
             guard rejected else { throw PortError("Mismatched material tic accepted.") }
             print("PASS 10 malformed material boundaries and material/view tic mismatch")
+        }
+        do {
+            let worker=ExtendedWorker()
+            _=try worker.start(executable:executable,paths:[base,fixtures.appendingPathComponent("audio-spatial.wad")],map:1,base:0,profile:0)
+            let frame=try worker.tick(count:2)
+            let starts=frame.audio.events.filter{$0.operation==1}
+            guard starts.count==2,Set(starts.map(\.channel)).count==2,
+                  starts.allSatisfy({$0.name=="DSPISTOL" && $0.volume==1}),
+                  starts.contains(where:{$0.pan < -0.7}),starts.contains(where:{$0.pan > 0.7}),
+                  try worker.geometry().audio.events.isEmpty else { throw PortError("Spatial sound or drain boundary failed.") }
+            worker.cancel();print("PASS independent left/right pistol channels, full nearby volume, no replay on geometry request")
+        }
+        do {
+            func words(_ values:[UInt32])->Data { Data(values.flatMap{v in (0..<4).map{UInt8(truncatingIfNeeded:v>>(8*$0))}}) }
+            let header=Data("MSA1".utf8)+words([1,10,1])
+            let event=words([5,0,1])+Data("DSPISTOL".utf8)+words([127,0])
+            let valid=header+event;_=try ExtendedAudio(data:valid)
+            func mutate(_ p:Int,_ v:UInt32)->Data { var d=valid;d.replaceSubrange(p..<p+4,with:words([v]));return d }
+            var invalid:[Data]=[Data(valid.prefix(15)),Data(valid.dropLast()),valid+Data([0]),mutate(4,2),mutate(12,4097),mutate(16,11),mutate(20,32),mutate(24,3),mutate(28,0),mutate(36,128),mutate(40,129),mutate(24,0)]
+            var unordered=Data("MSA1".utf8);unordered.append(words([1,10,2]));unordered.append(event);unordered.append(words([4,0,1]));unordered.append(Data("DSPISTOL".utf8));unordered.append(words([127,0]));invalid.append(unordered)
+            for d in invalid { var rejected=false;do{_=try ExtendedAudio(data:d)}catch{rejected=true};guard rejected else{throw PortError("Malformed audio event accepted.")} }
+            print("PASS 13 malformed audio packet/order boundaries")
         }
         for mode in ["stall","oversize","sequence","truncated"] {
             let worker=ExtendedWorker(timeout:0.2), start=ProcessInfo.processInfo.systemUptime

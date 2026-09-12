@@ -78,3 +78,40 @@ write('render-rotations',replace_room(b''.join(struct.pack('<5h',*t) for t in [(
 animated_room=replace_room(struct.pack('<5h',*player))
 animated_room=[(n,d.replace(b'FLOOR0_1',b'NUKAGE1\0').replace(b'STARTAN3',b'FIREBLU1') if n in ['SECTORS','SIDEDEFS'] else d) for n,d in animated_room]
 write('render-materials',animated_room)
+# A bounded sound stream fixture: one pistol request per tic after weapon raise.
+write('audio-loop',replace_room(struct.pack('<5h',*player))+[('DEHACKED',(base+'''Weapon 1
+Bobbing frame = 1100
+
+Frame 1100
+Sprite number = 2
+Duration = 1
+Next frame = 1100
+Args1 = 1
+
+[CODEPTR]
+Frame 1100 = WeaponSound
+''').encode())])
+# Two independent sound origins on the listener's left and right.
+write('audio-spatial',replace_room(b''.join(struct.pack('<5h',*t) for t in [(0,0,0,1,7),(0,128,0,9500,7),(0,-128,0,9500,7)]))+[('DEHACKED',(base+'''Thing 500
+ID # = 9500
+Initial frame = 1100
+Hit points = 100
+Width = 1048576
+Height = 3670016
+Bits = 0
+
+Frame 1100
+Sprite number = 0
+Duration = 1
+Next frame = 1101
+
+Frame 1101
+Sprite number = 0
+Duration = -1
+Next frame = 1101
+Unknown 1 = 1
+Unknown 2 = 0
+
+[CODEPTR]
+Frame 1101 = PlaySound
+''').encode())])

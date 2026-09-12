@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Native headless worker services. Presentation hooks intentionally have no UI.
-// Simulation remains upstream code; audio calls are counted, not played.
+// Simulation remains upstream code; optional audio capture lives in AudioEvents.c.
 #include "NativeInternal.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,19 +87,8 @@ void S_ChangeMusic(int music,int looping){}
 void S_InitListener(const struct mobj_s *listener){}
 void S_Reset(void){}
 void S_ResumeMusic(void){}
-void S_Start(void){}
 boolean S_StartAmbientSound(const struct mobj_s *origin,int id,struct ambient_s *ambient){I_Error("Ambient sound adapter is not implemented");}
 void S_StopAmbientSounds(void){}
-void S_StopSound(const struct mobj_s *origin){}
-void S_UnlinkSound(struct mobj_s *origin){}
-void S_StartSoundPitch(const struct mobj_s *origin,int id,pitchrange_t range){ME_RecordSound();}
-void S_StartSoundPitchEx(const struct mobj_s *origin,int id,pitchrange_t range){ME_RecordSound();}
-void S_StartSoundPreset(const struct mobj_s *origin,int id,pitchrange_t range){ME_RecordSound();}
-#define SOUND2(name) void name(const struct mobj_s *origin,int id){ME_RecordSound();}
-SOUND2(S_StartSoundBFG) SOUND2(S_StartSoundCGun) SOUND2(S_StartSoundHitFloor) SOUND2(S_StartSoundPain) SOUND2(S_StartSoundPistol) SOUND2(S_StartSoundSSG) SOUND2(S_StartSoundShotgun)
-#define SOUND3(name) void name(const struct mobj_s *source,const struct mobj_s *origin,int id){ME_RecordSound();}
-SOUND3(S_StartSoundMissile) SOUND3(S_StartSoundOrigin) SOUND3(S_StartSoundSource)
-
 // Episode menu hooks retain the simulation flag; the worker has no menu.
 void MN_ClearEpisodes(void) { EpiCustom = true; }
 void MN_AddEpisode(const char *map, const char *gfx, const char *txt, char key) { EpiCustom = true; }

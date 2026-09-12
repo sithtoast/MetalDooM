@@ -8,6 +8,8 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     private let status=NSTextField(labelWithString:"Loading worker…")
     private let queue=DispatchQueue(label:"MetalDooM.extended-preview")
     private let worker=ExtendedWorker()
+    private var audioPlayer:ExtendedSoundPlayer?
+    private var soundToggle:NSButton!
     private var sceneBuilder:ExtendedSceneBuilder?, buttons:[NSButton]=[], closed=false
     func applicationDidFinishLaunching(_ notification:Notification) {
         do {
@@ -33,7 +35,9 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
                 let button=NSButton(title:title,target:self,action:#selector(step(_:)));button.tag=tag;button.isEnabled=false
                 controls.addArrangedSubview(button);buttons.append(button)
             }
-            let caption=NSTextField(labelWithString:"Actor/weapon preview · Manual simulation · Audio and palette effects pending")
+            soundToggle=NSButton(checkboxWithTitle:"Sound",target:self,action:#selector(toggleSound))
+            soundToggle.state = .on;controls.addArrangedSubview(soundToggle)
+            let caption=NSTextField(labelWithString:"Manual simulation · Music and palette effects pending")
             caption.textColor = .secondaryLabelColor
             let stack=NSStackView(views:[controls,caption,status,view]);stack.orientation = .vertical;stack.alignment = .leading;stack.spacing=8
             stack.translatesAutoresizingMaskIntoConstraints=false;view.translatesAutoresizingMaskIntoConstraints=false
@@ -77,18 +81,23 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         do {
             try renderer.loadExtendedPreview(scene)
             status.stringValue="Tic \(scene.view.tic) · \(scene.geometry.triangleCount.formatted()) triangles · Sky \(scene.view.sky) · Health \(scene.view.health) · Ammo \(scene.view.presentation.ammo) · \(scene.view.presentation.actors.count) actors"
-            buttons.forEach{$0.isEnabled=true}
+            if audioPlayer==nil { audioPlayer=try ExtendedSoundPlayer(resources:scene.resources) }
+            audioPlayer?.muted=soundToggle.state != .on
+            try audioPlayer?.play(scene.view.audio) { [weak self] in
+                guard let self,!self.closed else { return };self.buttons.forEach{$0.isEnabled=true}
+            }
         } catch { failed(error) }
     }
+    @objc private func toggleSound() { audioPlayer?.muted=soundToggle.state != .on }
     private func failed(_ error:Error) {
         guard !closed else { return }
-        worker.cancel();status.stringValue="Preview stopped: \(error)";buttons.forEach{$0.isEnabled=false}
+        worker.cancel();audioPlayer?.stop();status.stringValue="Preview stopped: \(error)";buttons.forEach{$0.isEnabled=false}
     }
     func windowWillClose(_ notification:Notification) { shutdown() }
     func applicationWillTerminate(_ notification:Notification) { shutdown() }
     private func shutdown() {
         guard !closed else { return };closed=true
-        worker.cancel();view?.isPaused=true;view?.delegate=nil
+        worker.cancel();audioPlayer?.stop();view?.isPaused=true;view?.delegate=nil
     }
     func applicationShouldTerminate(_ sender:NSApplication)->NSApplication.TerminateReply {
         shutdown()

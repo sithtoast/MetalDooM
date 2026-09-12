@@ -140,7 +140,7 @@ int ME_Tick(const ME_Command *command)
          ((command->buttons & BT_WEAPONMASK) >> BT_WEAPONSHIFT) >= NUMWEAPONS))
         I_Error("Invalid worker command buttons");
     players[0].cmd.buttons = command->buttons;
-    P_Ticker(); gametic++;
+    P_Ticker(); gametic++; ME_AudioTick();
     entered = 0;
     return 1;
 }
@@ -237,4 +237,12 @@ size_t ME_CopyMaterials(void *out, size_t capacity)
     if (setjmp(error_boundary)) { entered=0; return 0; }
     size_t result=ME_WriteMaterials(out,capacity);
     entered=0;return result;
+}
+
+int ME_EnableAudio(void) { if(attempted)return 0;ME_AudioEnable();return 1; }
+size_t ME_CopyAudio(void *out,size_t capacity)
+{
+    if(!ready || failed)return 0;
+    entered=1;if(setjmp(error_boundary)){entered=0;return 0;}
+    size_t result=ME_WriteAudio(out,capacity);entered=0;return result;
 }

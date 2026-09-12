@@ -4,12 +4,14 @@ import AVFoundation
 // Original DMX unsigned PCM converted once to a common native mixer format.
 final class SoundPlayer {
     let engine = AVAudioEngine()
-    private let voices = (0..<16).map { _ in AVAudioPlayerNode() }
+    private let voices: [AVAudioPlayerNode]
     private var buffers: [Int:AVAudioPCMBuffer] = [:]
     private let format = AVAudioFormat(standardFormatWithSampleRate:44100,channels:1)!
     var volume: Float { get { engine.mainMixerNode.outputVolume } set { engine.mainMixerNode.outputVolume=max(0,min(1,newValue)) } }
     private(set) var scheduledSounds = 0
-    init(wad: WAD, offline: Bool = false, onlyLumps: Set<String>? = nil) throws {
+    init(wad: WAD, offline: Bool = false, onlyLumps: Set<String>? = nil, voiceCount: Int = 16) throws {
+        guard (1...32).contains(voiceCount) else { throw PortError("Invalid sound channel count.") }
+        voices=(0..<voiceCount).map { _ in AVAudioPlayerNode() }
         for (index,lump) in wad.lumps.enumerated() where lump.name.hasPrefix("DS") && (onlyLumps == nil || onlyLumps!.contains(lump.name)) {
             if let buffer = try Self.decode(lump.bytes,format:format) { buffers[index] = buffer }
         }
@@ -45,6 +47,17 @@ final class SoundPlayer {
         if active { if !engine.isRunning { try engine.start() } }
         else if engine.isRunning { engine.pause() }
     }
+    func prepare(lumps:Set<Int>,wad:WAD) throws {
+        for index in lumps where buffers[index]==nil {
+            guard wad.lumps.indices.contains(index),let buffer=try Self.decode(wad.lumps[index].bytes,format:format) else { throw PortError("Unsupported preview sound sample.") }
+            buffers[index]=buffer
+        }
+    }
+    func update(channel:Int,volume:Float,pan:Float) {
+        guard voices.indices.contains(channel) else { return }
+        voices[channel].volume=volume;voices[channel].pan=pan
+    }
+    func stopAll() { voices.forEach{$0.stop()} }
     func drain() {
         var event = MD_SoundEvent()
         while MD_PopSound(&event) != 0 { play(event) }

@@ -5,7 +5,7 @@ Requires Apple Silicon and macOS 14 or later. This is an early preview.
 
 ## Install
 
-The current local development app is **0.10.0 build 133**, ad-hoc signed and
+The current local development app is **0.10.0 build 135**, ad-hoc signed and
 unnotarized. No new release package was produced. The previous **0.9.0 build 124**
 distribution was separately Developer ID signed, accepted by Apple and stapled.
 GitHub workflow assets remain unnotarized. For unnotarized previews, macOS may
@@ -16,15 +16,15 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.10.0 — Rust development foundations
 
-Final successful local build: **133**.
+Final successful local build: **135**.
 
-Build 133 extends the explicit [Rust preview](EXTENDED_PREVIEW.md) with engine-timed
-wall/flat animation and cached scene resources. Camera/sprite updates reuse the
-world mesh when geometry is unchanged; moving sectors still rebuild it. All
-sixteen maps pass scene checks, with exact animation-phase and cache tests.
-Actors, weapons, firing controls and ammo status remain available. Audio,
-palette/translucency effects and full gameplay remain ahead; the normal picker
-keeps its Rust guard. The worker also has ordered sessions and required ID24 fields.
+Build 135 adds native [sound effects](EXTENDED_AUDIO.md) to the explicit Rust
+preview. Actual worker events drive firing, charge/impact, pickup, switch and
+moving-sector samples, with stereo positioning and a Sound toggle. Manual batches
+retain event spacing; music and synchronized continuous play remain ahead.
+All sixteen scene checks, actual Rust weapon PCM and classic audio regressions
+pass. Actors, weapons, animated materials and cached scene updates remain available.
+The ordinary picker still rejects Rust pending full campaign/save acceptance.
 
 ANIMATED and SWITCHES now drive engine material animation and native switch
 texture preload, including pairs without SW1/SW2 names. SIGIL II's flame sequence

@@ -68,3 +68,8 @@ ME_API size_t ME_CopyPresentation(void *out, size_t capacity);
 
 /* MMT1 animation translations, same whole-buffer semantics as geometry. */
 ME_API size_t ME_CopyMaterials(void *out, size_t capacity);
+
+/* Opt in before initialization. Headless probes remain capture-free by default. */
+ME_API int ME_EnableAudio(void);
+/* MSA1 FIFO: NULL/undersized queries preserve events; a complete copy drains. */
+ME_API size_t ME_CopyAudio(void *out,size_t capacity);

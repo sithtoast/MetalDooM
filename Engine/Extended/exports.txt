@@ -8,3 +8,5 @@ _ME_CopyGeometry
 _ME_CopyView
 _ME_CopyPresentation
 _ME_CopyMaterials
+_ME_EnableAudio
+_ME_CopyAudio
