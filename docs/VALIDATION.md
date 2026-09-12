@@ -1,5 +1,35 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 132: native Rust actor and weapon frames
+
+`scripts/test-extended-worker.sh original-doom2.wad /path/to/rerelease` passes
+complete-copy C canaries, worker request/error/deadline/cancellation checks, all
+sixteen scene/material/sky and actor/weapon decodes at startup/tic 35, eight
+camera-relative rotations and mirrored pairs, and nine malformed MSP1 packets.
+Actual Rust test rooms decode 16 Incinerator frames (ammo 20→16, up to four visible
+projectiles) and 31 full-charge Blade frames (ammo 70→20, separate flash, up to
+15 visible actors). Absent TNT1 invisible helpers do not contribute to presentation
+counts. Log: `build/presentation132-validation.log`.
+
+`scripts/test-rust-worker.sh` passes the full MBF21/private-symbol/session/ID24/
+all-map/weapon suite with nine private exports (`build/rust132-validation.log`).
+`scripts/test.sh /Users/wmh/Downloads/doom2.wad` passes all 32 classic maps,
+502 materials and 1381 sprite/HUD patches (`build/classic132-validation.log`).
+
+The explicit preview build succeeds (`build/build132.log`) at
+`build/actor-preview/MetalDooM.app`. Host deep/strict signature verification and
+bundled Info.plist confirm 0.10.0/build 132; CUA confirms the running title.
+Native visual checks cover classic MAP01 monsters/pistol/Minimal HUD, Rust MAP01's
+corpse and raised pistol at tic 35, and firing/muzzle flash at tic 70 with ammo
+50→47. MAP16's starting switch at tic 5 opens the surrounding geometry by tic 40;
+the resulting world/sprite/weapon scene is left awaiting manual input.
+
+These checks do not prove every monster/new-gun animation, palette/TRANMAP
+translucency, fake-floor clipping, weapon bob/interpolation, audio or continuous
+play. New Rust guns have automated decoding evidence only. Full campaign, saves
+and moving-world performance remain ahead. Prior preview bundles and the primary
+0.9.0 release are preserved; no upload or distribution package was produced.
+
 ## 2026-09-12 — 0.10.0 build 131: isolated worker and native Rust world preview
 
 `scripts/test-extended-worker.sh original-doom2.wad /path/to/rerelease` passes:

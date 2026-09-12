@@ -62,3 +62,6 @@ typedef struct {
     char sky[9];
 } ME_View;
 ME_API int ME_CopyView(ME_View *out);
+
+/* MSP1 resolved sprite/weapon values, same whole-buffer semantics as geometry. */
+ME_API size_t ME_CopyPresentation(void *out, size_t capacity);

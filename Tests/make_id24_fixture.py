@@ -71,3 +71,6 @@ for name, things in {'rust-incinerator':[(*player,),(-110,0,0,2004,7)],
                      'rust-fuel':[(*player,),(-110,0,0,2047,7)],
                      'rust-tank':[(*player,),(-110,0,0,17,7)]}.items():
     write(name,replace_room(b''.join(struct.pack('<5h',*t) for t in things)))
+# Eight directional zombie views around a stationary player; Doom art only.
+positions=[(128,0),(128,128),(0,128),(-128,128),(-128,0),(-128,-128),(0,-128),(128,-128)]
+write('render-rotations',replace_room(b''.join(struct.pack('<5h',*t) for t in [(0,0,0,1,7)]+[(x,y,0,3004,7) for x,y in positions])))

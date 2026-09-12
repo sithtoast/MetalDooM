@@ -5,11 +5,11 @@ by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
 **Version 0.10.0 · experimental source preview · local builds are not notarized.**
 
-Build 131 adds an explicit [Rust world preview](docs/EXTENDED_PREVIEW.md): a
-separate simulation worker feeds actual map geometry and skies to the native Metal
-renderer. All sixteen maps pass textured-scene checks. This is a development
-preview without actors, weapons or audio; Rust gameplay remains unsupported in
-the ordinary picker. See the [remaining milestones](docs/LEGACY_OF_RUST.md).
+Build 132 adds actors and weapons to the explicit [Rust preview](docs/EXTENDED_PREVIEW.md):
+a separate simulation worker feeds map geometry, skies and named sprite frames
+to the native Metal renderer. Manual firing controls update weapon poses and ammo.
+All sixteen maps pass scene and sprite checks. Audio and full gameplay remain
+ahead; the ordinary picker still rejects Rust. See the [remaining milestones](docs/LEGACY_OF_RUST.md).
 The previous 0.9.0 build 124 was separately notarized; that release is preserved.
 
 This branch adds independently switchable AO, test/torch/projectile/muzzle

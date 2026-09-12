@@ -29,11 +29,11 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             renderer=try Renderer(view:view);view.delegate=renderer
             renderer.onError={ [weak self] error in self?.failed(error) }
             let controls=NSStackView();controls.orientation = .horizontal;controls.spacing=8
-            for (tag,title) in [(1,"Forward"),(2,"Back"),(3,"Turn left"),(4,"Turn right"),(6,"Use"),(5,"Step 1 second")] {
+            for (tag,title) in [(1,"Forward"),(2,"Back"),(3,"Turn left"),(4,"Turn right"),(6,"Use"),(7,"Fire"),(8,"Fire 1 second"),(5,"Step 1 second")] {
                 let button=NSButton(title:title,target:self,action:#selector(step(_:)));button.tag=tag;button.isEnabled=false
                 controls.addArrangedSubview(button);buttons.append(button)
             }
-            let caption=NSTextField(labelWithString:"World-only simulation preview · Actors, weapons and audio are not shown")
+            let caption=NSTextField(labelWithString:"Actor/weapon preview · Manual simulation · Audio and palette effects pending")
             caption.textColor = .secondaryLabelColor
             let stack=NSStackView(views:[controls,caption,status,view]);stack.orientation = .vertical;stack.alignment = .leading;stack.spacing=8
             stack.translatesAutoresizingMaskIntoConstraints=false;view.translatesAutoresizingMaskIntoConstraints=false
@@ -66,7 +66,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         queue.async { [self] in
             do {
                 guard let resources else { throw PortError("Preview resources unavailable.") }
-                _=try worker.tick(forward:tag==1 ? 25:tag==2 ? -25:0,turn:tag==3 ? 8192:tag==4 ? -8192:0,buttons:tag==6 ? 2:0,count:tag<=2 ? 8:tag==5 ? 35:1)
+                _=try worker.tick(forward:tag==1 ? 25:tag==2 ? -25:0,turn:tag==3 ? 8192:tag==4 ? -8192:0,buttons:tag==6 ? 2:(tag==7 || tag==8) ? 1:0,count:tag<=2 ? 8:(tag==5 || tag==8) ? 35:1)
                 let scene=try ExtendedScene(view:worker.geometry(),resources:resources)
                 DispatchQueue.main.async { [weak self] in self?.present(scene) }
             } catch { DispatchQueue.main.async { [weak self] in self?.failed(error) } }
@@ -76,7 +76,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         guard !closed else { return }
         do {
             try renderer.loadExtendedPreview(scene)
-            status.stringValue="Tic \(scene.view.tic) · \(scene.geometry.triangleCount.formatted()) triangles · Sky \(scene.view.sky) · Simulation health \(scene.view.health)"
+            status.stringValue="Tic \(scene.view.tic) · \(scene.geometry.triangleCount.formatted()) triangles · Sky \(scene.view.sky) · Health \(scene.view.health) · Ammo \(scene.view.presentation.ammo) · \(scene.view.presentation.actors.count) actors"
             buttons.forEach{$0.isEnabled=true}
         } catch { failed(error) }
     }

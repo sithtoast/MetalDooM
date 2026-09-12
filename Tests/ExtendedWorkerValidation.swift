@@ -29,8 +29,67 @@ import Foundation
             guard rejected, resources.signature=="PWAD" else { throw PortError("Resource identity mismatch accepted.") }
             let scene=try ExtendedScene(view:first,resources:resources)
             guard scene.geometry.triangleCount>0 else { throw PortError("Invalid scene.") }
+            guard !first.presentation.actors.isEmpty, first.presentation.weapons.count==1,
+                  scene.spritePatches.count>1 else { throw PortError("Missing initial actor/weapon presentation.") }
+            _=try worker.tick(count:35)
+            let active=try worker.geometry()
+            _=try ExtendedScene(view:active,resources:resources)
+            print("PASS sprite frames MAP\(map): \(active.presentation.actors.count) actors, \(active.presentation.weapons.count) weapon layers at tic 35")
             print("PASS Rust MAP\(map): \(scene.geometry.triangleCount) textured triangles, \(scene.images.count) materials, sky \(first.sky), eyeZ \(first.eyeZ)")
             worker.cancel()
+        }
+        let fixtures=executable.deletingLastPathComponent().appendingPathComponent("fixtures")
+        do {
+            let worker=ExtendedWorker()
+            let state=try worker.start(executable:executable,paths:[base,fixtures.appendingPathComponent("render-rotations.wad")],map:1,base:0,profile:0)
+            let names=["POSSA5","POSSA4A6","POSSA3A7","POSSA2A8","POSSA1","POSSA2A8","POSSA3A7","POSSA4A6"]
+            let flips=[0,1,1,1,0,0,0,0]
+            guard state.presentation.actors.count==8 else { throw PortError("Player/helper incorrectly included in sprite list.") }
+            for (index,sprite) in state.presentation.actors.enumerated() {
+                guard sprite.name==names[index],sprite.flags&1==flips[index] else { throw PortError("Incorrect directional sprite/flip at \(index): \(sprite.name).") }
+            }
+            worker.cancel();print("PASS eight camera-relative rotations and mirrored pairs")
+        }
+        for (fixture,weapon,hold) in [("rust-incinerator",5,12),("rust-blade-full",6,85)] {
+            let worker=ExtendedWorker(), files=paths+[fixtures.appendingPathComponent(fixture+".wad")]
+            _=try worker.start(executable:executable,paths:files,map:1,base:1)
+            let resources=try WAD(previewResources:files,baseIndex:1,profile:1,identity:worker.identity!)
+            let art=try Art(wad:resources)
+            _=try worker.tick(forward:25,count:3)
+            _=try worker.tick(buttons:UInt8(4 | (weapon<<3)))
+            _=try worker.tick(count:35);let ready=try worker.tick(count:35)
+            guard ready.presentation.readyWeapon==weapon else { throw PortError("Fixture weapon not ready.") }
+            var names=Set<String>(), weaponNames=Set<String>(), maxActors=0, flash=false, last=ready
+            for tic in 0..<hold+35 {
+                last=try worker.tick(buttons:tic<hold ? 1:0)
+                maxActors=max(maxActors,last.presentation.actors.count)
+                flash=flash || last.presentation.weapons.count==2
+                for sprite in last.presentation.actors+last.presentation.weapons where names.insert(sprite.name).inserted {
+                    guard let index=resources.spriteLumpIndex(sprite.name) else { throw PortError("Missing firing sprite: \(sprite.name)") }
+                    _=try art.patch(lump:index)
+                }
+                weaponNames.formUnion(last.presentation.weapons.map(\.name))
+            }
+            guard last.presentation.ammo<ready.presentation.ammo, maxActors>0, weaponNames.count>1 else { throw PortError("Weapon/projectile presentation did not advance.") }
+            print("PASS \(fixture) firing: \(names.count) decoded sprite frames, \(maxActors) visible actors, flash=\(flash), ammo \(ready.presentation.ammo)->\(last.presentation.ammo)")
+            worker.cancel()
+        }
+        do {
+            let original=try Data(contentsOf:executable.deletingLastPathComponent().appendingPathComponent("initial-presentation.msp"))
+            _=try ExtendedPresentation(data:original)
+            func mutate(_ offset:Int,_ value:UInt32)->Data {
+                var data=original
+                for i in 0..<4 { data[offset+i]=UInt8(truncatingIfNeeded:value>>(8*i)) }
+                return data
+            }
+            let invalid=[Data(original.prefix(31)),Data(original.dropLast()),original+Data([0]),
+                mutate(4,2),mutate(12,UInt32.max),mutate(16,3),mutate(28,1),mutate(32,0),mutate(32+28,16)]
+            for data in invalid {
+                var rejected=false
+                do { _=try ExtendedPresentation(data:data) } catch { rejected=true }
+                guard rejected else { throw PortError("Malformed sprite snapshot accepted.") }
+            }
+            print("PASS \(invalid.count) malformed sprite snapshot boundaries")
         }
         for mode in ["stall","oversize","sequence","truncated"] {
             let worker=ExtendedWorker(timeout:0.2), start=ProcessInfo.processInfo.systemUptime

@@ -44,6 +44,7 @@ struct WAD {
     let engineOrder: [Int32]
     let lumps: [Lump]
     let maps: [String]
+    private var previewSpriteLumps: [String:Int]? = nil
     private var previewFlatLumps: [String:Bytes]? = nil
     // Detect from the base IWAD resources, before any add-on can override them.
     // These campaign-specific patch sets also identify renamed original IWADs.
@@ -123,17 +124,21 @@ struct WAD {
         guard SHA256.hash(data:material).map({String(format:"%02x",$0)}).joined() == identity else { throw PortError("Preview resources differ from the worker session.") }
         url=files[baseIndex].url;signature="PWAD";sourceURLs=files.map(\.url);sourceData=files.flatMap(\.sourceData)
         lumps=files.flatMap(\.lumps);engineOrder=[];maps=[];campaign=nil;finalDoom=0;isKEXEdition=false
-        var flats:[String:Bytes]=[:]
+        var flats:[String:Bytes]=[:], spriteNames:[String:Int]=[:], offset=0
         for file in files {
-            var inFlats=false
-            for lump in file.lumps {
+            var inFlats=false, inSprites=false
+            for (index,lump) in file.lumps.enumerated() {
+                if ["S_START","SS_START"].contains(lump.name) { inSprites=true;continue }
+                if ["S_END","SS_END"].contains(lump.name) { inSprites=false;continue }
+                if inSprites && lump.bytes.count>0 { spriteNames[lump.name]=offset+index }
                 if ["F_START","FF_START"].contains(lump.name) { inFlats=true;continue }
                 if ["F_END","FF_END"].contains(lump.name) { inFlats=false;continue }
                 if inFlats && lump.bytes.count>0 { flats[lump.name]=lump.bytes }
             }
-            guard !inFlats else { throw PortError("Unclosed preview flat namespace.") }
+            guard !inFlats, !inSprites else { throw PortError("Unclosed preview resource namespace.") }
+            offset += file.lumps.count
         }
-        previewFlatLumps=flats
+        previewFlatLumps=flats;previewSpriteLumps=spriteNames
 
     }
     // One shared directory plan preserves native lump indices without copying
@@ -216,6 +221,7 @@ struct WAD {
     var isSigil: Bool { sourceURLs.count>1 && maps.contains("E5M1") && lump("E5TEXT") != nil }
     var displayFiles: String { sourceURLs.map(\.lastPathComponent).joined(separator:" + ") }
     var sigilStory: String { String(data:lump("E5TEXT")?.data ?? Data(),encoding:.utf8) ?? "" }
+    func spriteLumpIndex(_ name:String) -> Int? { previewSpriteLumps?[name] }
     func flatLump(_ name: String) -> Bytes? { previewFlatLumps.map { $0[name] } ?? lump(name) }
     func lump(_ name: String) -> Bytes? { lumps.last { $0.name == name }?.bytes }
     func mapLump(_ map: String, _ name: String) throws -> Bytes {

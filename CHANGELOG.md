@@ -4,6 +4,22 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust actor and weapon preview (build 132)
+
+- Draw native actor and weapon sprites from copied worker frame names, including
+  camera-relative rotations, mirrored pairs, fullbright and shadow flags. Keep
+  sprite resources separate from wall/flat namespaces and hide absent blank TNT1
+  helpers. Add Fire / Fire 1 second controls and ready-ammo/actor status.
+- Add bounded MSP1 snapshots to MVW2 replies; keep the engine isolated and cache
+  uploaded sprite patches. Validate complete-copy canaries, malformed packets,
+  all 16 Rust map scenes/frames, eight rotations and actual Incinerator/Blade
+  firing artwork. Prior MBF21/ID24/weapon and classic 32-map suites pass.
+- Build and verify native 0.10.0/build 132: classic Doom II monsters/pistol/HUD;
+  Rust MAP01 corpse, pistol, muzzle flash and ammo 50→47; MAP16 switch opening.
+  New Rust guns have automated decoding evidence only. Audio, palette/translucency,
+  continuous play and campaign/save acceptance remain ahead. Preserve older
+  previews and the normal picker guard. No push or release package.
+
 ## 0.10.0 refinement — Isolated Rust world preview (build 131)
 
 - Add an explicit development preview that renders actual Rust worlds/skies

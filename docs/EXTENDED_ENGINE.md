@@ -1,7 +1,8 @@
 # Experimental extended simulation worker
 
-The **0.10.0 build 131** development milestone includes copied shared geometry,
-explicit session planning, three Rust-required ID24 fields, and an explicit [native world preview](EXTENDED_PREVIEW.md), and headless tests with the actual Rust
+The **0.10.0 build 132** development milestone includes copied geometry and sprite
+frames, explicit session planning, three Rust-required ID24 fields, an explicit
+[native preview](EXTENDED_PREVIEW.md), and headless tests with the actual Rust
 patch/resources. The normal app still uses Chocolate Doom; its Rust rejection
 remains in place. **Legacy of Rust is not playable in the GUI yet.**
 
@@ -54,7 +55,7 @@ Profiles are explicit development choices:
   The copied session still reports the declared ID24 requirement. This profile
   does **not** advertise full ID24 conformance or silently relabel it as MBF21.
 
-The dylib exports exactly eight `ME_` functions, keeping both engine and helper
+The dylib exports exactly nine `ME_` functions, keeping both engine and helper
 symbols private. One `ME_Tick` consumes one 35 Hz command. Movement, attack/use
 and validated weapon-change bits are accepted; special command bits and invalid
 weapon indices fail. Player/actor snapshots copy values, messages and selected
@@ -68,7 +69,7 @@ can be attempted once. Fatal engine errors stay inside the guarded C call and
 invalidate the session; terminate the worker after completion/error to reclaim
 its allocations. There is no teardown/restart API or extended save format yet.
 The separate [preview worker protocol](EXTENDED_PREVIEW.md) now carries copied
-views/geometry. Do not load the dylib into the Swift app process.
+views/geometry and named actor/weapon frames. Do not load the dylib into the Swift app process.
 
 Simulation uses directly initialized defaults and an explicit seed, without
 reading the user's Woof config. Upstream code owns physics, actors, weapons,
@@ -135,12 +136,14 @@ mesh batches, and MAP13 XNOD references match independently decoded lump records
 
 Build 131 adds `ME_CopyView` and the [isolated worker/world preview](EXTENDED_PREVIEW.md).
 The development build option packages an independently signed helper/dylib. The
-native app now renders Rust world geometry and skies through copied process data;
-actors, weapons, audio and full presentation remain ahead. The classic app and
+native app renders Rust world geometry and skies through copied process data.
+Build 132 adds `ME_CopyPresentation`, the ninth private export, and native actor/
+weapon rendering with manual firing. See the [sprite contract](EXTENDED_SPRITES.md).
+Audio and complete presentation remain ahead. The classic app and
 normal picker remain unchanged. All older previews and the primary release are
 preserved. No package or upload.
 
-Next: actor/weapon snapshots and presentation, animated materials and efficient
+Next: animated materials and efficient
 moving-world updates, then audio and targeted real-monster/map-special parity.
 Campaign transitions, boss/secret exits, JSON presentation and versioned saves
 remain acceptance gates. Keep the ordinary GUI Rust guard until native campaign

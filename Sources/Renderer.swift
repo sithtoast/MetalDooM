@@ -282,6 +282,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var textures: [MaterialKey: MTLTexture] = [:]
     private var animatedIDs: [MaterialKey:Int32] = [:]
     private var animatedWalls: [Int32:MTLTexture] = [:], animatedFlats: [Int32:MTLTexture] = [:]
+    private var extendedPreview = false
     private var engineReady = false
     private var previousPlayer = MD_Player(), currentPlayer = MD_Player()
     private var accumulator: Double = 0
@@ -547,6 +548,22 @@ final class Renderer: NSObject, MTKViewDelegate {
         try uploadSkyGeometry(scene.geometry)
         map=copied.map;textures=cached;batches=loaded;sky=loadedSky
         position=SIMD2(scene.view.x,scene.view.y);eyeZ=scene.view.eyeZ;yaw=scene.view.angle;pitch=0
+        if sprites == nil { sprites=try SpriteRenderer(device:device,wad:scene.resources,preload:false) }
+        let actors=scene.view.presentation.actors.map { source -> MD_Thing in
+            var value=MD_Thing()
+            value.x=source.x;value.y=source.y;value.z=source.z;value.floorZ=source.floorZ;value.light=source.light
+            value.lump=Int32(scene.spriteIndices[source.name]!);value.flip=Int32(source.flags&1)
+            value.fullbright=source.flags&2 != 0 ? 1:0;value.shadow=source.flags&4 != 0 ? 1:0
+            value.doomedType=Int32(source.editor);return value
+        }
+        let weapons=scene.view.presentation.weapons.map { source -> MD_WeaponSprite in
+            var value=MD_WeaponSprite();value.x=source.x;value.y=source.y;value.light=source.light
+            value.lump=Int32(scene.spriteIndices[source.name]!);value.flip=Int32(source.flags&1)
+            value.fullbright=source.flags&2 != 0 ? 1:0;value.shadow=source.flags&4 != 0 ? 1:0;return value
+        }
+        try sprites?.setPreview(things:actors,weapons:weapons,images:scene.spritePatches)
+        extendedPreview=true;hud.tick=Int32(scene.view.tic)
+        hud.invisibility=weapons.contains{$0.shadow != 0} ? 129:0
         hudStyle = .minimal
     }
 
@@ -766,7 +783,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:batch.count)
             }
             encoder.setDepthStencilState(depth)
-            if let sprites, engineReady {
+            if let sprites, engineReady || extendedPreview {
                 encoder.setRenderPipelineState(sceneEffects.contains(.spriteLighting) && ambientOcclusion?.structure != nil
                     ? ambientOcclusion!.spritePipeline:spritePipeline)
                 do { try sprites.drawWorld(encoder:encoder,camera:position,yaw:yaw,fullbrightGain:hdrEnabled && hdrSpriteBoost ? 1.5:1) }
@@ -873,7 +890,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                     encoder.setRenderPipelineState(spritePipeline)
                 }
                 encoder.setFragmentBytes(&noPower,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
-                sprites.drawHUD(encoder:encoder,state:hud,width:width,height:height,percent:hudSizePercent,style:hudStyle,portrait:minimalHUDPortrait)
+                if !extendedPreview { sprites.drawHUD(encoder:encoder,state:hud,width:width,height:height,percent:hudSizePercent,style:hudStyle,portrait:minimalHUDPortrait) }
             }
         }
         encoder.endEncoding()

@@ -6,3 +6,4 @@ _ME_CopyError
 _ME_CopySession
 _ME_CopyGeometry
 _ME_CopyView
+_ME_CopyPresentation

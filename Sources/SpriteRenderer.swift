@@ -18,12 +18,14 @@ final class SpriteRenderer {
     private var patches: [Int:GPUPatch] = [:]
     private var hudPatches: [String:GPUPatch] = [:]
     private var things: [MD_Thing] = []
+    private var previewWeapons:[MD_WeaponSprite]?
     private let hudDepth: MTLDepthStencilState
-    init(device: MTLDevice, wad: WAD) throws {
+    init(device: MTLDevice, wad: WAD, preload: Bool = true) throws {
         self.device = device; art = try Art(wad:wad)
         let state = MTLDepthStencilDescriptor(); state.depthCompareFunction = .always; state.isDepthWriteEnabled = false
         guard let depth = device.makeDepthStencilState(descriptor:state) else { throw PortError("Cannot create HUD depth state.") }
         hudDepth = depth
+        if !preload { return }
         let names = ["STBAR","STARMS","STTPRCNT","STFDEAD0","STFGOD0"]
             + (0...9).flatMap { ["STTNUM\($0)","STYSNUM\($0)"] }
             + (2...7).map { "STGNUM\($0)" }
@@ -55,6 +57,10 @@ final class SpriteRenderer {
             if inSprites && lump.bytes.count > 0 { patches[index] = try upload(art.patch(lump:index)) }
         }
     }
+    func setPreview(things:[MD_Thing],weapons:[MD_WeaponSprite],images:[Int:PatchImage]) throws {
+        for (index,image) in images where patches[index] == nil { patches[index]=try upload(image) }
+        self.things=things;previewWeapons=weapons
+    }
     private func upload(_ patch: PatchImage) throws -> GPUPatch {
         let image = patch.image
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba8Unorm,width:image.width,height:image.height,mipmapped:false)
@@ -67,9 +73,11 @@ final class SpriteRenderer {
     }
     var hasFuzz: Bool { things.contains { $0.shadow != 0 } }
     func drawWorld(encoder: MTLRenderCommandEncoder, camera: SIMD2<Float>, yaw: Float, fuzz: Bool=false, fullbrightGain: Float=1) throws {
-        let count = Int(MD_CopyThings(nil,0,camera.x,camera.y))
-        if things.count != count { things = [MD_Thing](repeating:MD_Thing(),count:count) }
-        if count > 0 { _ = things.withUnsafeMutableBufferPointer { MD_CopyThings($0.baseAddress,Int32(count),camera.x,camera.y) } }
+        if previewWeapons == nil {
+            let count = Int(MD_CopyThings(nil,0,camera.x,camera.y))
+            if things.count != count { things = [MD_Thing](repeating:MD_Thing(),count:count) }
+            if count > 0 { _ = things.withUnsafeMutableBufferPointer { MD_CopyThings($0.baseAddress,Int32(count),camera.x,camera.y) } }
+        }
         let right = SIMD3(sin(yaw),0,cos(yaw))
         for thing in things where (thing.shadow != 0)==fuzz {
             guard let patch = patches[Int(thing.lump)] else { throw PortError("Missing sprite frame \(thing.lump).") }
@@ -94,8 +102,13 @@ final class SpriteRenderer {
         }
     }
     func drawWeapon(encoder: MTLRenderCommandEncoder, width: Double, height: Double, fuzz: Bool=false, overlay: Bool=false) {
-        var frames = [MD_WeaponSprite](repeating:MD_WeaponSprite(),count:2)
-        let count = frames.withUnsafeMutableBufferPointer { MD_CopyWeaponSprites($0.baseAddress,2) }
+        var frames:[MD_WeaponSprite]
+        let count:Int
+        if let previewWeapons { frames=previewWeapons;count=frames.count }
+        else {
+            frames=[MD_WeaponSprite](repeating:MD_WeaponSprite(),count:2)
+            count=Int(frames.withUnsafeMutableBufferPointer { MD_CopyWeaponSprites($0.baseAddress,2) })
+        }
         encoder.setDepthStencilState(hudDepth)
         var matrix = matrix_identity_float4x4
         encoder.setVertexBytes(&matrix,length:MemoryLayout<simd_float4x4>.stride,index:1)

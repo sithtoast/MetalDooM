@@ -4,18 +4,21 @@ import Darwin
 struct ExtendedView {
     let tic: Int, x: Float, y: Float, eyeZ: Float, angle: Float, health: Int, sky: String
     let geometry: ExtendedGeometry?
+    let presentation: ExtendedPresentation
     init(data: Data) throws {
         let bytes=Bytes(data:data); try bytes.check(0,44)
-        guard data.prefix(4) == Data("MVW1".utf8), try bytes.i32(40) == 0 else { throw PortError("Invalid worker view header.") }
-        let size=try bytes.i32(36)
-        guard size >= 0, data.count == 44+size else { throw PortError("Invalid worker geometry length.") }
+        guard data.prefix(4) == Data("MVW2".utf8) else { throw PortError("Invalid worker view header.") }
+        let size=try bytes.i32(36), spriteSize=try bytes.i32(40)
+        guard size >= 0, spriteSize>=32, data.count == 44+size+spriteSize else { throw PortError("Invalid worker geometry length.") }
         tic=try bytes.i32(4); health=try bytes.i32(24)
         guard tic >= 0 else { throw PortError("Invalid worker tic.") }
         x=Float(try bytes.i32(8))/65536; y=Float(try bytes.i32(12))/65536; eyeZ=Float(try bytes.i32(16))/65536
         angle=Float(UInt32(bitPattern:Int32(try bytes.i32(20)))) * 2 * .pi/4294967296
         sky=try bytes.name(28)
         guard !sky.isEmpty, data[28..<36].prefix(while:{$0 != 0}).allSatisfy({(33...126).contains($0)}) else { throw PortError("Invalid worker sky.") }
-        geometry=size == 0 ? nil:try ExtendedGeometry(data:Data(data.dropFirst(44)))
+        geometry=size == 0 ? nil:try ExtendedGeometry(data:Data(data[44..<44+size]))
+        presentation=try ExtendedPresentation(data:Data(data[(44+size)...]))
+        guard presentation.tic==tic else { throw PortError("Worker sprite/view tics differ.") }
         guard geometry == nil || geometry?.tic == tic else { throw PortError("Worker view and geometry tics differ.") }
     }
 }

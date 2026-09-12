@@ -23,12 +23,15 @@ static int state(uint32_t seq,int geometry) {
     if(!ME_CopyView(&view))return 0;
     size_t size=geometry?ME_CopyGeometry(NULL,0):0;
     if((geometry && !size) || size>160*1024*1024)return 0;
-    unsigned char *body=calloc(1,44+size); if(!body)return 0;
-    memcpy(body,"MVW1",4);put(body+4,view.tic);put(body+8,view.x);put(body+12,view.y);
+    size_t presentation=ME_CopyPresentation(NULL,0);
+    if(!presentation || size+presentation>160*1024*1024)return 0;
+    unsigned char *body=calloc(1,44+size+presentation); if(!body)return 0;
+    memcpy(body,"MVW2",4);put(body+4,view.tic);put(body+8,view.x);put(body+12,view.y);
     put(body+16,view.eye_z);put(body+20,view.angle);put(body+24,view.health);
-    memcpy(body+28,view.sky,8);put(body+36,(uint32_t)size); // 40..43 reserved zero
+    memcpy(body+28,view.sky,8);put(body+36,(uint32_t)size); put(body+40,(uint32_t)presentation);
     if(geometry && ME_CopyGeometry(body+44,size)!=size){free(body);return 0;}
-    int result=send_frame(seq,0,body,44+size);free(body);return result;
+    if(ME_CopyPresentation(body+44+size,presentation)!=presentation){free(body);return 0;}
+    int result=send_frame(seq,0,body,44+size+presentation);free(body);return result;
 }
 static unsigned number(const char *s) {
     char *end;errno=0;unsigned long v=strtoul(s,&end,10);
@@ -45,7 +48,7 @@ int main(int argc,char **argv) {
         .base_wad_index=number(argv[3]),.profile=number(argv[4]),.skill=number(argv[5]),
         .random_seed=1993,.wad_count=(uint32_t)(argc-6),.wad_paths=(const char *const *)argv+6};
     if(!ME_Init(&config)){char error[2048];ME_CopyError(error,sizeof(error));return fail(0,error);}
-    if(!state(0,1))return 1;
+    if(!state(0,1)){char e[2048];ME_CopyError(e,sizeof(e));return fail(0,e[0]?e:"Cannot copy initial presentation");}
     uint32_t expected=1;
     for(;;) {
         unsigned char header[16],payload[210];
@@ -65,7 +68,7 @@ int main(int argc,char **argv) {
                 if(!ME_Tick(&c)){char error[2048];ME_CopyError(error,sizeof(error));return fail(seq,error);}
             }
         } else if(op!=2 || length) return fail(seq,"Invalid request operation/body");
-        if(!state(seq,op==2))return 1;
+        if(!state(seq,op==2)){char e[2048];ME_CopyError(e,sizeof(e));return fail(seq,e[0]?e:"Cannot copy presentation");}
         expected++;
     }
 }

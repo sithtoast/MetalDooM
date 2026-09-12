@@ -18,7 +18,12 @@ with tempfile.TemporaryDirectory() as cache:
     for mode in ['sequence', 'length', 'operation', 'truncated', 'reserved', 'quit', 'eof']:
         p = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
-            assert read(p)[:2] == (0, 0)
+            initial = read(p)
+            assert initial[:2] == (0, 0) and initial[2][:4] == b'MVW2'
+            geometry, presentation = struct.unpack_from('<II', initial[2], 36)
+            sprite_data = initial[2][44+geometry:]
+            assert len(sprite_data) == presentation and sprite_data[:4] == b'MSP1'
+            (pathlib.Path(executable).parent / 'initial-presentation.msp').write_bytes(sprite_data)
             if mode == 'eof':
                 p.stdin.close()
                 assert p.wait(timeout=3) == 0

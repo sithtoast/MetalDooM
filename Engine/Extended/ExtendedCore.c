@@ -220,3 +220,12 @@ int ME_CopyView(ME_View *out)
     snprintf(out->sky,sizeof(out->sky),"%s",sky);
     return 1;
 }
+
+size_t ME_CopyPresentation(void *out, size_t capacity)
+{
+    if (!ready) return 0;
+    entered=1;
+    if (setjmp(error_boundary)) { entered=0; return 0; }
+    size_t result=ME_WritePresentation(out,capacity);
+    entered=0;return result;
+}
