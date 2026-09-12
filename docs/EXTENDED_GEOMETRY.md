@@ -1,4 +1,4 @@
-# Copied extended geometry — MGE2, build 146
+# Copied extended geometry — MGE3, build 151
 
 The experimental worker now supplies its decoded map to the same `DoomMap` and
 `Geometry` types used by the native renderer. `Sources/ExtendedGeometry.swift`
@@ -25,8 +25,8 @@ resources; its fingerprint accompanies the map.
 
 | Offset | Header field |
 | --- | --- |
-| 0 | Four bytes `MGE2` |
-| 4 | Format version 2 |
+| 0 | Four bytes `MGE3` |
+| 4 | Format version 3 |
 | 8 | Simulation tic |
 | 12 | Map number, 1–32 |
 | 16, 20, 24 | Current player x, y, angle |
@@ -38,7 +38,7 @@ Arrays immediately follow the 120-byte header:
 | Array | Bytes/record | Fields |
 | --- | --- | --- |
 | Vertices | 8 | x, y (engine simulation coordinates) |
-| Lines | 20 | vertex a, vertex b, flags, front side, back side |
+| Lines | 24 | vertex a, vertex b, flags, front side, back side, blend table ID (0–64) |
 | Sides | 36 | sector, x offset, y offset; upper/lower/middle names |
 | Sectors | 44 | floor, ceiling, light (0–255); floor/ceiling names; floor X/Y and ceiling X/Y offsets |
 | Segs | 16 | vertex a, vertex b, line, side (0/1) |

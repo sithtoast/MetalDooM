@@ -1,5 +1,49 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 151: translucent walls and palette effects
+
+Candidate: `build/wall-palette-preview/MetalDooM.app`; `build/build151.log`.
+Source and bundled version/build are 0.10.0/151. Host deep/strict verification
+passes for app/helper/dylib; eighteen private engine exports remain. The feature
+stays on its unreleased 0.10.0 version, ad-hoc signed without a release package.
+
+- `build/wall-palette-worker-validation.log` and final
+  `build/wall-palette-worker-final-validation.log`: default/custom/tagged wall
+  assignment, indexed meshes, restart and fresh restore; damage, bonus, berserk,
+  suit, invulnerability and light-amplification selection plus saved continuation;
+  twelve malformed blend/color packets and missing wall/palette/map references;
+  existing custom actor tables, sixteen maps, weapon, material, audio and protocol
+  cases. Final rerun includes the added resource-boundary cases.
+- `build/wall-palette-metal-validation.log`: Metal API validation; exact palette
+  flash/removal and fixed-map/translucent oracles; crossing wall/billboard ordering
+  with 27,403 actor-front and 28,122 wall-front pixels; previous 25,724 actor overlap
+  and 104,636 opaque-occluder checks. Twenty-one actual Rust reference images,
+  real HUD palette probes/removal, four scrolling/save frames and interpolation
+  endpoints pass without Metal errors.
+- `build/wall-palette-geometry-validation.log`: all32 original Doom II and all16
+  Rust maps, XNOD geometry and malformed snapshots with MGE3 line stride24.
+- `build/wall-palette-mesh-validation.log`: exact reference meshes, stable topology
+  over140 tics, selective changes and malformed cached data. An initial compile
+  overlapped a documentation-comment edit; the clean rerun passes.
+- `build/wall-palette-ui-native-validation.log`: all16 tracks/HUD states, native
+  MIDI PCM, controls and24 malformed MUI3 packets. Initial sandbox AVMIDIPlayer
+  initialization failed; the compiled test passes on the native host. Physical
+  speaker audibility was not separately established.
+- `build/wall-palette-save-validation.log`: all-map future-tic/keyframe regression,
+  copied-state/RNG/audio checks and save envelope/atomic file replacement.
+
+Final build151 launched on actual MAP01. Run, Up/Right, manual Forward/Turn/Step
+and Escape pause were exercised. World, pistol and HUD screenshot inspected;
+left paused at tic18, health100, ammo50, 283actors, Music/Sound enabled.
+Running title confirms151.
+The effect pixel evidence comes from controlled fixtures; full live campaign
+acceptance remains outstanding. Earlier bundles and paused sessions are preserved.
+
+MGE3/MBL3/MUI3 replace their earlier versions. MVW5/MSP4 and ABI2 stay unchanged.
+This engine change alters private-save fingerprints; keep old bundles for old
+saves. Remaining presentation limits are documented in EXTENDED_TRANSLUCENCY.md
+and EXTENDED_PALETTES.md.
+
 ## 2026-09-12 — 0.10.0 build 150: custom per-state actor tables
 
 Candidate: `build/custom-blend-preview/MetalDooM.app`; `build/build150.log`.

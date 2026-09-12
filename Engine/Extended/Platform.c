@@ -37,7 +37,7 @@
 boolean automapactive,EpiCustom,followplayer,full_sounds,hud_time_use,menu_pause_demos,menuactive,message_colorized,r_swirl,show_obituary_messages,show_pickup_messages=true,show_toggle_messages=true,snd_ambient,uncapped,wi_overlay;
 int ddt_cheating,idmusnum=-1,savepage,screenblocks=10,speedometer;
 secretmessage_t hud_secret_message;
-pal_change_t palette_changes;
+pal_change_t palette_changes = PAL_CHANGE_ON;
 const char *skill_strings[]={"Easy","Easy","Normal","Hard","Nightmare"};
 void AM_ApplyColors(boolean force){}
 void AM_SetMapCenter(fixed_t x,fixed_t y){}

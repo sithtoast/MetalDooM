@@ -1,4 +1,4 @@
-# Rust actor translucency — 0.10.0 build 150
+# Rust actor and wall translucency — 0.10.0 build 151
 
 The explicit Rust preview draws ordinary translucent actors, additive glowing
 actors and per-state custom blend tables. Opaque geometry and actors draw first;
@@ -10,21 +10,25 @@ Sprite cutouts discard pixels. Shadow/fuzz takes precedence.
 ABI 2 still has 18 exports, including `ME_CopyBlendTables`, with the existing
 whole-buffer convention: size query, untouched short buffer, complete copy, no
 simulation or random-number changes. MEQ1 operation 8 has an empty request and a
-bounded MBL2 response. Swift requests it once after startup/identity validation
-and retains it for subsequent views. Restart/Continue use the same resources;
-a fresh restore worker supplies its own tables.
+bounded MBL3 response. Swift requests it after startup/identity validation and
+refreshes it after Restart, Continue and restore before accepting the new view.
+Palettes and colormaps stay resource-owned; the wall-only bank suffix is rebuilt
+for each level so campaign traversal cannot accumulate obsolete tables.
 
 | Offset | Bytes | Meaning |
 | --- | --- | --- |
-| 0 | 4 | MBL2 magic |
-| 4 | 4 | Version 2, little-endian |
-| 8 | 4 | Palette size 768 |
+| 0 | 4 | MBL3 magic |
+| 4 | 4 | Version 3, little-endian |
+| 8 | 4 | PLAYPAL bytes, 768–196608, multiple of 768 |
 | 12 | 4 | Table count, 2–64 |
-| 16 | 768 | First PLAYPAL palette, RGB triples |
-| 784 | count × 65536 | Tables in stable ID order |
+| 16 | 4 | COLORMAP bytes, 256–65536, multiple of 256 |
+| 20 | 4 | Reserved zero |
+| 24 | PLAYPAL size | All RGB palettes |
+| after palettes | COLORMAP size | All 256-entry colormaps |
+| after colormaps | count × 65536 | Tables in ID order |
 
 IDs 1 and 2 are the engine's normal and additive tables. IDs 3–64 are per-state
-custom tables. Before level spawn, the worker scans patched states in index
+custom state or wall tables. Before level spawn, the worker scans patched states in index
 order, checks each referenced table against its cached WAD lump allocation and
 requires exactly 65536 bytes. Shared pointers receive one ID. All state tables,
 including those first used later, are registered up front. Distinct lumps with
@@ -33,9 +37,9 @@ identical bytes may have separate IDs. No engine pointers cross into Swift.
 Tables index `(background << 8) | foreground`. The engine loads a supplied
 TRANMAP or generates its normal default; it generates the additive table using
 its existing color-distance implementation. Wrong TRANMAP/custom table lengths
-and more than 62 custom tables fail at initialization. MBL2 is at most 4,195,088
-bytes; malformed magic, version, palette size, count and total length reject.
-MBL1 replies are no longer accepted.
+and more than 62 custom tables fail explicitly. MBL3 is at most 4,456,472
+bytes; malformed headers, sizes, counts and total lengths reject. Previous
+MBL versions reject. Every selected palette, colormap and wall ID must exist.
 
 MSP4/version 4 replaces MSP3 without changing the 32-byte header, 40-byte actor
 records or 24-byte weapon records. Low actor flags remain mirrored 1, fullbright
@@ -64,11 +68,28 @@ draws. Palette buffers and table/index textures are cached, not rebuilt per fram
 
 This adapts the engine's blend operations to the existing native RGB renderer.
 It does not claim software-renderer pixel parity: native lighting is still RGB,
-and palette/fixed-colormap powerups, translucent walls, fake-floor clipping and
-ordering between fuzz and translucent actors remain separate work. Weapons keep
+and fake-floor clipping and ordering between fuzz and translucent surfaces
+remain separate work. Palette/fixed-colormap support is described in
+[EXTENDED_PALETTES.md](EXTENDED_PALETTES.md). Weapons keep
 their existing opaque/fuzz paths. Classic engine actor rendering is unchanged.
 This engine change also changes private-save fingerprints; preserve earlier
 bundles for earlier saves.
+
+## Translucent walls
+
+MGE3 adds a blend ID (0–64) at byte 20 of each 24-byte line record. The worker
+registers engine-resolved `tranmap` pointers after level setup: this covers Boom
+special 260, tag-based assignment and custom 65536-byte wall table lumps. Only
+two-sided middle textures use the ID; upper, lower and one-sided walls stay
+opaque. Existing clipping, pegging, masked holes and animated texture selection
+are retained, and wall compositing preserves original palette indices.
+
+Translucent walls form a bounded vertical-plane BSP. Crossing walls and dynamic
+billboards split at those planes, giving them one back-to-front order with depth
+testing and no depth writes. This handles a wall crossing an actor rather than
+sorting both by their centers. Excessive subdivision fails explicitly. The
+existing fuzz pass remains separate. Custom per-object and weapon blending remain
+unimplemented.
 
 ## Validation
 

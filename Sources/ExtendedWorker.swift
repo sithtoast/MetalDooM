@@ -72,7 +72,7 @@ final class ExtendedWorker {
             guard let geometry=view.geometry, geometry.map.name == String(format:"MAP%02d",map) else { throw PortError("Worker returned the wrong map.") }
             identity=geometry.contentSHA256
             blendTables=try ExtendedBlendTables(data:exchange(operation:8,body:Data(),limit:ExtendedBlendTables.maxByteCount))
-            try blendTables?.validate(view.presentation)
+            try validateColors(view)
             view.blendTables=blendTables
             return view
         } catch { cancel(); throw error }
@@ -93,9 +93,18 @@ final class ExtendedWorker {
         let command:[UInt8]=[UInt8(bitPattern:forward),UInt8(bitPattern:side),UInt8(truncatingIfNeeded:angle),UInt8(truncatingIfNeeded:angle>>8),buttons,0]
         return try request(operation:1,body:Data((0..<count).flatMap{_ in command}))
     }
+    private func validateColors(_ view:ExtendedView) throws {
+        try blendTables?.validate(view.presentation,palette:view.ui.palette,fixed:view.ui.fixedMap,walls:view.geometry?.map.lines.map(\.blend) ?? [])
+    }
     private func request(operation:UInt32,body:Data) throws -> ExtendedView {
         do {
-            let view=try decodeView(exchange(operation:operation,body:body,limit:160*1024*1024+56))
+            let refresh=operation==4 || operation==7
+            if refresh {blendTables=nil}
+            var view=try decodeView(exchange(operation:operation,body:body,limit:160*1024*1024+56))
+            if refresh {
+                blendTables=try ExtendedBlendTables(data:exchange(operation:8,body:Data(),limit:ExtendedBlendTables.maxByteCount))
+                try validateColors(view);view.blendTables=blendTables
+            }
             if let geometry=view.geometry, geometry.contentSHA256 != identity { throw PortError("Worker session identity changed.") }
             return view
         } catch {cancel();throw error}
@@ -181,7 +190,7 @@ final class ExtendedWorker {
     }
     private func decodeView(_ body:Data) throws -> ExtendedView {
         var result=try ExtendedView(data:body,previousGeometry:previousGeometry)
-        try blendTables?.validate(result.presentation)
+        try validateColors(result)
         result.blendTables=blendTables
         if let geometry=result.geometry { previousGeometry=geometry }
         lastUI=result.ui

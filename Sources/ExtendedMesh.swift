@@ -62,7 +62,7 @@ final class ExtendedMesh {
         }
         let skyKey=MaterialKey(name:"F_SKY1",flat:true)
         let batches=vertices.filter{$0.key != skyKey}.map{Batch(material:$0.key,vertices:$0.value)}.sorted {
-            ($0.material.flat ? "F":"W")+$0.material.name < ($1.material.flat ? "F":"W")+$1.material.name
+            (($0.material.flat ? "F":"W")+$0.material.name,$0.material.blend) < (($1.material.flat ? "F":"W")+$1.material.name,$1.material.blend)
         }
         return (Geometry(batches:batches,skyVertices:vertices[skyKey] ?? []),changed)
     }

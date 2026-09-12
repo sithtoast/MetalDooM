@@ -47,7 +47,7 @@ another command and invalidating the session. Invalid lifecycle actions fail.
 ## Copied state and transition transaction
 
 MVW5's 56-byte header and payload order remain. Its required UI payload is now
-MUI2/version 2, 144 bytes; old UI packets reject. Original HUD/music fields through
+MUI3/version 3, 144 bytes; old UI packets reject. Original HUD/music fields through
 reserved offset 88 keep their offsets. New little-endian u32/i32 fields:
 
 | Offset | Value |
@@ -59,7 +59,7 @@ reserved offset 88 keep their offsets. New little-endian u32/i32 fields:
 | 120, 124 | Player secrets, total secrets |
 | 128 | Level tics, equal to the view tic |
 | 132 | Secret-exit flag, zero before completion |
-| 136, 140 | Reserved zeros |
+| 136, 140 | Selected PLAYPAL palette and fixed COLORMAP index; see EXTENDED_PALETTES.md |
 
 The Swift decoder checks phases, map/next-map ranges, counters, reserved bytes,
 phase/health agreement, tic consistency and copied geometry map identity.

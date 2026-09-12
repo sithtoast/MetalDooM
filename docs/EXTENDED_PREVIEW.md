@@ -1,4 +1,4 @@
-# Rust native preview — 0.10.0 build 150
+# Rust native preview — 0.10.0 build 151
 
 An explicit development preview now starts the extended simulation in a separate
 child process and draws its copied geometry with the existing native Metal world
@@ -19,8 +19,8 @@ simulation; displayed health/ammo are simulation state. No speedrun/upload work.
 The helper is packaged only with the explicit development build option:
 
 ```sh
-METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/custom-blend-preview" bash scripts/build.sh
-open -n "$PWD/build/custom-blend-preview/MetalDooM.app" --args \
+METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/wall-palette-preview" bash scripts/build.sh
+open -n "$PWD/build/wall-palette-preview/MetalDooM.app" --args \
   --rust-preview "/path/to/Ultimate Doom/rerelease" --map MAP01
 ```
 
@@ -83,7 +83,7 @@ The sprite renderer accepts copied records and caches uploaded patches; it never
 queries the classic engine in preview mode. See [sprite details](EXTENDED_SPRITES.md).
 Current
 physical floors/ceilings, side offsets and switch texture identities are copied;
-control-sector lighting, fake floors, sky transfers, per-object/wall translucency still need their full presentation adapters. Wall/flat animation
+control-sector lighting, fake floors, sky transfers, per-object translucency still need their full presentation adapters. Wall/flat animation
 uses the worker's current translation tables. See [materials and caching](EXTENDED_MATERIALS.md).
 Build 139 caches static clipping/stitching, updates affected wall/sector chunks,
 and retains unchanged Metal material buffers. MAP13's 140-tic worker/CPU mean
@@ -121,8 +121,9 @@ paths. Every request/reply header is 16 bytes, little-endian:
 
 Operations: 1 ticks (1–35 six-byte commands); 2 geometry (empty body); 3 graceful
 quit (empty body/reply); 4 lifecycle action (u32: 0 restart, 1 continue).
-Operation 8 copies the immutable [MBL2 blend tables](EXTENDED_TRANSLUCENCY.md)
-with an empty request; Swift fetches them once at startup. Operations 5–7 carry
+Operation 8 copies the [MBL3 blend/color tables](EXTENDED_TRANSLUCENCY.md)
+with an empty request; Swift fetches them at startup and refreshes after level
+changes and restore. Operations 5–7 carry
 campaign metadata and private Save/Restore (see their linked contracts).
 Lifecycle replies force complete geometry at tic zero. Tick batches stop early
 at death/completion. Commands carry signed forward/side bytes, signed LE16
@@ -131,9 +132,9 @@ byte or command terminates the session with a bounded error reply.
 
 Startup and geometry replies carry an `MVW5` body: magic, tic, fixed x/y/eye-z,
 unsigned Doom angle, signed health, eight-byte sky name, geometry byte count,
-sprite byte count, material byte count, audio byte count, UI byte count (56 bytes total), then optional [MGE2](EXTENDED_GEOMETRY.md),
+sprite byte count, material byte count, audio byte count, UI byte count (56 bytes total), then optional [MGE3](EXTENDED_GEOMETRY.md),
 required [MSP4](EXTENDED_SPRITES.md), [MMT1](EXTENDED_MATERIALS.md) and
-[MSA1](EXTENDED_AUDIO.md) and [MUI2](EXTENDED_LIFECYCLE.md). Tick replies
+[MSA1](EXTENDED_AUDIO.md) and [MUI3](EXTENDED_LIFECYCLE.md). Tick replies
 include geometry when changed and always include sprite/material/UI state and drained sound events. Old body versions reject. Swift checks envelope size/
 sequence/status, view/geometry/sprite/material/audio/UI tic agreement, map identity and stable content identity. Maximum reply
 is 160 MiB + 56 bytes; errors are at most 2048 bytes. Startup/requests have a
@@ -184,4 +185,7 @@ Music control and pause/fire/weapon behavior are recorded in VALIDATION.md.
 Build 145 adds Save…/Load… controls; see [save/restore](EXTENDED_SAVES.md) for
 state coverage, engine/resource compatibility and validation.
 
-Build 146 renders scrolling floors/ceilings using MGE2; see EXTENDED_SCROLLING.md.
+Build 146 introduced scrolling floors/ceilings using MGE2; see EXTENDED_SCROLLING.md.
+
+Build 151 adds translucent walls and palette/fixed-colormap effects. See
+EXTENDED_TRANSLUCENCY.md and EXTENDED_PALETTES.md for contracts and limits.

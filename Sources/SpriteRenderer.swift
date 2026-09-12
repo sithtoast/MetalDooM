@@ -104,6 +104,36 @@ final class SpriteRenderer {
         }
         return GPUPatch(texture:texture,indices:indices,width:Float(image.width),height:Float(image.height),left:Float(patch.left),top:Float(patch.top))
     }
+    private func worldVertices(_ thing:MD_Thing,patch:GPUPatch,yaw:Float,gain:Float)->[WorldVertex] {
+        let right=SIMD3(sin(yaw),0,cos(yaw))
+        let center = SIMD3(thing.x,thing.z,-thing.y)
+        let left = center-right*patch.left
+        // Doom's patch origins can put artwork below the object's feet.
+        // Unlike the software renderer, Metal's floor depth test clips it.
+        // Lift only the visual quad, retaining offsets above the live floor.
+        let bottom = max(patch.top-patch.height,thing.floorZ-thing.z)
+        let a = left+SIMD3(0,bottom,0), b = a+right*patch.width
+        let c = b+SIMD3(0,patch.height,0), d = a+SIMD3(0,patch.height,0)
+        let u0: Float = thing.flip != 0 ? patch.width : 0, u1: Float = thing.flip != 0 ? 0 : patch.width
+        let light = max(0.12,thing.light), fullbright = Float(thing.fullbright)*gain
+        func vertex(_ position: SIMD3<Float>, _ u: Float, _ v: Float) -> WorldVertex {
+            WorldVertex(position:SIMD4(position,1),uvLight:SIMD4(u,v,light,fullbright))
+        }
+        return [vertex(a,u0,patch.height),vertex(b,u1,patch.height),vertex(c,u1,0),
+                    vertex(a,u0,patch.height),vertex(c,u1,0),vertex(d,u0,0)]
+    }
+    func transparentActors(yaw:Float)throws->[TransparentPolygon] {
+        try things.indices.filter {!previewBlend.isEmpty && previewBlend[$0]>0 && things[$0].shadow==0}.map {i in
+            guard let p=patches[Int(things[i].lump)],let indices=p.indices else {throw PortError("Missing translucent actor patch")}
+            let v=worldVertices(things[i],patch:p,yaw:yaw,gain:1)
+            return TransparentPolygon(vertices:[v[0],v[1],v[2],v[5]],material:nil,texture:p.texture,indices:indices,blend:previewBlend[i],wall:false)
+        }
+    }
+    func bindBlend(_ index:Int,encoder:MTLRenderCommandEncoder)throws {
+        guard (1...blendTextures.count).contains(index) else {throw PortError("Missing transparent surface blend table")}
+        encoder.setFragmentTexture(blendTextures[index-1],index:2)
+        encoder.setFragmentBuffer(blendPalette,offset:0,index:3)
+    }
     var hasFuzz: Bool { things.contains { $0.shadow != 0 } }
     var hasTranslucency:Bool {zip(things,previewBlend).contains {$0.0.shadow==0 && $0.1>0}}
     func drawWorld(encoder: MTLRenderCommandEncoder, camera: SIMD2<Float>, yaw: Float, fuzz: Bool=false, translucent:Bool=false, fullbrightGain: Float=1) throws {
@@ -112,7 +142,6 @@ final class SpriteRenderer {
             if things.count != count { things = [MD_Thing](repeating:MD_Thing(),count:count) }
             if count > 0 { _ = things.withUnsafeMutableBufferPointer { MD_CopyThings($0.baseAddress,Int32(count),camera.x,camera.y) } }
         }
-        let right = SIMD3(sin(yaw),0,cos(yaw))
         var order=things.indices.filter { i in
             (things[i].shadow != 0)==fuzz && (fuzz || ((previewBlend.isEmpty ? 0:previewBlend[i])>0)==translucent)
         }
@@ -129,25 +158,12 @@ final class SpriteRenderer {
             guard let patch = patches[Int(thing.lump)] else { throw PortError("Missing sprite frame \(thing.lump).") }
             if translucent {
                 guard let indices=patch.indices else {throw PortError("Missing translucent sprite indices.")}
+                var kind:UInt32=0;encoder.setFragmentBytes(&kind,length:4,index:5)
                 encoder.setFragmentTexture(blendTextures[previewBlend[index]-1],index:2)
                 encoder.setFragmentTexture(indices,index:3)
                 encoder.setFragmentBuffer(blendPalette,offset:0,index:3)
             }
-            let center = SIMD3(thing.x,thing.z,-thing.y)
-            let left = center-right*patch.left
-            // Doom's patch origins can put artwork below the object's feet.
-            // Unlike the software renderer, Metal's floor depth test clips it.
-            // Lift only the visual quad, retaining offsets above the live floor.
-            let bottom = max(patch.top-patch.height,thing.floorZ-thing.z)
-            let a = left+SIMD3(0,bottom,0), b = a+right*patch.width
-            let c = b+SIMD3(0,patch.height,0), d = a+SIMD3(0,patch.height,0)
-            let u0: Float = thing.flip != 0 ? patch.width : 0, u1: Float = thing.flip != 0 ? 0 : patch.width
-            let light = max(0.12,thing.light), fullbright = Float(thing.fullbright)*fullbrightGain
-            func vertex(_ position: SIMD3<Float>, _ u: Float, _ v: Float) -> WorldVertex {
-                WorldVertex(position:SIMD4(position,1),uvLight:SIMD4(u,v,light,fullbright))
-            }
-            let vertices = [vertex(a,u0,patch.height),vertex(b,u1,patch.height),vertex(c,u1,0),
-                            vertex(a,u0,patch.height),vertex(c,u1,0),vertex(d,u0,0)]
+            let vertices=worldVertices(thing,patch:patch,yaw:yaw,gain:fullbrightGain)
             encoder.setVertexBytes(vertices,length:MemoryLayout<WorldVertex>.stride*6,index:0)
             encoder.setFragmentTexture(patch.texture,index:0)
             encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:6)

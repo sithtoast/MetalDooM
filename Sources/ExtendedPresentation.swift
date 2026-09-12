@@ -77,25 +77,30 @@ struct ExtendedInterpolation {
     }
 }
 
-/// Immutable palette-index tables copied once per worker, indexed background * 256 + foreground.
+/// Palette-index tables refreshed per level, indexed background * 256 + foreground.
 struct ExtendedBlendTables {
-    static let maxByteCount=16+768+64*65536
-    let palette:[UInt8], tables:[[UInt8]]
+    static let maxByteCount=24+256*768+256*256+64*65536
+    let palettes:[UInt8], colormaps:[UInt8], tables:[[UInt8]]
+    var palette:[UInt8] {Array(palettes.prefix(768))}
     var normal:[UInt8] {tables[0]}
     var additive:[UInt8] {tables[1]}
     init(data:Data) throws {
-        let b=Bytes(data:data);try b.check(0,16)
-        let count=try b.i32(12)
-        guard (2...64).contains(count),data.count==16+768+count*65536,data.prefix(4)==Data("MBL2".utf8),
-              try b.i32(4)==2,try b.i32(8)==768 else {throw PortError("Invalid blend table snapshot.")}
-        palette=Array(data[16..<784])
-        tables=(0..<count).map {Array(data[(784+$0*65536)..<(784+($0+1)*65536)])}
+        let b=Bytes(data:data);try b.check(0,24)
+        let count=try b.i32(12),colors=try b.i32(8),maps=try b.i32(16)
+        guard (2...64).contains(count),(768...256*768).contains(colors),colors%768==0,
+              (256...256*256).contains(maps),maps%256==0,data.count==24+colors+maps+count*65536,
+              data.prefix(4)==Data("MBL3".utf8),try b.i32(4)==3,try b.i32(20)==0 else {throw PortError("Invalid blend/color snapshot.")}
+        palettes=Array(data[24..<24+colors]);colormaps=Array(data[24+colors..<24+colors+maps])
+        let start=24+colors+maps
+        tables=(0..<count).map {Array(data[(start+$0*65536)..<(start+($0+1)*65536)])}
     }
-    func validate(_ presentation:ExtendedPresentation) throws {
-        guard presentation.actors.allSatisfy({$0.blendTable<=tables.count}) else {throw PortError("Actor references an absent blend table.")}
+    func validate(_ presentation:ExtendedPresentation,palette:Int=0,fixed:Int=0,walls:[Int]=[]) throws {
+        guard palette<palettes.count/768,fixed<colormaps.count/256,
+              presentation.actors.allSatisfy({$0.blendTable<=tables.count}),walls.allSatisfy({$0<=tables.count}) else {throw PortError("Missing blend table, palette or colormap.")}
     }
     func rgba(index:Int)->[UInt8] {
-        tables[index].flatMap { entry in
+        let palette=self.palette
+        return tables[index].flatMap { entry in
             let p=Int(entry)*3;return [palette[p],palette[p+1],palette[p+2],255]
         }
     }

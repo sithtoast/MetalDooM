@@ -5,23 +5,23 @@
 Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, branch
 **codex/legacy-of-rust**, based on fetched origin/main merge **afd7357**. Preserve
 `/Users/wmh/Dev/MetalDooM` and its release artifacts. Current feature version is
-**0.10.0**, final successful build **150**. This remains the same unreleased Rust
+**0.10.0**, final successful build **151**. This remains the same unreleased Rust
 feature; do not bump the minor version for each refinement.
 
-The explicit Rust preview now has **normal/additive/per-state actor translucency**, **camera/weapon interpolation during Run**, **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
+The explicit Rust preview now has **translucent walls and palette effects**, **normal/additive/per-state actor translucency**, **camera/weapon interpolation during Run**, **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
 plus death/restart and native completion/Continue,
 plus level MIDI, a minimal HUD, cached geometry, selective Metal updates, Run/Pause and keyboard/mouse controls,
 with one-tic world/actor/weapon/material/audio/UI presentation. Manual buttons show every
 tic too. Keep the ordinary Rust picker guard until full campaign acceptance.
 No speedrun/demo/upload work was requested; that idea remains a future aside.
 
-Read [translucency](docs/EXTENDED_TRANSLUCENCY.md), [interpolation](docs/EXTENDED_INTERPOLATION.md), [scrolling flats](docs/EXTENDED_SCROLLING.md), [save/restore](docs/EXTENDED_SAVES.md), [preview/process contract](docs/EXTENDED_PREVIEW.md),
+Read [palette effects](docs/EXTENDED_PALETTES.md), [translucency](docs/EXTENDED_TRANSLUCENCY.md), [interpolation](docs/EXTENDED_INTERPOLATION.md), [scrolling flats](docs/EXTENDED_SCROLLING.md), [save/restore](docs/EXTENDED_SAVES.md), [preview/process contract](docs/EXTENDED_PREVIEW.md),
 [campaign presentation](docs/EXTENDED_CAMPAIGN.md), [lifecycle](docs/EXTENDED_LIFECYCLE.md), [HUD/music](docs/EXTENDED_UI.md), [incremental geometry](docs/EXTENDED_MESH.md), [audio](docs/EXTENDED_AUDIO.md), [materials/cache](docs/EXTENDED_MATERIALS.md),
 [sprites](docs/EXTENDED_SPRITES.md), [geometry](docs/EXTENDED_GEOMETRY.md),
 [worker](docs/EXTENDED_ENGINE.md), [validation](docs/VALIDATION.md) and
 [roadmap](docs/LEGACY_OF_RUST.md).
 
-Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/custom-blend-preview" bash scripts/build.sh`.
+Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/wall-palette-preview" bash scripts/build.sh`.
 Launch with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
 Only the explicit option packages/signs the helper/dylib and notices. Standard
 builds remain classic. Ordered resources are id24res → Doom II → id1, base index 1;
@@ -48,6 +48,29 @@ diagnostics only. Finite steps allow natural sample tails; explicit pause stops
 voices/mixer. Closing/error cancels future work; termination reaps the child and
 removes scratch. Sound mute stops/skips voices; unmute only plays future starts.
 
+**Build 151 adds translucent middle walls and palette effects.** MGE3/version3
+keeps header120 and changes line stride to24, with blendID at20. MBL3/version3
+has header24, all PLAYPAL palettes, all COLORMAP bytes and the bounded 2–64 table
+bank (maximum 4,456,472 bytes). State tables keep their stable prefix; wall-only
+suffixes rebuild after level setup/Continue/restart/restore. The client refreshes
+op8 before accepting a new level. MUI3/version3 keeps144 bytes, selecting palette
+and fixed map at136/140. ABI2 remains18 exports; MVW5/MSP4 remain unchanged.
+
+Boom260 default/custom/tagged wall assignment comes from engine-resolved tranmap
+pointers. Only two-sided middle textures blend; original texture indices, holes,
+pegging and animation remain. A bounded vertical BSP splits crossing walls and
+billboards for a shared painter order. Fixed colormaps apply during world drawing;
+PLAYPAL flashes apply after HUD. Native RGB lighting still quantizes to the base
+palette; software lighting parity is not claimed. Per-object/weapon blending,
+fuzz/translucent ordering, fake-floor/control-sector/sky effects, actor/moving-
+surface interpolation and full campaign playthroughs remain.
+
+Current candidate: `build/wall-palette-preview/MetalDooM.app`, 0.10.0/build151;
+`build/build151.log`. Tests use `build/wall-palette-*-validation.log`; exact final
+native evidence is recorded in docs/VALIDATION.md. Preserve build150 and all older
+bundles, private saves and paused sessions. This engine change updates private
+save fingerprints; older saves require their matching older bundle.
+
 **Build 150 adds per-state custom actor blend tables.** MBL2/op8 supplies a
 bounded bank of 2–64 tables (normal/additive plus up to 62 custom WAD lumps).
 Engine initialization validates every patched state's table allocation/length,
@@ -57,7 +80,7 @@ forbidding additive16. IDs must exist in the session bank. State tables override
 opaque/fullbright/default flags; fuzz wins. Per-object custom tables still reject
 because the keyframe path does not serialize that pointer. No Vendor changes.
 
-Current candidate: `build/custom-blend-preview/MetalDooM.app`, 0.10.0/build150;
+Previous candidate: `build/custom-blend-preview/MetalDooM.app`, 0.10.0/build150;
 `build/build150.log`. Tests: `build/custom-blend-worker-validation.log`,
 `build/custom-blend-metal-validation.log`, `build/custom-blend-save-validation.log`.
 Host deep/strict signatures and 0.10.0/build150 running title pass. Actual MAP01

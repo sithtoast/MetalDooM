@@ -14,7 +14,7 @@ struct ExtendedGeometry {
         self.data=data
         let bytes=Bytes(data:data)
         try bytes.check(0,120)
-        guard data.prefix(4) == Data("MGE2".utf8), try bytes.i32(4) == 2 else {
+        guard data.prefix(4) == Data("MGE3".utf8), try bytes.i32(4) == 3 else {
             throw PortError("Unsupported worker geometry format.")
         }
         tic=try bytes.i32(8)
@@ -25,7 +25,7 @@ struct ExtendedGeometry {
             throw PortError("Invalid geometry content fingerprint.")
         }
         contentSHA256=String(decoding:hash,as:UTF8.self)
-        let counts=try (0..<7).map { try bytes.i32(28+$0*4) }, strides=[8,20,36,44,16,12,24]
+        let counts=try (0..<7).map { try bytes.i32(28+$0*4) }, strides=[8,24,36,44,16,12,24]
         var expected=120
         for (count,stride) in zip(counts,strides) {
             guard (0...1_000_000).contains(count) else { throw PortError("Excessive geometry count.") }
@@ -73,7 +73,8 @@ struct ExtendedGeometry {
             return (0..<counts[kind]).map { start+$0*strides[kind] }
         }
         let points=try records(0).map { try SIMD2(fixed($0),fixed($0+4)) }
-        let lines=try records(1).map { try Line(a:bytes.i32($0),b:bytes.i32($0+4),flags:unsigned($0+8),front:bytes.i32($0+12),back:bytes.i32($0+16)) }
+        let lines=try records(1).map { try Line(a:bytes.i32($0),b:bytes.i32($0+4),flags:unsigned($0+8),front:bytes.i32($0+12),back:bytes.i32($0+16),blend:bytes.i32($0+20)) }
+        guard lines.allSatisfy({(0...64).contains($0.blend)}) else {throw PortError("Invalid wall blend table ID")}
         let sides=try records(2).map { try Side(sector:bytes.i32($0),x:fixed($0+4),y:fixed($0+8),upper:name($0+12),lower:name($0+20),middle:name($0+28)) }
         let sectors=try records(3).map { try Sector(floor:fixed($0),ceiling:fixed($0+4),light:Float(bytes.i32($0+8)).clamped(0,255)/255,floorTexture:name($0+12),ceilingTexture:name($0+20),floorOffset:SIMD2(fixed($0+28),fixed($0+32)),ceilingOffset:SIMD2(fixed($0+36),fixed($0+40))) }
         let segs=try records(4).map { try Seg(a:bytes.i32($0),b:bytes.i32($0+4),line:bytes.i32($0+8),side:bytes.i32($0+12)) }

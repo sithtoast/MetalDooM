@@ -51,17 +51,22 @@ import Foundation
             let repeated=try worker.geometry()
             guard repeated.tic==0,repeated.blendTables?.additive==tables.additive else {throw PortError("Blend copy changed simulation or tables")}
             func words(_ values:[UInt32])->Data {Data(values.flatMap {v in (0..<4).map{UInt8(truncatingIfNeeded:v>>(8*$0))}})}
-            let packet=Data("MBL2".utf8)+words([2,768,2])+Data(tables.palette+tables.normal+tables.additive)
+            let packet=Data("MBL3".utf8)+words([3,UInt32(tables.palettes.count),2,UInt32(tables.colormaps.count),0])+Data(tables.palettes+tables.colormaps+tables.normal+tables.additive)
             _=try ExtendedBlendTables(data:packet)
             var cases=[Data(packet.prefix(15)),Data(packet.dropLast()),packet+Data([0])]
-            for (offset,value) in [(0,UInt32(0)),(4,1),(8,767),(12,65)] {
+            for (offset,value) in [(0,UInt32(0)),(4,1),(8,767),(12,65),(8,256*768+768),(16,255),(16,257),(16,256*256+256),(20,1)] {
                 var d=packet;d.replaceSubrange(offset..<offset+4,with:words([value]));cases.append(d)
             }
             for invalid in cases {
                 var rejected=false;do {_=try ExtendedBlendTables(data:invalid)}catch {rejected=true}
                 guard rejected else {throw PortError("Malformed blend packet accepted")}
             }
-            print("PASS exact TRANMAP bytes, separate additive table, actor selection, stable copied state and 7 malformed blend packets")
+            for (palette,fixed,walls) in [(tables.palettes.count/768,0,[Int]()),(0,tables.colormaps.count/256,[]),(0,0,[3])] {
+                var rejected=false
+                do {try tables.validate(initial.presentation,palette:palette,fixed:fixed,walls:walls)} catch {rejected=true}
+                guard rejected else {throw PortError("Missing wall/color resource accepted")}
+            }
+            print("PASS exact TRANMAP bytes, separate additive table, actor selection, stable copied state and 12 malformed blend packets")
         }
         do {
             let customPaths=[base,fixtures.appendingPathComponent("blend-custom.wad")]
@@ -102,6 +107,51 @@ import Foundation
             let state=try worker.start(executable:executable,paths:[base,fixtures.appendingPathComponent("blend-custom-max.wad")],map:1,base:0,profile:0)
             guard state.blendTables?.tables.count==64,state.presentation.actors.map(\.blendTable)==[64] else {throw PortError("Maximum valid blend bank failed")}
             print("PASS maximum 64-table bank and highest actor table ID")
+        }
+        for mode in ["default","custom","tagged"] {
+            let paths=[base,fixtures.appendingPathComponent("wall-"+mode+".wad")]
+            let worker=ExtendedWorker();defer{worker.close()}
+            let initial=try worker.start(executable:executable,paths:paths,map:1,base:0,profile:0)
+            let id=mode=="default" ? 1:3
+            guard initial.geometry!.map.lines[6].blend==id,initial.blendTables!.tables.count==(id==1 ? 2:3) else {throw PortError("Wall blend assignment failed")}
+            let resources=try WAD(previewResources:paths,baseIndex:0,profile:0,identity:worker.identity!)
+            let scene=try ExtendedScene(view:initial,resources:resources)
+            guard scene.geometry.batches.contains(where:{$0.material.blend==id && $0.vertices.count>0}),
+                  scene.images.filter({$0.key.blend>0}).values.allSatisfy({$0.paletteIndices != nil}) else {throw PortError("Missing indexed transparent wall geometry")}
+            let saved=try worker.save(),fresh=ExtendedWorker();defer{fresh.close()}
+            _=try fresh.start(executable:executable,paths:paths,map:1,base:0,profile:0)
+            let restored=try fresh.restore(saved),restart=try worker.advance(restart:true)
+            guard restored.geometry!.map.lines[6].blend==id,restart.geometry!.map.lines[6].blend==id,
+                  restored.blendTables!.tables==initial.blendTables!.tables else {throw PortError("Wall table save/restart failed")}
+            print("PASS \(mode) wall table, indexed geometry, restore and refreshed restart bank")
+        }
+        for mode in ["bonus","berserk","suit","invulnerable","light","damage"] {
+            let paths=[base,fixtures.appendingPathComponent("palette-"+mode+".wad")]
+            let worker=ExtendedWorker();defer{worker.close()}
+            let initial=try worker.start(executable:executable,paths:paths,map:1,base:0,profile:0)
+            guard initial.ui.palette==0,initial.ui.fixedMap==0 else {throw PortError("Spawn palette is not neutral")}
+            var state=initial,seen=false
+            for tic in 0..<35 {
+                state=try worker.tick(forward:tic<2 ? 25:0)
+                if state.ui.palette>0 {seen=true}
+            }
+            switch mode {
+            case "bonus":guard seen,state.ui.palette==0 else {throw PortError("Bonus palette/fade failed")}
+            case "berserk":guard state.ui.palette==3 else {throw PortError("Berserk palette failed")}
+            case "suit":guard state.ui.palette==13 else {throw PortError("Radiation palette failed")}
+            case "invulnerable":guard state.ui.fixedMap==32 else {throw PortError("Invulnerability colormap failed")}
+            case "light":guard state.ui.fixedMap==1 else {throw PortError("Light amplification colormap failed")}
+            default:guard state.ui.palette>0,state.ui.health<100 else {throw PortError("Damage palette failed")}
+            }
+            let saved=try worker.save(),fresh=ExtendedWorker();defer{fresh.close()}
+            _=try fresh.start(executable:executable,paths:paths,map:1,base:0,profile:0)
+            let loaded=try fresh.restore(saved)
+            guard loaded.ui.palette==state.ui.palette,loaded.ui.fixedMap==state.ui.fixedMap else {throw PortError("Restored color phase changed")}
+            for _ in 0..<35 {
+                let a=try worker.tick(),b=try fresh.tick()
+                guard a.ui.palette==b.ui.palette,a.ui.fixedMap==b.ui.fixedMap else {throw PortError("Restored palette continuation diverged")}
+            }
+            print("PASS \(mode) palette/colormap selection, fade and saved continuation")
         }
         for name in ["blend-bad-table","blend-custom-short","blend-custom-long","blend-custom-limit"] {
             let worker=ExtendedWorker();defer{worker.close()}

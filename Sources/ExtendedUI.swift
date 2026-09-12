@@ -4,10 +4,11 @@ struct ExtendedUI {
     let tic:Int,health:Int,armor:Int,weapon:Int,readyAmmo:Int,keys:UInt32,weapons:UInt32
     let ammo:[Int],maxAmmo:[Int],music:String,looping:Bool,musicGeneration:Int,ammoType:Int
     let phase:Int,map:Int,nextMap:Int,kills:Int,totalKills:Int,items:Int,totalItems:Int,secrets:Int,totalSecrets:Int,levelTics:Int,secretExit:Bool
+    let palette:Int,fixedMap:Int
     var playing:Bool { phase==0 }
     init(data:Data) throws {
         let b=Bytes(data:data)
-        guard data.count==144,data.prefix(4)==Data("MUI2".utf8),try b.i32(4)==2,try b.i32(88)==0 else { throw PortError("Invalid UI snapshot header/length") }
+        guard data.count==144,data.prefix(4)==Data("MUI3".utf8),try b.i32(4)==3,try b.i32(88)==0 else { throw PortError("Invalid UI snapshot header/length") }
         tic=try b.i32(8);health=try b.i32(12);armor=try b.i32(16);weapon=try b.i32(20);readyAmmo=try b.i32(24)
         let cards=try b.i32(28),owned=try b.i32(32),flags=try b.i32(76)
         musicGeneration=try b.i32(80);ammoType=try b.i32(84)
@@ -20,10 +21,11 @@ struct ExtendedUI {
         phase=try b.i32(92);map=try b.i32(96);nextMap=try b.i32(100)
         kills=try b.i32(104);totalKills=try b.i32(108);items=try b.i32(112);totalItems=try b.i32(116)
         secrets=try b.i32(120);totalSecrets=try b.i32(124);levelTics=try b.i32(128)
+        palette=try b.i32(136);fixedMap=try b.i32(140)
         let exit=try b.i32(132);secretExit=exit==1
         guard (0...3).contains(phase),(1...32).contains(map),phase==2 ? (1...32).contains(nextMap):nextMap==0,
               [kills,totalKills,items,totalItems,secrets,totalSecrets,levelTics].allSatisfy({$0>=0}),levelTics==tic,
-              (0...1).contains(exit),phase>=2 || exit==0,try b.i32(136)==0,try b.i32(140)==0,
+              (0...1).contains(exit),phase>=2 || exit==0,(0...255).contains(palette),(0...255).contains(fixedMap),
               phase != 0 || health>0,phase != 1 || health<=0 else {throw PortError("Invalid level lifecycle snapshot")}
         keys=UInt32(cards);weapons=UInt32(owned);looping=flags==1;music=String(decoding:name,as:UTF8.self)
     }

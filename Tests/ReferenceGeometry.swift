@@ -12,7 +12,7 @@ struct ReferenceGeometry {
             WorldVertex(position: SIMD4(p.x, height, -p.y, 1), uvLight: SIMD4(u,v,light,0))
         }
         func wall(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ bottom: Float, _ top: Float,
-                  _ side: Side, _ texture: String, _ light: Float, _ anchor: Float) {
+                  _ side: Side, _ texture: String, _ light: Float, _ anchor: Float,blend:Int=0) {
             guard top > bottom, texture != "-", !texture.isEmpty else { return }
             let length = simd_length(b-a), u = side.x
             let one = vertex(a,bottom,u,anchor-bottom+side.y,light)
@@ -22,7 +22,7 @@ struct ReferenceGeometry {
             // w marks directional walls; the fragment shader rejects the far side.
             var vertices = [one,two,three,one,three,four]
             for i in vertices.indices { vertices[i].uvLight.w = 1 }
-            groups[MaterialKey(name:texture,flat:texture == "F_SKY1"), default:[]] += vertices
+            groups[MaterialKey(name:texture,flat:texture == "F_SKY1",blend:blend), default:[]] += vertices
         }
         for line in map.lines {
             for isBack in [false,true] {
@@ -56,7 +56,7 @@ struct ReferenceGeometry {
                     let openingBottom = max(sector.floor,other.floor), openingTop = min(sector.ceiling,other.ceiling)
                     let anchor = bottomPegged ? openingBottom+height(side.middle) : openingTop
                     wall(a,b,max(openingBottom,anchor+side.y-height(side.middle)),
-                         min(openingTop,anchor+side.y),side,side.middle,light,anchor)
+                         min(openingTop,anchor+side.y),side,side.middle,light,anchor,blend:line.blend)
                 }
             }
         }

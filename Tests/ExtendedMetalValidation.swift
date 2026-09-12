@@ -48,7 +48,9 @@ func runMeshMetalValidation() throws {
         let normal=(0..<256).flatMap{bg in (0..<256).map{fg in UInt8((bg+2*fg)/3)}}
         let additive=(0..<256).flatMap{bg in (0..<256).map{fg in UInt8(min(255,bg+fg))}}
         let custom=(0..<256).flatMap{bg in (0..<256).map{fg in UInt8((2*bg+fg)/3)}}
-        let tables=try ExtendedBlendTables(data:Data("MBL2".utf8)+words([2,768,3])+Data(palette+normal+additive+custom))
+        let palettes=palette+(0..<256).flatMap{[UInt8($0),0,0]}
+        let maps=Array(UInt8(0)...UInt8(255))+Array(UInt8(0)...UInt8(255))+Array((UInt8(0)...UInt8(255)).reversed())
+        let tables=try ExtendedBlendTables(data:Data("MBL3".utf8)+words([3,UInt32(palettes.count),3,UInt32(maps.count),0])+Data(palettes+maps+normal+additive+custom))
         var images:[Int:PatchImage]=[:]
         // Distinct RGB control colors avoid invisible mask pixels where opaque
         // art equals the background; fullbright blending must use source indices.
@@ -116,6 +118,68 @@ func runMeshMetalValidation() throws {
         var shadow=near;shadow.shadow=1
         guard try draw([shadow],[2])==draw([shadow],[0]) else {throw PortError("Fuzz did not take precedence over translucency")}
         print("PASS native fullbright/shaded normal/additive/custom lookup pixels, \(overlap) overlapping pixels sorted both orders, cutouts, \(occluded) opaque actor pixels, wall occlusion and fuzz precedence")
+        renderer.validationColors(tables)
+        let neutral=try draw([],[])
+        renderer.validationColors(palette:1)
+        let flashed=try draw([],[])
+        var flashOracle=neutral
+        for p in stride(from:0,to:neutral.count,by:4) {
+            let index=UInt8((Int(neutral[p])+Int(neutral[p+1])+Int(neutral[p+2])+1)/3)
+            flashOracle[p]=0;flashOracle[p+1]=0;flashOracle[p+2]=index;flashOracle[p+3]=255
+        }
+        guard flashed==flashOracle else {throw PortError("Whole-frame palette lookup differs from oracle")}
+        renderer.validationColors()
+        guard try draw([],[])==neutral else {throw PortError("Palette removal did not restore exact pixels")}
+        renderer.validationColors(fixed:1);let lit=try draw([],[])
+        renderer.validationColors(fixed:2);let inverted=try draw([],[])
+        for p in stride(from:0,to:lit.count,by:4) {
+            guard inverted[p]==255-lit[p],inverted[p+1]==255-lit[p+1],inverted[p+2]==255-lit[p+2] else {throw PortError("Fixed colormap lookup differs from oracle")}
+        }
+        let mappedActors=try draw([near,far],[3,1])
+        var mappedOracle=inverted
+        for i in nearMask.indices where nearMask[i] || farMask[i] {
+            var color=Int(inverted[i*4])
+            if farMask[i] {color=(color+2*55)/3}
+            if nearMask[i] {color=(2*color+155)/3}
+            for c in 0..<3 {mappedOracle[i*4+c]=UInt8(color)}
+        }
+        guard mappedActors==mappedOracle else {throw PortError("Fixed colormap/translucency interaction differs from oracle")}
+        renderer.validationColors()
+        // This angled wall crosses the actor's billboard. Use opaque depth
+        // visibility to independently determine per-pixel blend order.
+        let wallImage=images[220]!,d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba8Unorm,width:32,height:64,mipmapped:false)
+        d.storageMode = .shared;d.usage = .shaderRead
+        let tex=renderer.device.makeTexture(descriptor:d)!
+        wallImage.image.rgba.withUnsafeBytes{tex.replace(region:MTLRegionMake2D(0,0,32,64),mipmapLevel:0,withBytes:$0.baseAddress!,bytesPerRow:128)}
+        d.pixelFormat = .r8Uint;let indexTexture=renderer.device.makeTexture(descriptor:d)!
+        wallImage.paletteIndices!.withUnsafeBytes{indexTexture.replace(region:MTLRegionMake2D(0,0,32,64),mipmapLevel:0,withBytes:$0.baseAddress!,bytesPerRow:32)}
+        func wallVertex(_ x:Float,_ y:Float,_ z:Float,_ u:Float,_ v:Float)->WorldVertex {WorldVertex(position:SIMD4(x,y,z,1),uvLight:SIMD4(u,v,1,1))}
+        let polygon=TransparentPolygon(vertices:[wallVertex(-32,0,-64,0,64),wallVertex(32,0,64,32,64),wallVertex(32,64,64,32,0),wallVertex(-32,64,-64,0,0)],material:nil,texture:tex,indices:indexTexture,blend:3,wall:true)
+        try renderer.validationWall(polygon,opaque:true)
+        let wallOnly=try draw([],[]),opaqueBoth=try draw([near],[0])
+        try renderer.validationWall(polygon)
+        let transparentBoth=try draw([near],[1])
+        var expected=background,frontActor=0,frontWall=0
+        for i in nearMask.indices {
+            let p=i*4,wall=wallOnly[p..<p+4] != background[p..<p+4],actor=nearMask[i]
+            if !wall && !actor {continue}
+            var color=(Int(background[p])+Int(background[p+1])+Int(background[p+2])+1)/3
+            let fg=(Int(wallOnly[p])+Int(wallOnly[p+1])+Int(wallOnly[p+2])+1)/3
+            let actorNear=opaqueBoth[p..<p+4]==nearOpaque[p..<p+4]
+            if wall && actor && actorNear {color=(2*color+fg)/3;color=(color+200)/3;frontActor+=1}
+            else if wall && actor {color=(color+200)/3;color=(2*color+fg)/3;frontWall+=1}
+            else if wall {color=(2*color+fg)/3}
+            else {color=(color+200)/3}
+            for c in 0..<3 {expected[p+c]=UInt8(color)}
+        }
+        guard frontActor>100,frontWall>100 else {throw PortError("Wall fixture did not cross the actor")}
+        guard transparentBoth==expected else {
+            let differences=zip(transparentBoth,expected).filter{$0 != $1}.count
+            throw PortError("Wall/actor BSP differs from per-pixel depth oracle in \(differences) bytes")
+        }
+        try renderer.validationWall(nil)
+        print("PASS palette flash/removal, exact fixed-colormap and blend interaction, crossing wall/actor order (\(frontActor) actor-front, \(frontWall) wall-front pixels)")
+
     }
     for number in [1,13,16] {
         let worker=ExtendedWorker();defer{worker.close()}
@@ -156,6 +220,19 @@ func runMeshMetalValidation() throws {
                         if x<width/2 {left+=1} else {right+=1}
                     }
                     guard left>20,right>20 else {throw PortError("Missing visible health/armor or weapon/ammo HUD")}
+                    renderer.validationColors(palette:1)
+                    let flash=try frame(view,renderer),colors=state.blendTables!.palettes
+                    let probes=stride(from:0,to:actual.count,by:4).filter{actual[$0..<$0+4] != hidden[$0..<$0+4]}.prefix(64)
+                    for p in probes {
+                        let rgb=[Int(actual[p+2]),Int(actual[p+1]),Int(actual[p])]
+                        let index=(0..<256).min {a,b in
+                            func distance(_ i:Int)->Int {(0..<3).reduce(0){sum,c in let d=rgb[c]-Int(colors[i*3+c]);return sum+d*d}}
+                            let da=distance(a),db=distance(b);return da==db ? a<b:da<db
+                        }!
+                        guard flash[p]==colors[768+index*3+2],flash[p+1]==colors[768+index*3+1],flash[p+2]==colors[768+index*3] else {throw PortError("HUD palette mapping failed")}
+                    }
+                    renderer.validationColors()
+                    guard try frame(view,renderer)==actual else {throw PortError("HUD palette removal changed pixels")}
                     print("PASS native \(width)x\(height) HUD pixels left \(left), right \(right), bottom-only composition and exact restoration")
                 }
                 guard actual==expected else {

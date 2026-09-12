@@ -1,6 +1,6 @@
 # Experimental extended simulation worker
 
-The **0.10.0 build 148** development milestone includes copied geometry, sprite
+The **0.10.0 build 151** development milestone includes copied geometry, sprite
 frames, material animations, sound events, HUD and level music, explicit session planning, three Rust-required ID24 fields, an explicit
 [native preview](EXTENDED_PREVIEW.md), and headless tests with the actual Rust
 patch/resources. The normal app still uses Chocolate Doom; its Rust rejection

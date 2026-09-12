@@ -1,9 +1,11 @@
 import Foundation
 import simd
 
-struct PixelImage { let width: Int, height: Int; let rgba: [UInt8] }
+struct PixelImage { let width: Int, height: Int; let rgba: [UInt8]; var paletteIndices:[UInt8]?=nil }
 struct PatchImage { let image: PixelImage; let left: Int, top: Int; var paletteIndices:[UInt8]? = nil }
-struct MaterialKey: Hashable { let name: String; let flat: Bool }
+struct MaterialKey: Hashable { let name: String; let flat: Bool; var blend:Int=0
+    var unblended:MaterialKey {MaterialKey(name:name,flat:flat)}
+}
 struct WorldVertex {
     var position: SIMD4<Float>
     var uvLight: SIMD4<Float>
@@ -91,6 +93,7 @@ final class Art {
         let width = try texture.u16(12), height = try texture.u16(14)
         guard width > 0, height > 0, width <= 4096, height <= 4096, width*height <= 4_194_304 else { throw PortError("Unsupported texture dimensions.") }
         var pixels = [UInt8](repeating: 0, count: width*height*4)
+        var indices=[UInt8](repeating:0,count:width*height)
         let count = try texture.u16(20)
         for i in 0..<count {
             let p = 22+i*10, xOrigin = try texture.i16(p), yOrigin = try texture.i16(p+2), patchIndex = try texture.u16(p+4)
@@ -115,13 +118,14 @@ final class Art {
                         let outputY = yOrigin+top+y
                         guard outputY >= 0, outputY < height else { continue }
                         let c = color(patch.data[cursor+3+y]), offset = (outputY*width+outputX)*4
+                        indices[offset/4]=patch.data[cursor+3+y]
                         pixels.replaceSubrange(offset..<offset+4, with: c)
                     }
                     cursor += length+4
                 }
             }
         }
-        return PixelImage(width: width, height: height, rgba: pixels)
+        return PixelImage(width: width, height: height, rgba: pixels,paletteIndices:indices)
     }
     func textureHeights() throws -> [String:Float] {
         try definitions.mapValues { Float(try $0.u16(14)) }
@@ -283,7 +287,7 @@ struct Geometry {
             WorldVertex(position: SIMD4(p.x, height, -p.y, 1), uvLight: SIMD4(u,v,light,0))
         }
         func wall(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ bottom: Float, _ top: Float,
-                  _ side: Side, _ texture: String, _ light: Float, _ anchor: Float) {
+                  _ side: Side, _ texture: String, _ light: Float, _ anchor: Float,blend:Int=0) {
             guard top > bottom, texture != "-", !texture.isEmpty else { return }
             let length = simd_length(b-a), u = side.x
             let one = vertex(a,bottom,u,anchor-bottom+side.y,light)
@@ -293,7 +297,7 @@ struct Geometry {
             // w marks directional walls; the fragment shader rejects the far side.
             var vertices = [one,two,three,one,three,four]
             for i in vertices.indices { vertices[i].uvLight.w = 1 }
-            groups[MaterialKey(name:texture,flat:texture == "F_SKY1"), default:[]] += vertices
+            groups[MaterialKey(name:texture,flat:texture == "F_SKY1",blend:blend), default:[]] += vertices
         }
         for index in lineIndices ?? Array(map.lines.indices) {
             let line=map.lines[index]
@@ -328,7 +332,7 @@ struct Geometry {
                     let openingBottom = max(sector.floor,other.floor), openingTop = min(sector.ceiling,other.ceiling)
                     let anchor = bottomPegged ? openingBottom+height(side.middle) : openingTop
                     wall(a,b,max(openingBottom,anchor+side.y-height(side.middle)),
-                         min(openingTop,anchor+side.y),side,side.middle,light,anchor)
+                         min(openingTop,anchor+side.y),side,side.middle,light,anchor,blend:line.blend)
                 }
             }
         }

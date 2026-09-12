@@ -78,7 +78,7 @@ int main(int argc,char **argv) {
         if((op==5 || op==6 || op==8) && !length) {
             size_t (*copy)(void *,size_t)=op==5 ? ME_CopyCampaign:op==6 ? ME_CopySave:ME_CopyBlendTables;
             size_t size=copy(NULL,0);
-            if(!size || size>(op==8 ? 4195088:op==5 ? 1024*1024:64*1024*1024)){char e[2048];ME_CopyError(e,sizeof(e));return fail(seq,e[0]?e:"Snapshot unavailable at this lifecycle phase");}
+            if(!size || size>(op==8 ? 4456472:op==5 ? 1024*1024:64*1024*1024)){char e[2048];ME_CopyError(e,sizeof(e));return fail(seq,e[0]?e:"Snapshot unavailable at this lifecycle phase");}
             void *body=malloc(size);if(!body)return fail(seq,"Snapshot allocation failed");
             if(copy(body,size)!=size){free(body);return fail(seq,"Cannot copy snapshot");}
             int sent=send_frame(seq,0,body,size);free(body);if(!sent)return 1;

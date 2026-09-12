@@ -245,7 +245,7 @@ struct Side: Equatable {
     let sector: Int, x: Float, y: Float
     let upper: String, lower: String, middle: String
 }
-struct Line: Equatable { let a: Int, b: Int, flags: Int, front: Int, back: Int }
+struct Line: Equatable { let a: Int, b: Int, flags: Int, front: Int, back: Int; var blend:Int=0 }
 struct Seg: Equatable { let a: Int, b: Int, line: Int, side: Int }
 struct Leaf: Equatable { let count: Int, first: Int; var sector: Int? = nil }
 struct Node: Equatable {

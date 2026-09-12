@@ -11,6 +11,7 @@ size_t ME_WritePresentation(void *out, size_t capacity);
 size_t ME_WriteMaterials(void *out, size_t capacity);
 size_t ME_WriteBlendTables(void *out, size_t capacity);
 void ME_InitBlendTables(void);
+void ME_LevelBlendTables(void);
 unsigned ME_BlendTableIndex(const unsigned char *table);
 
 void ME_AudioEnable(void);

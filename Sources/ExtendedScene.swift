@@ -43,7 +43,7 @@ final class ExtendedSceneBuilder {
         guard let copied, let geometry else { throw PortError("Preview requires initial geometry.") }
         for key in Set(geometry.batches.map(\.material)) {
             _=try image(key)
-            if let target=view.materials.translations[key] { _=try image(target) }
+            if let target=view.materials.translations[key.unblended] { _=try image(target) }
         }
         let sky=try image(MaterialKey(name:view.sky,flat:false))
         for sprite in view.presentation.actors+view.presentation.weapons where indices[sprite.name]==nil {

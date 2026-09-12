@@ -4,6 +4,23 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust translucent walls and palette effects (build 151)
+
+- Render default/custom/tagged translucent middle walls, preserving texture holes,
+  clipping and animation. Split crossing walls and actor billboards into a shared
+  draw order instead of sorting their centers.
+- Show damage/pickup flashes, berserk and radiation-suit palettes, invulnerability
+  and light amplification. Apply palette flashes to the HUD as well as the world,
+  and preserve effect timing through Save/Load.
+- Refresh wall blend resources across level changes and restore; validate copied
+  palette/colormap sizes and references. Keep the private ABI at eighteen exports.
+- Pass exact native Metal wall/actor and palette pixel checks, all-map geometry,
+  incremental mesh, worker, HUD/music and save regressions. Build and verify signed
+  0.10.0/build151 on actual MAP01 with movement, turning, stepping and Pause.
+- Keep this refinement on the same unreleased 0.10.0. Preserve older bundles/saves;
+  native lighting parity, fuzz/translucent ordering, further world effects and full
+  campaign playtesting remain. Local ad-hoc preview; no distribution or push.
+
 ## 0.10.0 refinement — Rust custom actor blend tables (build 150)
 
 - Render patched per-state translucency tables, including fullbright actors and

@@ -36,7 +36,7 @@ static void Flat(unsigned char **out, int index)
 size_t ME_WriteGeometry(void *out, size_t capacity)
 {
     const int counts[] = {numvertexes, numlines, numsides, numsectors, numsegs, numsubsectors, numnodes};
-    const size_t strides[] = {8,20,36,44,16,12,24};
+    const size_t strides[] = {8,24,36,44,16,12,24};
     size_t size = 120;
     for (int i = 0; i < 7; i++) {
         if (counts[i] < 0 || counts[i] > 1000000) I_Error("Excessive geometry count");
@@ -44,8 +44,8 @@ size_t ME_WriteGeometry(void *out, size_t capacity)
     }
     if (!out || capacity < size) return size;
     unsigned char *p = out;
-    memcpy(p,"MGE2",4); p += 4;
-    Word(&p,2); Word(&p,leveltime); Word(&p,gamemap);
+    memcpy(p,"MGE3",4); p += 4;
+    Word(&p,3); Word(&p,leveltime); Word(&p,gamemap);
     Word(&p,players[0].mo->x); Word(&p,players[0].mo->y); Word(&p,players[0].mo->angle);
     for (int i=0;i<7;i++) Word(&p,counts[i]);
     memcpy(p,ME_CurrentSession()->content_sha256,64); p += 64;
@@ -53,7 +53,7 @@ size_t ME_WriteGeometry(void *out, size_t capacity)
     for (int i=0;i<numlines;i++) {
         const line_t *l=&lines[i];
         Word(&p,l->v1-vertexes); Word(&p,l->v2-vertexes); Word(&p,l->flags);
-        Word(&p,l->sidenum[0]); Word(&p,l->sidenum[1]);
+        Word(&p,l->sidenum[0]); Word(&p,l->sidenum[1]); Word(&p,ME_BlendTableIndex(l->tranmap));
     }
     for (int i=0;i<numsides;i++) {
         const side_t *s=&sides[i];

@@ -22,6 +22,23 @@ extension Renderer {
         if reset {sprites=try SpriteRenderer(device:device,wad:resources,preload:false)}
         try sprites!.setPreview(things:things,weapons:[],images:images,blend:blend,tables:tables)
     }
+    func validationColors(_ tables:ExtendedBlendTables?=nil,palette:UInt32=0,fixed:Int32=0) {
+        if let tables {
+            extendedPalette=device.makeBuffer(bytes:tables.palettes,length:tables.palettes.count,options:.storageModeShared)
+            extendedColormaps=device.makeBuffer(bytes:tables.colormaps,length:tables.colormaps.count,options:.storageModeShared)
+        }
+        previewPaletteIndex=palette;hud.fixedColorMap=fixed
+    }
+    func validationWall(_ polygon:TransparentPolygon?,opaque:Bool=false)throws {
+        batches.removeAll{$0.material.name=="TESTWALL"}
+        transparentWorld=nil
+        guard let polygon else {return}
+        if opaque {
+            let v=polygon.vertices,triangles=(1..<v.count-1).flatMap{[v[0],v[$0],v[$0+1]]}
+            let buffer=device.makeBuffer(bytes:triangles,length:triangles.count*MemoryLayout<WorldVertex>.stride,options:.storageModeShared)!
+            batches.append(GPUBatch(vertices:buffer,texture:polygon.texture!,material:MaterialKey(name:"TESTWALL",flat:false),count:triangles.count))
+        } else {transparentWorld=try TranslucentWorld(walls:[polygon])}
+    }
     var validationPreviewBuffers:[MaterialKey:ObjectIdentifier] { Dictionary(uniqueKeysWithValues:batches.map{($0.material,ObjectIdentifier($0.vertices))}) }
 }
 ''')

@@ -50,7 +50,7 @@ size_t ME_WriteUI(void *out,size_t capacity) {
     for(int i=0;i<NUMCARDS;i++)if(player->cards[i])keys |= 1u<<i;
     for(int i=0;i<NUMWEAPONS;i++)if(player->weaponowned[i])weapons |= 1u<<i;
     int ammo=weaponinfo[player->readyweapon].ammo;
-    memcpy(p,"MUI2",4);p+=4;word(&p,2);word(&p,leveltime);
+    memcpy(p,"MUI3",4);p+=4;word(&p,3);word(&p,leveltime);
     word(&p,player->health);word(&p,player->armorpoints);word(&p,player->readyweapon);
     word(&p,ammo==am_noammo ? -1:player->ammo[ammo]);word(&p,keys);word(&p,weapons);
     for(int i=0;i<NUMAMMO;i++)word(&p,player->ammo[i]);
@@ -60,7 +60,18 @@ size_t ME_WriteUI(void *out,size_t capacity) {
     word(&p,phase);word(&p,gamemap);word(&p,phase==2 ? wminfo.next+1:0);
     word(&p,player->killcount);word(&p,totalkills);word(&p,player->itemcount);word(&p,totalitems);
     word(&p,player->secretcount);word(&p,totalsecret);word(&p,leveltime);
-    word(&p,phase>=2 && secretexit);word(&p,0);word(&p,0);
+    word(&p,phase>=2 && secretexit);
+    // Woof's normal gameplay palette selection (no menu/reduced-flash options).
+    // Rendering copies state; it must not decrement timers or advance RNG.
+    int damage=player->damagecount,palette=0;
+    if(player->powers[pw_strength]) {
+        int strength=12-(player->powers[pw_strength]>>6);
+        if(strength>damage)damage=strength;
+    }
+    if(damage>0)palette=1+MIN(7,(damage+7)>>3);
+    else if(player->bonuscount>0)palette=9+MIN(3,(player->bonuscount+7)>>3);
+    else if(player->powers[pw_ironfeet]>128 || (player->powers[pw_ironfeet]&8))palette=13;
+    word(&p,phase<2 ? palette:0);word(&p,phase<2 ? player->fixedcolormap:0);
     return size;
 }
 

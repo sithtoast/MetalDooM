@@ -78,7 +78,7 @@ import Foundation
                 try require(try cache.update(base).1.isEmpty,"Restored unchanged mesh uploaded")
                 // Cached decoder must reject bad dynamic references/names and
                 // fall back to validation when immutable wire geometry changes.
-                let bytes=Bytes(data:previous.data),sides=120+(try bytes.i32(28))*8+(try bytes.i32(32))*20
+                let bytes=Bytes(data:previous.data),sides=120+(try bytes.i32(28))*8+(try bytes.i32(32))*24
                 var bad=previous.data
                 for i in 0..<4 { bad[sides+i]=255 }
                 var rejected=false

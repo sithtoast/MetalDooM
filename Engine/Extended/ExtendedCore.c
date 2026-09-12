@@ -125,6 +125,7 @@ int ME_Init(const ME_Config *config)
     R_InitData(); ME_InitBlendTables(); P_Init();
     playeringame[0] = true; precache = false;
     G_InitNew((skill_t)(config->skill - 1), 1, config->map, false);
+    ME_LevelBlendTables();
     ready = 1;
     entered = 0;
     return 1;
@@ -281,6 +282,7 @@ int ME_Advance(uint32_t action) {
         if(wminfo.nextep!=0 || wminfo.next<0 || wminfo.next>=limit)I_Error("Next map is outside this campaign");
         G_NativeContinue();
     } else I_Error("Invalid level lifecycle action");
+    ME_LevelBlendTables();
     entered=0;return 1;
 }
 
@@ -298,5 +300,5 @@ size_t ME_CopySave(void *out,size_t capacity) {
 int ME_RestoreSave(const void *data,size_t size) {
     if(!ready || failed)return 0;
     entered=1;if(setjmp(error_boundary)){entered=0;return 0;}
-    int result=ME_ReadSave(data,size);entered=0;return result;
+    int result=ME_ReadSave(data,size);if(result)ME_LevelBlendTables();entered=0;return result;
 }

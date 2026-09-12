@@ -47,12 +47,12 @@ writing; a full copy writes exactly 144 bytes and never drains state or ticks th
 simulation. One initialized resource session per worker remains the lifetime rule; level
 restart/continue can now replace the world within it.
 
-MUI2 is version 2. Its original fields keep these offsets; all integers are
+MUI3 is version 3. Its original fields keep these offsets; all integers are
 little-endian 32-bit values:
 
 | Offset | Value |
 | ---: | --- |
-| 0 | Magic MUI2 |
+| 0 | Magic MUI3 |
 | 4 | Version 2 |
 | 8 | Simulation tic |
 | 12, 16 | Signed health and armor |
@@ -63,10 +63,10 @@ little-endian 32-bit values:
 | 68 | Eight-byte zero-padded music resource name |
 | 76, 80 | Loop flag 0/1 and positive music generation |
 | 84, 88 | Ammo type -1..3, reserved zero |
-| 92–140 | Lifecycle phase, maps, counters, time, secret-exit flag and reserved zeros; see EXTENDED_LIFECYCLE.md |
+| 92–140 | Lifecycle phase, maps, counters, time, secret-exit flag, palette and fixed colormap; see EXTENDED_LIFECYCLE.md |
 
 MVW5 extends the outer header to 56 bytes, adding UI byte count at offset 52.
-Payload order is optional MGE1, then required MSP1, MMT1, MSA1 and MUI2. All tics
+Payload order is optional MGE3, then required MSP4, MMT1, MSA1 and MUI3. All tics
 must agree; HUD health must agree with the view and ready weapon/ammo with MSP1.
 The Swift decoder also checks sizes, version, reserved bytes, bit ranges, inventory
 values, ammo-type/count agreement, and printable padded music names. Old outer
@@ -83,7 +83,7 @@ First run `scripts/test-extended-worker.sh original-doom2.wad rerelease-director
 then `scripts/test-extended-ui.sh original-doom2.wad rerelease-directory` with native
 Core Audio access. Tests cover all sixteen authoritative map tracks and MIDI
 durations, stable selection after 35 tics, initial HUD state, armor/two-key pickups,
-complete-copy canaries, twenty-four malformed MUI2 packets and inconsistent view tics.
+complete-copy canaries, twenty-four malformed MUI3 packets and inconsistent view tics.
 A short original MIDI fixture exercises real mixer PCM, nonloop/loop completion,
 pause/resume, independent enablement and unchanged classic backend preference.
 PCM proves generated output; physical speaker audibility is unverified.
@@ -93,3 +93,6 @@ optimized/reference geometry. The classic resolution/HUD suite checks original
 and minimal layouts, all six keys, portraits and resolution independence. Shared
 classic music tests check 35 tracks, native PCM, controller reset, pause/resume,
 mute and natural looping. See VALIDATION.md for logs and running-build evidence.
+
+Build 151 uses offsets 136/140 for selected palette/fixed colormap. See
+EXTENDED_PALETTES.md. ABI 2 currently exposes eighteen functions.
