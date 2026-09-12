@@ -200,7 +200,7 @@ struct ReferenceGeometry {
                 let height = ceiling ? sector.ceiling : sector.floor
                 for points in triangles {
                     let triangle = points.map { p in
-                        vertex(SIMD2<Float>(p),height,Float(p.x),Float(-p.y),max(0.12,sector.light))
+                        vertex(SIMD2<Float>(p),height,Float(p.x)+(ceiling ? sector.ceilingOffset.x:sector.floorOffset.x).truncatingRemainder(dividingBy:64),Float(-p.y)+(ceiling ? sector.ceilingOffset.y:sector.floorOffset.y).truncatingRemainder(dividingBy:64),max(0.12,sector.light))
                     }
                     groups[MaterialKey(name:name,flat:true),default:[]] += triangle
                 }

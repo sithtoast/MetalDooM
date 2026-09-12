@@ -1,10 +1,10 @@
-# Copied extended geometry — build 129
+# Copied extended geometry — MGE2, build 146
 
 The experimental worker now supplies its decoded map to the same `DoomMap` and
 `Geometry` types used by the native renderer. `Sources/ExtendedGeometry.swift`
 decodes copied bytes without linking or loading Woof into the app process.
-This build-129 milestone builds CPU mesh batches; it does **not** select Rust in the GUI,
-render a live Rust session, or establish complete Boom/ID24 presentation.
+Build 146 adds independent floor/ceiling offsets to the live preview. Full
+Boom/ID24 presentation remains incomplete; see EXTENDED_SCROLLING.md.
 
 ## Contract
 
@@ -14,7 +14,7 @@ session thread between ticks. NULL queries the required size. An undersized
 buffer is untouched and returns the required size. A successful full copy returns
 that size; zero means not ready or a guarded engine error. Discard output on error.
 No engine pointers, compiler padding, native `size_t`, or resource paths enter the
-snapshot. This is an experimental value format, not production IPC or a save.
+snapshot. This is an experimental value format, used by the private worker IPC; it is not a save.
 
 All words are little-endian 32-bit. Coordinates/heights/offsets are signed 16.16;
 angles use unsigned Doom binary angles. Indices are unsigned except missing line
@@ -25,8 +25,8 @@ resources; its fingerprint accompanies the map.
 
 | Offset | Header field |
 | --- | --- |
-| 0 | Four bytes `MGE1` |
-| 4 | Format version 1 |
+| 0 | Four bytes `MGE2` |
+| 4 | Format version 2 |
 | 8 | Simulation tic |
 | 12 | Map number, 1–32 |
 | 16, 20, 24 | Current player x, y, angle |
@@ -40,7 +40,7 @@ Arrays immediately follow the 120-byte header:
 | Vertices | 8 | x, y (engine simulation coordinates) |
 | Lines | 20 | vertex a, vertex b, flags, front side, back side |
 | Sides | 36 | sector, x offset, y offset; upper/lower/middle names |
-| Sectors | 28 | floor, ceiling, light (0–255); floor/ceiling names |
+| Sectors | 44 | floor, ceiling, light (0–255); floor/ceiling names; floor X/Y and ceiling X/Y offsets |
 | Segs | 16 | vertex a, vertex b, line, side (0/1) |
 | Subsectors | 12 | seg count, first seg, engine sector |
 | Nodes | 24 | x, y, dx, dy, right child, left child |

@@ -36,7 +36,7 @@ static void Flat(unsigned char **out, int index)
 size_t ME_WriteGeometry(void *out, size_t capacity)
 {
     const int counts[] = {numvertexes, numlines, numsides, numsectors, numsegs, numsubsectors, numnodes};
-    const size_t strides[] = {8,20,36,28,16,12,24};
+    const size_t strides[] = {8,20,36,44,16,12,24};
     size_t size = 120;
     for (int i = 0; i < 7; i++) {
         if (counts[i] < 0 || counts[i] > 1000000) I_Error("Excessive geometry count");
@@ -44,8 +44,8 @@ size_t ME_WriteGeometry(void *out, size_t capacity)
     }
     if (!out || capacity < size) return size;
     unsigned char *p = out;
-    memcpy(p,"MGE1",4); p += 4;
-    Word(&p,1); Word(&p,leveltime); Word(&p,gamemap);
+    memcpy(p,"MGE2",4); p += 4;
+    Word(&p,2); Word(&p,leveltime); Word(&p,gamemap);
     Word(&p,players[0].mo->x); Word(&p,players[0].mo->y); Word(&p,players[0].mo->angle);
     for (int i=0;i<7;i++) Word(&p,counts[i]);
     memcpy(p,ME_CurrentSession()->content_sha256,64); p += 64;
@@ -64,6 +64,8 @@ size_t ME_WriteGeometry(void *out, size_t capacity)
         const sector_t *s=&sectors[i];
         Word(&p,s->floorheight); Word(&p,s->ceilingheight); Word(&p,s->lightlevel);
         Flat(&p,s->floorpic); Flat(&p,s->ceilingpic);
+        Word(&p,s->floor_xoffs); Word(&p,s->floor_yoffs);
+        Word(&p,s->ceiling_xoffs); Word(&p,s->ceiling_yoffs);
     }
     for (int i=0;i<numsegs;i++) {
         const seg_t *s=&segs[i];

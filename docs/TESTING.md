@@ -171,3 +171,7 @@ file-envelope checks. `scripts/test-extended-save-app.sh /path/to/rerelease` nee
 a logged-in native Metal/audio session and tests worker replacement in the app.
 Use Save…/Load… in the packaged preview to verify actual dialog behavior. Saves
 require matching engine and WAD fingerprints; see [the contract](EXTENDED_SAVES.md).
+
+Rust scrolling: `scripts/test-extended-scroll.sh /path/to/rerelease` generates
+original floor/ceiling/carry fixtures; `scripts/test-extended-metal.sh` includes
+visible scrolling and saved-phase GPU readbacks. See EXTENDED_SCROLLING.md.

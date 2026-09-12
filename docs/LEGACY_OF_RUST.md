@@ -1,6 +1,6 @@
 # Legacy of Rust development and ID24 evidence
 
-Status: **0.10.0 build 145 native preview with Save/Load, restart, normal/secret transitions, animated intermissions, stories, credits, custom cast, HUD, music and sound; full Rust campaign support remains pending.**
+Status: **0.10.0 build 146 native preview with scrolling floors/ceilings, Save/Load, restart, normal/secret transitions, animated intermissions, stories, credits, custom cast, HUD, music and sound; full Rust campaign support remains pending.**
 First campaign acceptance remains fully playable bundled single-player Rust.
 Multiplayer and the online add-on catalog are outside scope. General ID24
 conformance is a separate target and must never be inferred from this campaign.

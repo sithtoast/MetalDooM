@@ -5,23 +5,23 @@
 Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, branch
 **codex/legacy-of-rust**, based on fetched origin/main merge **afd7357**. Preserve
 `/Users/wmh/Dev/MetalDooM` and its release artifacts. Current feature version is
-**0.10.0**, final successful build **145**. This remains the same unreleased Rust
+**0.10.0**, final successful build **146**. This remains the same unreleased Rust
 feature; do not bump the minor version for each refinement.
 
-The explicit Rust preview now has **Save/Load**, **animated intermissions, stories, credits and custom cast**,
+The explicit Rust preview now has **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
 plus death/restart and native completion/Continue,
 plus level MIDI, a minimal HUD, cached geometry, selective Metal updates, Run/Pause and keyboard/mouse controls,
 with one-tic world/actor/weapon/material/audio/UI presentation. Manual buttons show every
 tic too. Keep the ordinary Rust picker guard until full campaign acceptance.
 No speedrun/demo/upload work was requested; that idea remains a future aside.
 
-Read [save/restore](docs/EXTENDED_SAVES.md), [preview/process contract](docs/EXTENDED_PREVIEW.md),
+Read [scrolling flats](docs/EXTENDED_SCROLLING.md), [save/restore](docs/EXTENDED_SAVES.md), [preview/process contract](docs/EXTENDED_PREVIEW.md),
 [campaign presentation](docs/EXTENDED_CAMPAIGN.md), [lifecycle](docs/EXTENDED_LIFECYCLE.md), [HUD/music](docs/EXTENDED_UI.md), [incremental geometry](docs/EXTENDED_MESH.md), [audio](docs/EXTENDED_AUDIO.md), [materials/cache](docs/EXTENDED_MATERIALS.md),
 [sprites](docs/EXTENDED_SPRITES.md), [geometry](docs/EXTENDED_GEOMETRY.md),
 [worker](docs/EXTENDED_ENGINE.md), [validation](docs/VALIDATION.md) and
 [roadmap](docs/LEGACY_OF_RUST.md).
 
-Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/save-preview" bash scripts/build.sh`.
+Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/scroll-preview" bash scripts/build.sh`.
 Launch with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
 Only the explicit option packages/signs the helper/dylib and notices. Standard
 builds remain classic. Ordered resources are id24res → Doom II → id1, base index 1;
@@ -47,6 +47,25 @@ diagnostics only. Finite steps allow natural sample tails; explicit pause stops
 voices/mixer. Closing/error cancels future work; termination reaps the child and
 removes scratch. Sound mute stops/skips voices; unmute only plays future starts.
 
+**Build 146 adds scrolling floors and ceilings.** MGE2/version2 keeps header120
+and expands sectors to44 with floor/ceiling X/Y signed16.16 offsets. Decoder full/
+cached paths preserve them; classic Sector callers default to zero. Plane UVs use
+X+xoffs, -Y+yoffs modulo64, following upstream r_plane.c. Offset-only changes
+rebuild one sector flat chunk, preserving walls and BSP topology. Scroller state
+and phase already live in the keyframe save; restart clears them. Engine bytes
+changed, so build145 saves still require the preserved matching build145 app.
+
+Current candidate: `build/scroll-preview/MetalDooM.app`, 0.10.0/build146;
+`build/build146.log`. Host deep/strict signatures, plist and native title pass.
+Actual MAP01 is left paused at tic35/health100/ammo50 with Music/Sound enabled;
+the world/HUD screenshot is verified. See docs/VALIDATION.md for details. Preserve
+build145/save-preview and its paused saved session. Focused tests:
+`build/scroll-validation.log`, `build/scroll-mesh.log`, `build/scroll-metal.log`,
+`build/scroll-geometry.log`, `build/scroll-worker-regression.log` and
+`build/scroll-save-regression.log`. Remaining rendering work includes flat rotation,
+bob/interpolation, palette/translucency, control-sector/fake-floor/sky effects.
+Full actual campaign/boss playthroughs and ordinary picker acceptance remain ahead.
+
 **Build 145 adds private Rust Save/Load.** `ME_CopySave`/`ME_RestoreSave` bring
 ABI2 to 17 exports. MEQ1 op6 returns bounded JSON; op7 restores once into a fresh
 worker and returns full MVW5 state. `kf_file.c` is imported from the existing Woof
@@ -59,7 +78,7 @@ paused game. Inputs and sound tails clear, the selected music restarts, and the
 next audio tick follows the saved tick. Save is live-level only; Load works at
 death/completion too. No autosaves, demo recording, upload or cross-build promise.
 
-Current candidate: `build/save-preview/MetalDooM.app`, 0.10.0/build 145,
+Previous candidate: `build/save-preview/MetalDooM.app`, 0.10.0/build 145,
 `build/build145.log`. Host deep/strict signatures and plist/running title pass.
 Actual MAP01 Save… at tic35/ammo48, fire to tic70/ammo46, then Load… returns
 paused at tic35/ammo48 with matching world/weapon frame. Music/Sound remain on;
@@ -206,11 +225,11 @@ max 28.16 ms; static topology builds once across 140 changing snapshots. Native
 scene loading separately averages **3.39 ms MAP13**, with 21/21 exact reference
 GPU images across MAP01/13/16. Initial prototype was 17.64 ms CPU; final sample
 had the live preview open. Do not present this as sustained full campaign rate.
-Full MGE1 copy/compare and whole changed-material uploads remain future costs.
+Full MGE2 copy/compare and whole changed-material uploads remain future costs.
 
 **Next: campaign and actual boss-playthrough acceptance**, alongside targeted monster/map
 special parity. Keep measuring actual continuous scenes before promising 35 tics/s
-across maps. Scrolling flats, interpolation/bob, palette/translucency/control-sector/
+across maps. Interpolation/bob, palette/translucency/control-sector/
 sky effects and actual boss-trigger playthroughs remain outstanding. Saves and
 animated campaign presentation are implemented above.
 
@@ -259,10 +278,10 @@ That earlier app was left **MAP01 tic 91, health 100, ammo 47, Sound on, Paused*
 Host process identity: app PID 40471, its bundled worker PID 40500.
 Run is ready for the user; do not automatically leave combat running.
 
-Worker ABI2 now has fifteen private exports, including ME_Advance lifecycle actions
-and ME_CopyCampaign presentation metadata.
-MUI2 carries HUD/music/lifecycle; existing structures and MGE1/MSP1/MMT1/MSA1 stay.
-MVW5 header56 includes UI size at52; payloads are optional MGE1 followed by required
+Worker ABI2 now has seventeen private exports, including lifecycle actions,
+campaign metadata and save/restore.
+MUI2 carries HUD/music/lifecycle; existing structures and MGE2/MSP1/MMT1/MSA1 stay.
+MVW5 header56 includes UI size at52; payloads are optional MGE2 followed by required
 MSP1/MMT1/MSA1/MUI2. Old outer versions reject. `ME_EnableAudio` precedes
 init; `ME_CopyAudio` drains only on complete copy, while UI copies never drain.
 One separate process owns each resource session and its successive levels; never
@@ -272,7 +291,7 @@ pitch, Euclidean attenuation and safe unlink positions. Capture consumes no RNG.
 Missing/invalid samples, ambient/random/loop definitions and overflow fail.
 Ambient playback remains absent; sound_events is requests, not audibility.
 
-Next complete scrolling flats, bob/interpolation, palette/TRANMAP translucency,
+Next complete bob/interpolation, palette/TRANMAP translucency,
 control-sector/fake-floor/sky effects, targeted monster/map-special parity, actual
 boss exits and remaining world presentation. Full campaign play remains unaccepted; use the
 explicit preview with bounded Restart/Continue mechanics for now.
@@ -284,7 +303,7 @@ Preserve all older candidates: `build/mesh-final` (139), `build/mesh-preview` (1
 `build/extended-milestone` (127), `build/MetalDooM.app` (126).
 The 0.9.0 build 124 release was separately notarized in a prior task (Apple request
 121f1db9-34a4-4f5f-aeb3-599a59de0727); release ZIP remains in primary checkout
-`build/releases/MetalDooM-0.9.0-build124/`. Builds 126–145 are ad-hoc signed,
+`build/releases/MetalDooM-0.9.0-build124/`. Builds 126–146 are ad-hoc signed,
 unnotarized and unpackaged. No push/publish/upload/Apple submission performed.
 
 The remaining sections are historical.

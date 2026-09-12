@@ -1,4 +1,4 @@
-# Rust native preview — 0.10.0 build 145
+# Rust native preview — 0.10.0 build 146
 
 An explicit development preview now starts the extended simulation in a separate
 child process and draws its copied geometry with the existing native Metal world
@@ -19,8 +19,8 @@ simulation; displayed health/ammo are simulation state. No speedrun/upload work.
 The helper is packaged only with the explicit development build option:
 
 ```sh
-METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/campaign-preview" bash scripts/build.sh
-open -n "$PWD/build/campaign-preview/MetalDooM.app" --args \
+METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/scroll-preview" bash scripts/build.sh
+open -n "$PWD/build/scroll-preview/MetalDooM.app" --args \
   --rust-preview "/path/to/Ultimate Doom/rerelease" --map MAP01
 ```
 
@@ -127,7 +127,7 @@ byte or command terminates the session with a bounded error reply.
 
 Startup and geometry replies carry an `MVW5` body: magic, tic, fixed x/y/eye-z,
 unsigned Doom angle, signed health, eight-byte sky name, geometry byte count,
-sprite byte count, material byte count, audio byte count, UI byte count (56 bytes total), then optional [MGE1](EXTENDED_GEOMETRY.md),
+sprite byte count, material byte count, audio byte count, UI byte count (56 bytes total), then optional [MGE2](EXTENDED_GEOMETRY.md),
 required [MSP1](EXTENDED_SPRITES.md), [MMT1](EXTENDED_MATERIALS.md) and
 [MSA1](EXTENDED_AUDIO.md) and [MUI2](EXTENDED_LIFECYCLE.md). Tick replies
 include geometry when changed and always include sprite/material/UI state and drained sound events. Old body versions reject. Swift checks envelope size/
@@ -179,3 +179,5 @@ Music control and pause/fire/weapon behavior are recorded in VALIDATION.md.
 
 Build 145 adds Save…/Load… controls; see [save/restore](EXTENDED_SAVES.md) for
 state coverage, engine/resource compatibility and validation.
+
+Build 146 renders scrolling floors/ceilings using MGE2; see EXTENDED_SCROLLING.md.

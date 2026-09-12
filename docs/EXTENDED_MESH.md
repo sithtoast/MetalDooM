@@ -2,7 +2,7 @@
 
 The preview retains a fixed map's BSP layout and updates the surfaces affected by
 current sector/side values. This build-139 optimization left simulation, ABI and
-wire layouts unchanged. Build 140 adds MUI1/MVW5; the MGE1 geometry format is unchanged. Every triangle is retained; the native comparison uses the old complete
+wire layouts unchanged. Build 140 adds MUI1/MVW5; build 146 adds MGE2 floor/ceiling offsets. Every triangle is retained; the native comparison uses the old complete
 mesh as its reference.
 
 ## Copied data and invalidation
@@ -10,7 +10,7 @@ mesh as its reference.
 `ExtendedGeometry` first validates header/length/count bounds. Against the previous
 valid snapshot it compares identity/counts and every vertex, line, seg, leaf and
 node byte. Exact matches reuse those already validated arrays. Only differing
-36-byte side and 28-byte sector records decode again; names and side-sector
+36-byte side and 44-byte sector records decode again; names and side-sector
 references still validate. Player/start metadata updates normally. A changed
 immutable record falls back to complete decoding/validation. Invalid cached data
 fails rather than inheriting the previous value. `reusedTopology` describes this
@@ -18,7 +18,8 @@ wire-array reuse; changed side-sector membership can still invalidate the mesh.
 
 `ExtendedMesh` checks actual static arrays and side-sector membership, caches one
 `GeometryTopology`, and builds one chunk per linedef plus one flat chunk per
-sector. A changed sector invalidates its flats and both sides of bordering lines;
+sector. An offset-only sector change invalidates its flats; other changed sector fields
+also invalidate both sides of bordering lines;
 a changed side invalidates every line that references it. This includes adjacent
 height-dependent upper/lower/middle walls, pegging, sky boundaries, light clamps
 and offsets. Static changes rebuild the topology cache. Missing resource behavior
@@ -62,7 +63,7 @@ at 0.40 ms mean on MAP01, 3.39 ms MAP13, 0.18 ms MAP16 (MAP13 max 4.15 ms).
 It retains 6,130 of 7,776 observed material buffers on MAP13 and renders seven
 sampled tics on each map against the frozen old full mesh: **all 21 images match
 pixel-for-pixel**. These samples are not sustained whole-campaign frame rates.
-The worker still copies/compares full MGE1 and sends it when anything changes;
+The worker still copies/compares full MGE2 and sends it when anything changes;
 changed materials still assemble/upload all of that material's vertices.
 
 Commands (private WAD inputs, generated outputs stay ignored):
@@ -92,6 +93,8 @@ Final app: `build/mesh-final/MetalDooM.app` (139), `build/build139.log`.
 Native MAP13 Step shows tic 12 then exactly 35, Run/E/F reaches tic 46/ammo 49,
 and Escape pauses at 280 with all 508,713 triangles and health 100.
 
-Music/HUD, scrolling flats, full ID24 palette/sky/control-sector presentation,
+Full ID24 palette/sky/control-sector presentation,
 interpolation, campaign routes/restarts and saves remain separate acceptance work.
 The normal picker still rejects Rust; no speedrun or upload work is included.
+
+Build 146 scrolling and native buffer/phase validation: EXTENDED_SCROLLING.md.

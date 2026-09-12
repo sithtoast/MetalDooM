@@ -31,7 +31,12 @@ final class ExtendedMesh {
         if initial { dirty=Set(chunks.indices) }
         else {
             for i in value.sectors.indices where map.sectors[i] != value.sectors[i] {
-                dirty.insert(map.lines.count+i);dirty.formUnion(sectorLines[i])
+                dirty.insert(map.lines.count+i)
+                let old=map.sectors[i],new=value.sectors[i]
+                if old.floor != new.floor || old.ceiling != new.ceiling || old.light != new.light ||
+                   old.floorTexture != new.floorTexture || old.ceilingTexture != new.ceilingTexture {
+                    dirty.formUnion(sectorLines[i])
+                }
             }
             for i in value.sides.indices where map.sides[i] != value.sides[i] { dirty.formUnion(sideLines[i]) }
         }

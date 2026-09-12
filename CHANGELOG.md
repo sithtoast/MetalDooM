@@ -4,6 +4,20 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust scrolling floors and ceilings (build 146)
+
+- Render independent floor and ceiling texture scrolling from engine-owned offsets,
+  including reversed directions and fractional phase. Preserve conveyor movement.
+- Update affected flat meshes while retaining wall buffers and BSP topology.
+  Pause freezes scrolling; restart resets it; saves restore the exact phase.
+- Extend the private geometry packet to MGE2, keeping classic callers at zero
+  offsets. Existing preview saves require their matching preserved engine build.
+- Validate five scroller fixtures, signed/fractional wrapping, saved continuation,
+  exact Metal reference/restored pixels and existing all-map geometry/worker/save
+  regressions. Verify native 0.10.0/build146 MAP01 at tic35 with the HUD intact.
+- Preserve build145 and prior bundles. Other rendering gaps and full campaign/boss
+  acceptance remain ahead; no ordinary picker change, WAD bundle or upload.
+
 ## 0.10.0 refinement — Rust save and restore (build 145)
 
 - Add Save…/Load… to the Rust preview, preserving inventory, actors, weapon state,

@@ -239,6 +239,7 @@ struct WAD {
 struct Sector: Equatable {
     let floor: Float, ceiling: Float, light: Float
     let floorTexture: String, ceilingTexture: String
+    var floorOffset: SIMD2<Float> = .zero, ceilingOffset: SIMD2<Float> = .zero
 }
 struct Side: Equatable {
     let sector: Int, x: Float, y: Float

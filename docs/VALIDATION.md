@@ -1,5 +1,48 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 146: Scrolling Rust floors/ceilings
+
+Final candidate: `build/scroll-preview/MetalDooM.app`; `build/build146.log`.
+Host deep/strict signature verification passes. Bundle plist and running window
+report 0.10.0/build146. Actual MAP01 Step 1 second reaches tic35, health100,
+ammo50 and283 actors; the native screenshot shows intact world, pistol and HUD.
+It remains paused with Music/Sound on. Build145 and its earlier save remain
+preserved. This local candidate is ad-hoc signed, unnotarized and unpackaged.
+
+- `build/scroll-validation.log`: five original rooms cover floor-only, ceiling-only,
+  combined, reverse-direction and carry scrollers. Check per-tic offset direction/
+  speed, signed/fractional periodic UVs, cached/full decode parity, one rebuilt flat
+  chunk per tick and no wall changes, idle copies, save phase/future continuation,
+  restart and MGE1 rejection. Texture-only scrolling leaves player position fixed;
+  carry still moves the player.
+- `build/scroll-metal.log`: real Metal readbacks for all four texture-scroll cases
+  differ from an identical stationary-flat scene, match full reference meshes,
+  and restore pixel-for-pixel from a save. Wall buffer identities remain unchanged.
+  At 1280x800, floor-only changes 837,941 bytes, ceiling-only 776,939, combined
+  1,614,880 and reverse 1,615,394. The existing 21 sampled MAP01/MAP13/MAP16 images
+  also match the reference; HUD hide/restore checks pass.
+- `build/scroll-mesh.log`: existing 140-tic cache/full-mesh comparisons and dynamic
+  sector/side/topology mutation tests pass, retaining one BSP build per map.
+- `build/scroll-geometry.log`: 32 classic Doom II and16 Rust maps, all XNOD reference
+  checks and14 malformed full/cached packet cases. Updated the old bad-version
+  fixture from version2 (now valid) to version3.
+- `build/scroll-worker-regression.log` and `build/scroll-save-regression.log` retain
+  all-map worker/render/audio/protocol checks, save continuation and malformed
+  file/copy boundaries with MGE2.
+
+Simulation already advanced scroller offsets; MGE1 omitted them. MGE2 carries
+four extra sector words. The plane UV signs follow pinned Woof r_plane.c; period64
+wrapping retains texture phase while reducing large UV additions. Constant and
+carry fixtures are covered; displacement/accelerative scrollers share these
+fields but do not yet have dedicated moving-control-sector tests. The classic
+Sector defaults stay zero. The full-mesh oracle retains its original triangulation
+with only the new plane-offset expression added.
+
+Remaining: flat rotation, interpolation/bob, palette/TRANMAP translucency,
+control-sector/fake-floor/sky effects, full boss/campaign playthrough acceptance,
+and ordinary picker support. No extras.wad or sibling-pack support is implied.
+See EXTENDED_SCROLLING.md for wire layout, lifecycle and compatibility limits.
+
 ## 2026-09-12 — 0.10.0 build 145: Native Rust save/restore
 
 Final candidate: `build/save-preview/MetalDooM.app`; `build/build145.log`.

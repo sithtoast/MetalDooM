@@ -4,6 +4,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ $# != 1 ]]; then echo "Usage: $0 rerelease-directory" >&2; exit 2; fi
 OUT="$PROJECT_DIR/build/extended-metal"
 mkdir -p "$OUT"
+python3 "$PROJECT_DIR/Tests/make_scroll_fixture.py" "$PROJECT_DIR/build/extended/fixtures"
 bash "$PROJECT_DIR/scripts/build-engine.sh" "$OUT/engine"
 python3 - "$PROJECT_DIR" "$OUT" <<'PY'
 from pathlib import Path
@@ -20,8 +21,10 @@ extension Renderer {
 ''')
 (out/'ExtendedScene.swift').write_text((root/'Sources/ExtendedScene.swift').read_text()+'''
 extension ExtendedScene {
-    func validationReference() throws -> ExtendedScene {
-        let reference=try ReferenceGeometry(map:copiedGeometry.map,textureHeights:Art(wad:resources).textureHeights())
+    func validationReference(stationaryFlats:Bool=false) throws -> ExtendedScene {
+        var map=copiedGeometry.map
+        if stationaryFlats {for i in map.sectors.indices {map.sectors[i].floorOffset = .zero;map.sectors[i].ceilingOffset = .zero}}
+        let reference=try ReferenceGeometry(map:map,textureHeights:Art(wad:resources).textureHeights())
         let full=Geometry(batches:reference.batches,skyVertices:reference.skyVertices)
         return ExtendedScene(view:view,resources:resources,copied:copiedGeometry,geometry:full,images:images,sky:sky,indices:spriteIndices,patches:spritePatches,changed:true,changedMaterials:Set(full.batches.map(\\.material)).union([MaterialKey(name:"F_SKY1",flat:true)]))
     }

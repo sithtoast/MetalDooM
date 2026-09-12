@@ -363,9 +363,15 @@ struct Geometry {
             for ceiling in [false,true] {
                 let name = ceiling ? sector.ceilingTexture : sector.floorTexture
                 let height = ceiling ? sector.ceiling : sector.floor
+                // Woof plane coordinates are world X + xoffs, -world Y + yoffs.
+                // Reduce the offset to one 64-texel period before adding it to
+                // world coordinates, retaining precision during long sessions.
+                let shift = ceiling ? sector.ceilingOffset : sector.floorOffset
+                let u = shift.x.truncatingRemainder(dividingBy:64)
+                let v = shift.y.truncatingRemainder(dividingBy:64)
                 for points in triangles {
                     let triangle = points.map { p in
-                        vertex(SIMD2<Float>(p),height,Float(p.x),Float(-p.y),max(0.12,sector.light))
+                        vertex(SIMD2<Float>(p),height,Float(p.x)+u,Float(-p.y)+v,max(0.12,sector.light))
                     }
                     groups[MaterialKey(name:name,flat:true),default:[]] += triangle
                 }

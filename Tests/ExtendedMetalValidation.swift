@@ -86,6 +86,33 @@ func runMeshMetalValidation() throws {
         guard reused>0 else { throw PortError("No Metal buffers reused") }
         print(String(format:"PASS MAP%02d: 7 exact GPU pixel comparisons to old full meshes; %d/%d material-buffer observations reused; native load mean %.2f ms, max %.2f ms",number,reused,total,loadTimes.reduce(0,+)/Double(loadTimes.count),loadTimes.max()!))
     }
+    for kind in ["floor","ceiling","both","reverse"] {
+        let scrollPaths=paths+[exe.deletingLastPathComponent().appendingPathComponent("fixtures/scroll-\(kind).wad")]
+        let worker=ExtendedWorker();defer{worker.close()}
+        let first=try worker.start(executable:exe,paths:scrollPaths,map:1,base:1)
+        let resources=try WAD(previewResources:scrollPaths,baseIndex:1,profile:1,identity:worker.identity!)
+        let builder=try ExtendedSceneBuilder(resources:resources)
+        let (window,view,renderer)=try surface(0),(otherWindow,otherView,other)=try surface(650)
+        defer{view.delegate=nil;otherView.delegate=nil;window.close();otherWindow.close()}
+        try renderer.loadExtendedPreview(builder.prepare(first))
+        let before=renderer.validationPreviewBuffers
+        let state=try worker.tick(),scene=try builder.prepare(state)
+        try renderer.loadExtendedPreview(scene);try other.loadExtendedPreview(scene.validationReference())
+        let actual=try frame(view,renderer)
+        guard actual == (try frame(otherView,other)) else {throw PortError("Scrolling GPU/reference mismatch")}
+        for (key,id) in before where !key.flat {guard renderer.validationPreviewBuffers[key]==id else {throw PortError("Scrolling uploaded wall buffer")}}
+        try other.loadExtendedPreview(scene.validationReference(stationaryFlats:true))
+        let stationary=try frame(otherView,other)
+        let changed=zip(actual,stationary).filter{$0 != $1}.count
+        guard changed>100 else {throw PortError("Scrolling did not visibly move the \(kind) material")}
+        let saved=try worker.save(),loaded=ExtendedWorker();defer{loaded.close()}
+        _=try loaded.start(executable:exe,paths:scrollPaths,map:1,base:1)
+        let restored=try loaded.restore(saved),restoredBuilder=try ExtendedSceneBuilder(resources:resources)
+        try other.loadExtendedPreview(restoredBuilder.prepare(restored))
+        guard actual == (try frame(otherView,other)) else {throw PortError("Saved scrolling frame did not restore exactly")}
+        print("PASS \(kind): \(changed) GPU bytes differ from stationary flats, exact reference/save pixels and retained wall buffers")
+    }
+
 }
 setbuf(stdout,nil)
 do { try runMeshMetalValidation() } catch { fputs("FAIL: \(error)\n",stderr);exit(1) }
