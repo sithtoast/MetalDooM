@@ -2,7 +2,7 @@
 
 The preview now draws the engine's current wall/flat animation translations.
 It retains decoded images, sprite patches, GPU textures and unchanged meshes
-within one fixed worker session. Simulation remains manually stepped.
+within one fixed worker session. Build 137 adds continuous one-tic playback and paced manual actions.
 
 ## MMT1 copied state
 
@@ -63,6 +63,6 @@ This removes redundant work on unchanged scenes, but is not a continuous-play
 performance claim. Worker geometry comparison is still linear in map size, and
 any geometry change rebuilds the whole mesh. Partial sector updates, scrolling
 flat offsets, control-sector effects, sky definitions, palette/translucency, music,
-campaign transitions and saves remain work ahead. Build 135 adds native
+campaign transitions and saves remain work ahead. Build 137 adds continuous playback; build 135 added native
 [sound effects](EXTENDED_AUDIO.md) via MVW4. See VALIDATION.md for final
 native checks and logs.

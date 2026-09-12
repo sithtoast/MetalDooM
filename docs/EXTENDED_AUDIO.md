@@ -1,6 +1,6 @@
-# Rust sound effects preview — build 135
+# Rust sound effects preview — build 137
 
-The manual Rust preview plays sound effects from the worker's actual gameplay
+The Rust development preview plays sound effects from the worker's actual gameplay
 calls, including pistol fire, Rust weapon charge/fire/impact, pickups, switches
 and moving sectors. The Sound checkbox starts enabled; turning it off stops
 current voices and suppresses new starts. Music remains pending.
@@ -55,21 +55,28 @@ optional MGE1, required MSP1, required MMT1, required MSA1. Aggregate payload st
 within 160 MiB. All snapshot tics must agree. Geometry queries do not replay audio
 already consumed by a tick reply; protocol versions are intentionally strict.
 
-## Native playback and manual timing
+## Native playback and scene timing
 
 The parent resolves names against its verified ordered resource view and lazily
 uses the existing DMX-to-44.1-kHz PCM decoder. Classic playback still defaults to
 16 voices; only the explicit preview requests 32. Stop and parameter-update
 records act on the corresponding native AVAudioPlayerNode.
 
-The scene displays the completed batch, then main-queue callbacks play its events
-at their copied offsets, spaced by 1/35 second. Command buttons wait for that
-batch's event timeline to finish, preventing a queue of overlapping simulations.
-The Sound checkbox stays usable. PCM tails finish naturally while simulation is
-stopped; this is manual sound audition, not synchronized continuous gameplay.
-Empty-event batches finish immediately. Closing/error increments a cancellation
-generation, stops voices and pauses the mixer; deferred callbacks cannot restart
-playback. No audio callback ticks the engine.
+The preview submits one simulation tic per request. Main-queue presentation applies
+that scene and its copied sound events together, before the next display refresh.
+`present` accepts startup tic zero followed by consecutive tics only; duplicate,
+stale or skipped replies fail. No delayed sound callback can fall behind a scene.
+Manual multi-tic buttons use the same pacing path and show intermediate frames.
+This is tic-aligned event delivery, not sample-accurate hardware synchronization.
+
+Run/Pause targets 35 tics/s with one request in flight; expensive updates slow the
+simulation without catch-up bursts. Explicit pause/focus loss stops voices and
+pauses the mixer. An already pending reply advances the audio cursor silently;
+resume permits future starts without replaying suppressed events. Finite manual
+actions allow natural sample tails after their last tic. Closing/errors cancel
+future wakeups and stop sound. No audio callback ticks the engine. The older
+`play` batch-audition method remains for diagnostics and retains cancellable timed
+callbacks; the preview no longer uses it.
 
 Mute explicitly stops/skips voices. An early gain-only offline test returned
 nonzero samples even when AVAudioMixer reported outputVolume=0; the final preview
@@ -93,3 +100,7 @@ DSINCBRN/DSINCFI1–2/DSINCHT1–3, Blade DSHETCHG/DSHETSHT/DSHETXPL, pickups, a
 DSSTNMOV/DSSWTCHN. A brief live pistol test measures the device-output tap; this
 proves output data, not physical speaker audibility. See VALIDATION.md for logs,
 final native controls and remaining limits.
+
+Build 137 adds native checks for one-tic scene/PCM delivery at the same exact
+pistol tics 39/53/67, duplicate rejection, a silent in-flight reply after pause,
+and subsequent mute/unmute/resume (`build/continuous136-audio-validation.log`).

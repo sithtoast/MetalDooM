@@ -1,6 +1,6 @@
 # Legacy of Rust development and ID24 evidence
 
-Status: **0.10.0 build 135 native preview with sound effects, material animation and scene reuse; Legacy of Rust is not playable yet.**
+Status: **0.10.0 build 137 continuous native preview with keyboard/mouse controls and sound; full Legacy of Rust campaign support remains pending.**
 First campaign acceptance remains fully playable bundled single-player Rust.
 Multiplayer and the online add-on catalog are outside scope. General ID24
 conformance is a separate target and must never be inferred from this campaign.
@@ -142,7 +142,8 @@ before resource/game initialization, not guessed separately by Swift and C.
    and all-map CPU mesh validation. Build 131 adds an explicit [native world preview](EXTENDED_PREVIEW.md)
    through a child process. Build 132 adds [actor/weapon frames](EXTENDED_SPRITES.md)
    and manual firing. Build 133 adds engine-timed material animation and
-   [cached scene updates](EXTENDED_MATERIALS.md). Build 135 adds native
+   [cached scene updates](EXTENDED_MATERIALS.md). Build 137 adds continuous one-tic
+   scene/audio playback and Run/Pause; MAP13 performance still needs work. Build 135 adds native
    [sound effects](EXTENDED_AUDIO.md). Music, full presentation and native
    gameplay remain required. Validate targeted combat/map behavior, not just startup.
 4. **Campaign and persistence:** episodes, boss/secret routes, native interlevel

@@ -3,101 +3,107 @@
 ## Where to resume
 
 Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, branch
-**codex/legacy-of-rust**, based on fetched origin/main merge **afd7357** (includes
-6171c87 and completed 0.9.0 build 124). Preserve `/Users/wmh/Dev/MetalDooM` and its
-release artifacts. The previous resolution/KEX branch description is historical.
+**codex/legacy-of-rust**, based on fetched origin/main merge **afd7357**. Preserve
+`/Users/wmh/Dev/MetalDooM` and its release artifacts. Current feature version is
+**0.10.0**, final successful build **137**. This remains the same unreleased Rust
+feature; do not bump the minor version for each refinement.
 
-Current feature version is **0.10.0**, final successful app build **135**. The
-explicit Rust preview now plays native sound effects from gameplay calls, with
-stereo positioning and a Sound checkbox. Actors, weapons, material animation and
-scene reuse remain available. **Rust is not playable through the ordinary picker**;
-keep its guard until full native campaign acceptance.
+The explicit Rust preview now has **Run/Pause and keyboard/mouse controls**, with
+one-tic world/actor/weapon/material/audio presentation. Manual buttons show every
+tic too. Keep the ordinary Rust picker guard until full campaign acceptance.
+No speedrun/demo/upload work was requested; that idea remains a future aside.
 
 Read [preview/process contract](docs/EXTENDED_PREVIEW.md),
 [audio](docs/EXTENDED_AUDIO.md), [materials/cache](docs/EXTENDED_MATERIALS.md),
 [sprites](docs/EXTENDED_SPRITES.md), [geometry](docs/EXTENDED_GEOMETRY.md),
-[worker](docs/EXTENDED_ENGINE.md) and [roadmap](docs/LEGACY_OF_RUST.md).
-ABI 2 now has twelve private exports. `ME_EnableAudio` opts in before initialization;
-`ME_CopyAudio` copies/drains bounded MSA1 events only on a complete-buffer copy.
-Headless callers remain capture-free by default. Existing struct/MGE1/MSP1/MMT1
-layouts are unchanged. MVW4 has a 52-byte header and optional MGE1, required MSP1,
-MMT1, MSA1. One dedicated process owns each session; never load the extended dylib
-into the Swift app process.
+[worker](docs/EXTENDED_ENGINE.md), [validation](docs/VALIDATION.md) and
+[roadmap](docs/LEGACY_OF_RUST.md).
 
-Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/audio-final" bash scripts/build.sh`.
+Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/continuous-final" bash scripts/build.sh`.
 Launch with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
 Only the explicit option packages/signs the helper/dylib and notices. Standard
 builds remain classic. Ordered resources are id24res → Doom II → id1, base index 1;
-the parent verifies their content identity. Missing artwork/samples fail; WADs and
-generated bundles stay private/ignored.
+the parent verifies their identity. WADs/generated bundles stay private/ignored.
 
-Controls submit eight movement tics, a 45-degree turn, one Use tic, one/35 attack
-tics, or 35 idle tics. Step after spawn raises the weapon and releases the initial
-use latch. Sound starts enabled. Each completed batch displays its scene, then
-plays copied sound events at 1/35-second offsets; command buttons wait for the
-event timeline. Empty-event batches finish immediately. Sound tails finish
-naturally while simulation is stopped. This is manual audition, not synchronized
-continuous gameplay. Sound off explicitly stops voices/suppresses starts; unmute
-does not replay skipped starts. Closing/error invalidates pending callbacks,
-stops/pauses audio and cancels/reaps the worker/removes scratch.
+Controls: Run, WASD movement/strafe, arrows turn/move, Shift run, E/Space Use, F
+Fire, 1–7 weapons, click captures horizontal mouse aim and subsequent clicks fire.
+Escape or Pause stops playback/audio and clears input. Focus loss/minimizing also
+pauses. Build 137 adds a local Escape monitor for manual/button-focused steps;
+continuous input still uses GameView, with no classic gameplay code changes.
+No vertical look, interpolation or weapon bob. Manual buttons retain their prior
+8/1/35 tic counts and turn size; Run uses normal turn acceleration.
 
-The native sound adapter resolves extended/BEX sound names and aliases, tracks 32
-origin/singularity channels, updates position/attenuation and safely detaches
-removed origins. Capture consumes no RNG; normal pitch, Euclidean attenuation,
-DMX-only samples and simplified priorities are deliberate limits. Missing/invalid
-samples, random/ambient/loop definitions and queue overflow fail explicitly.
-Music and ambient playback remain absent. The snapshot sound_events counter is
-still request count, not audible output count.
+`ExtendedPlaybackClock` permits only one in-flight worker request, targets 35
+simulation tics/s and discards elapsed wall-time debt when late. Slow work slows
+simulation rather than queuing commands or skipping tics. Pause cancels wakeups;
+a pending reply may still present its already-computed tic silently. Run stays
+unavailable until that reply settles. Resume clears input and starts a new deadline.
+The native audio `present` path accepts tic 0 then consecutive single tics, applies
+events immediately with the scene and rejects replay/gaps. This is tic-aligned
+presentation, not sample-accurate hardware timing. Old timed `play` remains for
+diagnostics only. Finite steps allow natural sample tails; explicit pause stops
+voices/mixer. Closing/error cancels future work; termination reaps the child and
+removes scratch. Sound mute stops/skips voices; unmute only plays future starts.
 
-Worker tests pass in `build/audio134-worker-validation.log`: all sixteen scenes,
-prior sprite/material/weapon checks, FIFO/canary/drain/4096-event overflow, no
-replay on geometry query, independent left/right sources, thirteen malformed
-sound packets, and identical player/actor bytes over 200 tics with capture off/on.
-`build/rust134-validation.log` passes the prior MBF21/session/ID24/map/weapon suite
-with twelve exports. Worker code is unchanged in 135; it refines parent mute.
-Native audio log `build/audio135-native-validation.log` verifies pistol timing
-39/53/67, PCM/stereo/mute/stop, pending-callback cancellation, actual Incinerator/Blade/pickup/switch/movement samples
-and a live device-output tap. Classic sound/menu PCM and pause/resume regressions
-pass in `build/classic135-audio-validation.log`. Prior geometry/material evidence
-remains in VALIDATION.md, including MAP13 XNOD byte parity.
+**Next priority: granular geometry updates, particularly MAP13.** The new
+140-tic CPU/worker check found geometry changes on every tic in MAP01/13/16 and
+thus full mesh rebuilds. Mean/p95 times: MAP01 **12.52/13.93 ms**, MAP13
+**210.57/227.59 ms**, MAP16 **4.27/5.11 ms**. These exclude Metal upload/draw.
+MAP13 cannot approach 35 tics/s with full geometry decode/rebuild. Separate static
+topology from changing sector light/heights/side offsets/materials and avoid full
+CPU/GPU rebuilds; verify exact moving-world parity and remeasure these same maps.
+Do not call this full-rate Rust gameplay based on the smaller maps.
 
-Native candidate: `build/audio-final/MetalDooM.app`, **0.10.0/build 135**;
-`build/build135.log`. Host deep/strict signature verification passes, and bundled
-plist/CUA title agree. Final CUA checks Sound on, MAP16 Step → Use → Step
-(35→36→71), Sound off, firing to 106/ammo 47, playback blocking/re-enabling controls,
-and restoring Sound on. The visible preview is left there, with a firing pose
-and active monster. Raise the window before visual inspection: an occluded Metal
-window may retain its previous surface. A live device tap measured nonzero PCM;
-physical speaker audibility remains unverified.
+Tests pass: `build/continuous136-validation.log` (clock deadlines/backpressure,
+exact finite lengths, pause/resume, 140 consecutive scene/audio tics and firing
+on MAP01/13/16) and `build/continuous136-audio-validation.log` (native synchronized
+pistol PCM tics 39/53/67, duplicate rejection, silent pending reply after pause,
+mute/resume, prior cancellation and both Rust weapons/pickups/switches/stereo/stop,
+live device-output tap peak 0.49497473). Physical speaker hearing is unverified.
+Build 137 only changes the parent Escape handler; tested clock/audio/worker code
+is unchanged from those logs. Prior all-16-map/core logs remain
+`build/audio134-worker-validation.log`, `build/rust134-validation.log`; prior
+classic PCM regression is `build/classic135-audio-validation.log`.
 
-Intermediate build 134 is preserved at `build/audio-preview/MetalDooM.app`; its
-test instance was closed. Its gain-only mute offline check returned PCM despite
-reported mixer volume zero. Final 135 uses explicit stop/suppress behavior, which
-passes. Preserve build 133 `build/material-preview/MetalDooM.app`, build 132
-`build/actor-preview/MetalDooM.app` and earlier bundles. Rust-specific gun artwork
-still has automated frame evidence only, despite native PCM acceptance.
+Live build 136: intermediate manual frame at tic 14 then exact 35, MAP16 Run + E/F
+switch opening/ammo 50→49, Escape pause, subsequent combat and minimize pause.
+Closed test app/worker 9761/9782 exit and scratch disappears. Command-Tab/AX Raise
+did not prove app focus transfer in CUA; minimizing did exercise automatic pause.
+Raise the preview before screenshots to avoid an occluded Metal surface.
+Final native candidate is `build/continuous-final/MetalDooM.app` (137), with
+`build/build137.log`. Host deep/strict signature verification and bundled plist
+confirm 0.10.0/build 137. Final CUA title agrees: manual Step + Escape stops at
+tic 4, another Step shows tic 18 then exactly 39, muted Fire 1 second shows tic 49
+then exactly 74/ammo 47, Sound on + Run advances to 87 and Escape pauses at 91.
+The final app is left **MAP01 tic 91, health 100, ammo 47, Sound on, Paused**.
+Host process identity: app PID 40471, its bundled worker PID 40500.
+Run is ready for the user; do not automatically leave combat running.
 
-Next: more granular moving-world updates and synchronized continuous playback;
-then music/campaign presentation. Worker comparison still traverses full geometry,
-and any geometry change rebuilds the whole mesh. This is not proven real-time
-performance. Complete scrolling flats, weapon bob/interpolation, palette/TRANMAP
-translucency, control-sector/fake-floor/sky effects, targeted monster/map-special
-parity, campaign/boss/secret routes, JSON presentation and versioned saves. Keep
-the ordinary Rust guard until native campaign play is validated.
+Worker ABI 2 remains twelve private exports; all engine/protocol code is unchanged
+this turn. Opt-in `ME_EnableAudio` precedes init and `ME_CopyAudio` copies/drains MSA1
+only on complete copy. MVW4 header52 has optional MGE1, required MSP1/MMT1/MSA1.
+One separate process owns each session; never load its dylib in the Swift app.
+Existing capture has 32 origin/singularity channels, DMX samples, fixed normal
+pitch, Euclidean attenuation and safe unlink positions. Capture consumes no RNG.
+Missing/invalid samples, ambient/random/loop definitions and overflow fail.
+Music/ambient playback remains absent; sound_events is requests, not audibility.
 
-Older previews are preserved: build 126 `build/MetalDooM.app`, 127
-`build/extended-milestone/MetalDooM.app`, 128 `build/rust-milestone/MetalDooM.app`,
-129 `build/geometry-milestone/MetalDooM.app`. The user's speedrun demo/upload idea
-remains a future aside, with no implementation or upload authorization implied.
+After geometry performance, complete music/HUD/campaign presentation, scrolling
+flats, bob/interpolation, palette/TRANMAP translucency, control-sector/fake-floor/
+sky effects, targeted monster/map-special parity, boss/secret routes, JSON
+presentation and versioned saves. Death/restart and full campaign play remain
+unaccepted; use a fresh explicitly launched session for now.
 
-The **0.9.0 build 124** release was notarized by the user in the preceding task:
-Apple accepted `121f1db9-34a4-4f5f-aeb3-599a59de0727`; stapler, codesign and
-Gatekeeper were verified in the host context. ZIP location remains the primary
-checkout's `build/releases/MetalDooM-0.9.0-build124/`. This is prior-task evidence.
-Builds 126–135 are ad-hoc signed, unnotarized, and unpackaged. GitHub workflow outputs
-remain unnotarized. No push, publish, upload or Apple submission was performed.
+Preserve all older candidates: `build/continuous-preview` (136), `build/audio-final`
+(135), `build/audio-preview` (134), `build/material-preview` (133), `build/actor-preview`
+(132), `build/geometry-milestone` (129), `build/rust-milestone` (128),
+`build/extended-milestone` (127), `build/MetalDooM.app` (126).
+The 0.9.0 build 124 release was separately notarized in a prior task (Apple request
+121f1db9-34a4-4f5f-aeb3-599a59de0727); release ZIP remains in primary checkout
+`build/releases/MetalDooM-0.9.0-build124/`. Builds 126–137 are ad-hoc signed,
+unnotarized and unpackaged. No push/publish/upload/Apple submission performed.
 
-The remaining sections are historical and describe earlier branches/previews.
+The remaining sections are historical.
 
 ## Latest refinement — Optional Minimal HUD portrait (build 124)
 

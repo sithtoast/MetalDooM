@@ -1,13 +1,13 @@
 import AVFoundation
 
-/// Main-queue playback of a completed manual simulation batch. The UI waits for
-/// the batch's event timeline before accepting another command. PCM tails finish
-/// naturally while the simulation is stopped; no timers advance gameplay.
+/// Main-queue sound playback. The preview presents one tic and its audio together.
+/// The batch audition API remains available to diagnostic tools.
 final class ExtendedSoundPlayer {
     let sound:SoundPlayer
     var muted=false { didSet { if muted { sound.stopAll() } } }
     private let resources:WAD
     private var generation=0, lastTic=0
+    private var synchronizedTic:Int?
     private var indices:[String:Int]=[:]
     init(resources:WAD,offline:Bool=false) throws {
         self.resources=resources
@@ -28,6 +28,18 @@ final class ExtendedSoundPlayer {
         case 1: sound.play(MD_SoundEvent(channel:Int32(event.channel),lump:Int32(indices[event.name]!),volume:event.volume,pan:event.pan))
         default: sound.update(channel:event.channel,volume:event.volume,pan:event.pan)
         }
+    }
+    /// Apply the audio belonging to the scene being presented now. Consecutive
+    /// one-tic replies are mandatory; no delayed callbacks can drift behind it.
+    func present(_ audio:ExtendedAudio,audible:Bool=true) throws {
+        let previous=synchronizedTic ?? 0
+        guard audio.tic == (synchronizedTic == nil ? 0:previous+1),
+              audio.events.allSatisfy({$0.tic>=previous}) else { throw PortError("Nonconsecutive synchronized sound events.") }
+        try prepare(audio)
+        synchronizedTic=audio.tic
+        guard audible else { return }
+        if !muted && !audio.events.isEmpty { try sound.setActive(true) }
+        for event in audio.events { apply(event) }
     }
     func play(_ audio:ExtendedAudio,completion:@escaping ()->Void) throws {
         guard audio.tic>=lastTic,audio.events.allSatisfy({$0.tic>=lastTic}) else { throw PortError("Stale preview sound events.") }

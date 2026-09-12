@@ -5,12 +5,12 @@ by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
 **Version 0.10.0 · experimental source preview · local builds are not notarized.**
 
-Build 135 adds native [sound effects](docs/EXTENDED_AUDIO.md) to the explicit
-[Rust preview](docs/EXTENDED_PREVIEW.md), with a Sound toggle and timed playback
-of each manual batch. Actors, weapons and animated materials remain available.
-All sixteen maps pass scene checks, and native mixer tests cover both Rust weapons,
-pickups and switches. Music and full campaign play remain ahead; the ordinary
-picker still rejects Rust. See the [remaining milestones](docs/LEGACY_OF_RUST.md).
+Build 137 adds Run/Pause and keyboard/mouse controls to the explicit
+[Rust preview](docs/EXTENDED_PREVIEW.md). Each simulation tic presents its world,
+actors, weapon and [sound effects](docs/EXTENDED_AUDIO.md) together. Escape and
+focus loss pause playback. Large maps still slow down while rebuilding geometry;
+MAP13 optimization, music and full campaign play remain ahead. The ordinary picker
+still rejects Rust. See the [remaining milestones](docs/LEGACY_OF_RUST.md).
 The previous 0.9.0 build 124 was separately notarized; that release is preserved.
 
 This branch adds independently switchable AO, test/torch/projectile/muzzle

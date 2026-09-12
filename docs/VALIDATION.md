@@ -1,5 +1,59 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 137: Continuous Rust scene/audio playback
+
+Final candidate: `build/continuous-final/MetalDooM.app`, **0.10.0/build 137**,
+`build/build137.log`. Intermediate 136 is preserved at `build/continuous-preview`.
+Version remains 0.10.0 as a refinement of the unreleased Rust feature. Worker
+source/ABI/protocol and classic renderer/audio are unchanged. The final app adds
+a local Escape handler so button-focused manual steps can be interrupted too.
+
+`scripts/test-extended-playback.sh` passes (`build/continuous136-validation.log`):
+
+- Deadline pacing, one in-flight request, late-work backpressure without catch-up
+  debt, exactly 35 finite commands, pause during pending work and fresh resume.
+- 140 consecutive scene/audio tics and firing on real MAP01, MAP13 and MAP16.
+  Every sampled tic changes copied geometry and rebuilds the mesh.
+
+| Map | Worker + CPU preparation mean | p95 | Maximum |
+| --- | ---: | ---: | ---: |
+| MAP01 | 12.52 ms | 13.93 ms | 15.98 ms |
+| MAP13 | 210.57 ms | 227.59 ms | 250.40 ms |
+| MAP16 | 4.27 ms | 5.11 ms | 6.37 ms |
+
+These are 140-tic local samples after startup, excluding native Metal upload and
+rendering. They do not establish full-rate gameplay. MAP13 is decisively over the
+28.57 ms simulation budget; incremental geometry/light updates are the next task.
+Playback slows instead of stacking requests, dropping tics or bursting old input.
+
+Native `scripts/test-extended-audio.sh` passes
+(`build/continuous136-audio-validation.log`):
+
+- One-tic audio presentation immediately schedules each scene's starts and renders
+  PCM at exact pistol event tics 39/53/67. There are no delayed preview callbacks.
+- Duplicate snapshots reject. A pending reply after pause advances the cursor
+  silently without restarting the mixer; mute suppresses starts, resume/unmute
+  accepts later tics and future starts. Prior batch cancellation tests still pass.
+- Incinerator/Blade/pickup/switch/movement, stereo, mute and stop checks pass.
+  The native device tap measures peak 0.49497473; physical hearing is unverified.
+
+Live build 136 checks (same playback/audio code, before the final Escape handler):
+manual Step shows intermediate tic 14 and stops at exactly 35. Run + keyboard E/F
+opens MAP16 geometry and consumes ammo 50→49. Escape pauses at tic 249; another
+run accepts movement/turn/weapon input and proceeds into combat. Minimizing pauses
+at tic 906. Command-Tab/AX Raise did not reliably transfer native focus in CUA, so
+those actions are not accepted as app-switch evidence. Closing exits app 9761
+and child 9782 and removes their private scratch directory. Final 137 native
+verification confirms bundled plist/CUA title 0.10.0/build 137 and host deep/strict
+signature. Manual Step + Escape interrupts at tic 4, the next Step displays 18
+then stops at 39, muted firing displays 49 then stops at 74/ammo 47. Sound on +
+Run advances to 87 and Escape pauses at 91. Final MAP01 stays paused, health 100,
+Sound on, with Run ready. No death/restart or full campaign acceptance implied.
+
+Continuous controls are still an explicit development preview. Full HUD/music,
+interpolation/palette/ID24 presentation, campaign transitions, restart and saves
+are not accepted. The ordinary picker guard stays in place. No push or packaging.
+
 ## 2026-09-12 — 0.10.0 build 135: Rust sound effects and native playback
 
 `scripts/test-extended-worker.sh` passes the previous 16-map scene/sprite/material/

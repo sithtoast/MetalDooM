@@ -9,7 +9,12 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     private let queue=DispatchQueue(label:"MetalDooM.extended-preview")
     private let worker=ExtendedWorker()
     private var audioPlayer:ExtendedSoundPlayer?
-    private var soundToggle:NSButton!
+    private var soundToggle:NSButton!, runButton:NSButton!
+    private var clock=ExtendedPlaybackClock(), wake:DispatchWorkItem?
+    private var playbackGeneration=0, manualTag:Int?, ready=false, stopped=false
+    private var keyMonitor:Any?
+    private var turnHeld=0
+    private let mode=NSTextField(labelWithString:"Paused")
     private var sceneBuilder:ExtendedSceneBuilder?, buttons:[NSButton]=[], closed=false
     func applicationDidFinishLaunching(_ notification:Notification) {
         do {
@@ -24,11 +29,18 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             window=NSWindow(contentRect:NSRect(x:0,y:0,width:1100,height:760),styleMask:[.titled,.closable,.miniaturizable,.resizable],backing:.buffered,defer:false)
             window.title="\(appTitle) — Rust world preview — \(String(format:"MAP%02d",map))"
             window.delegate=self;window.isReleasedWhenClosed=false
+            // Manual buttons deliberately block gameplay input, but Escape must
+            // still interrupt their finite sequence (including button focus).
+            keyMonitor=NSEvent.addLocalMonitorForEvents(matching:.keyDown) { [weak self] event in
+                guard let self,event.window==self.window,event.keyCode==53 else { return event }
+                self.pause();return nil
+            }
             view=GameView(frame:.zero,device:MTLCreateSystemDefaultDevice())
             view.colorPixelFormat = .bgra8Unorm;view.depthStencilPixelFormat = .depth32Float
             view.clearColor=MTLClearColorMake(0,0,0,1);view.preferredFramesPerSecond=60
             view.inputBlocked=true;view.framebufferOnly=false
             renderer=try Renderer(view:view);view.delegate=renderer
+            view.onEscape={ [weak self] in self?.pause() }
             renderer.onError={ [weak self] error in self?.failed(error) }
             let controls=NSStackView();controls.orientation = .horizontal;controls.spacing=8
             for (tag,title) in [(1,"Forward"),(2,"Back"),(3,"Turn left"),(4,"Turn right"),(6,"Use"),(7,"Fire"),(8,"Fire 1 second"),(5,"Step 1 second")] {
@@ -37,9 +49,12 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             }
             soundToggle=NSButton(checkboxWithTitle:"Sound",target:self,action:#selector(toggleSound))
             soundToggle.state = .on;controls.addArrangedSubview(soundToggle)
-            let caption=NSTextField(labelWithString:"Manual simulation · Music and palette effects pending")
+            runButton=NSButton(title:"Run",target:self,action:#selector(toggleRunning))
+            runButton.isEnabled=false
+            let transport=NSStackView(views:[runButton,mode]);transport.spacing=12
+            let caption=NSTextField(labelWithString:"WASD move · Arrows turn/move · Shift run · E use · F fire · 1–7 weapon · Click to aim · Esc pause")
             caption.textColor = .secondaryLabelColor
-            let stack=NSStackView(views:[controls,caption,status,view]);stack.orientation = .vertical;stack.alignment = .leading;stack.spacing=8
+            let stack=NSStackView(views:[transport,controls,caption,status,view]);stack.orientation = .vertical;stack.alignment = .leading;stack.spacing=8
             stack.translatesAutoresizingMaskIntoConstraints=false;view.translatesAutoresizingMaskIntoConstraints=false
             let content=NSView();window.contentView=content;content.addSubview(stack)
             NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo:content.leadingAnchor,constant:12),stack.trailingAnchor.constraint(equalTo:content.trailingAnchor,constant:-12),stack.topAnchor.constraint(equalTo:content.topAnchor,constant:12),stack.bottomAnchor.constraint(equalTo:content.bottomAnchor,constant:-12),view.widthAnchor.constraint(equalTo:stack.widthAnchor),view.heightAnchor.constraint(greaterThanOrEqualToConstant:300)])
@@ -56,7 +71,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
                     let resources=try WAD(previewResources:paths,baseIndex:1,profile:1,identity:identity)
                     let builder=try ExtendedSceneBuilder(resources:resources);self.sceneBuilder=builder
                     let scene=try builder.prepare(state)
-                    DispatchQueue.main.async { [weak self] in self?.present(scene) }
+                    DispatchQueue.main.async { [weak self] in self?.presentInitial(scene) }
                 } catch { DispatchQueue.main.async { [weak self] in self?.failed(error) } }
             }
         } catch {
@@ -65,39 +80,103 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         }
     }
     @objc private func step(_ sender:NSButton) {
-        buttons.forEach{$0.isEnabled=false};status.stringValue="Updating worker world…"
-        let tag=sender.tag
+        guard ready,!stopped,!clock.busy else { return }
+        manualTag=sender.tag
+        clock.start(now:ProcessInfo.processInfo.systemUptime,steps:sender.tag<=2 ? 8:(sender.tag==5 || sender.tag==8) ? 35:1)
+        updateControls();schedule()
+    }
+    @objc private func toggleRunning() {
+        if clock.running { pause();return }
+        guard ready,!stopped,!clock.busy else { return }
+        manualTag=nil;view.releaseMouse();turnHeld=0
+        clock.start(now:ProcessInfo.processInfo.systemUptime)
+        view.inputBlocked=false;window.makeFirstResponder(view)
+        updateControls();schedule()
+    }
+    private func pause() {
+        clock.pause();wake?.cancel();wake=nil;playbackGeneration+=1
+        view?.inputBlocked=true;view?.releaseMouse();turnHeld=0
+        audioPlayer?.stop();updateControls()
+    }
+    private func updateControls() {
+        let available=ready && !closed && !stopped
+        buttons.forEach{$0.isEnabled=available && !clock.busy}
+        runButton?.title=clock.running ? "Pause":"Run"
+        runButton?.isEnabled=available && (clock.running || !clock.inFlight)
+        mode.stringValue=stopped ? "Stopped":clock.running ? (manualTag == nil ? "Running · 35 tics/s target":"Stepping") : clock.inFlight ? "Pausing…":"Paused"
+    }
+    private func schedule() {
+        guard clock.running,!closed,!stopped else { return }
+        let token=playbackGeneration
+        let work=DispatchWorkItem { [weak self] in
+            guard let self,self.playbackGeneration==token else { return };self.advance()
+        }
+        wake=work
+        DispatchQueue.main.asyncAfter(deadline:.now()+max(0,clock.deadline-ProcessInfo.processInfo.systemUptime),execute:work)
+    }
+    private func command()->(Int8,Int8,Int16,UInt8) {
+        if let tag=manualTag {
+            return (tag==1 ? 25:tag==2 ? -25:0,0,tag==3 ? 8192:tag==4 ? -8192:0,tag==6 ? 2:(tag==7 || tag==8) ? 1:0)
+        }
+        let keys=view.consumeMovement(),speed=view.running ? 50:25,strafe=view.running ? 40:24
+        var forward=0,side=0,turn=Int((-view.mouseMotion.x*0.0025*65536/(2 * .pi)).clamped(-30000,30000))
+        view.mouseMotion = .zero
+        if keys.contains(13) || keys.contains(126) { forward+=speed }
+        if keys.contains(1) || keys.contains(125) { forward-=speed }
+        if keys.contains(0) { side-=strafe };if keys.contains(2) { side+=strafe }
+        turnHeld=(keys.contains(123) || keys.contains(124)) ? turnHeld+1:0
+        let turnSpeed=turnHeld<6 ? 320:view.running ? 1280:640
+        if keys.contains(123) { turn+=turnSpeed };if keys.contains(124) { turn-=turnSpeed }
+        var buttons=UInt8(view.consumeAttack())
+        if view.useQueued || view.keys.contains(14) || view.keys.contains(49) { buttons |= 2 }
+        view.useQueued=false
+        let weapon=view.consumeWeapon();if weapon>=0 { buttons |= UInt8(4 | weapon<<3) }
+        return (Int8(forward),Int8(side),Int16(clamping:turn),buttons)
+    }
+    private func advance() {
+        guard !closed,!stopped else { return }
+        guard clock.claim(now:ProcessInfo.processInfo.systemUptime) else { schedule();return }
+        let input=command(),token=playbackGeneration
         queue.async { [self] in
             do {
                 guard let sceneBuilder else { throw PortError("Preview resources unavailable.") }
-                let state=try worker.tick(forward:tag==1 ? 25:tag==2 ? -25:0,turn:tag==3 ? 8192:tag==4 ? -8192:0,buttons:tag==6 ? 2:(tag==7 || tag==8) ? 1:0,count:tag<=2 ? 8:(tag==5 || tag==8) ? 35:1)
+                let state=try worker.tick(forward:input.0,side:input.1,turn:input.2,buttons:input.3,count:1)
                 let scene=try sceneBuilder.prepare(state)
-                DispatchQueue.main.async { [weak self] in self?.present(scene) }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self,!self.closed,!self.stopped else { return }
+                    do {
+                        try self.display(scene,audible:self.playbackGeneration==token)
+                        self.clock.finish();self.updateControls();self.schedule()
+                    } catch { self.failed(error) }
+                }
             } catch { DispatchQueue.main.async { [weak self] in self?.failed(error) } }
         }
     }
-    private func present(_ scene:ExtendedScene) {
-        guard !closed else { return }
-        do {
-            try renderer.loadExtendedPreview(scene)
-            status.stringValue="Tic \(scene.view.tic) · \(scene.geometry.triangleCount.formatted()) triangles · Sky \(scene.view.sky) · Health \(scene.view.health) · Ammo \(scene.view.presentation.ammo) · \(scene.view.presentation.actors.count) actors"
-            if audioPlayer==nil { audioPlayer=try ExtendedSoundPlayer(resources:scene.resources) }
-            audioPlayer?.muted=soundToggle.state != .on
-            try audioPlayer?.play(scene.view.audio) { [weak self] in
-                guard let self,!self.closed else { return };self.buttons.forEach{$0.isEnabled=true}
-            }
-        } catch { failed(error) }
+    private func presentInitial(_ scene:ExtendedScene) {
+        guard !closed,!stopped else { return }
+        do { try display(scene,audible:false);ready=true;updateControls() }
+        catch { failed(error) }
     }
+    private func display(_ scene:ExtendedScene,audible:Bool) throws {
+        try renderer.loadExtendedPreview(scene)
+        if audioPlayer==nil { audioPlayer=try ExtendedSoundPlayer(resources:scene.resources) }
+        audioPlayer?.muted=soundToggle.state != .on
+        try audioPlayer?.present(scene.view.audio,audible:audible)
+        status.stringValue="Tic \(scene.view.tic) · \(scene.geometry.triangleCount.formatted()) triangles · Sky \(scene.view.sky) · Health \(scene.view.health) · Ammo \(scene.view.presentation.ammo) · \(scene.view.presentation.actors.count) actors"
+    }
+    func applicationDidResignActive(_ notification:Notification) { pause() }
+    func windowDidResignKey(_ notification:Notification) { pause() }
     @objc private func toggleSound() { audioPlayer?.muted=soundToggle.state != .on }
     private func failed(_ error:Error) {
         guard !closed else { return }
-        worker.cancel();audioPlayer?.stop();status.stringValue="Preview stopped: \(error)";buttons.forEach{$0.isEnabled=false}
+        stopped=true;pause();worker.cancel();status.stringValue="Preview stopped: \(error)"
     }
     func windowWillClose(_ notification:Notification) { shutdown() }
     func applicationWillTerminate(_ notification:Notification) { shutdown() }
     private func shutdown() {
-        guard !closed else { return };closed=true
-        worker.cancel();audioPlayer?.stop();view?.isPaused=true;view?.delegate=nil
+        guard !closed else { return };closed=true;pause()
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor);self.keyMonitor=nil }
+        worker.cancel();view?.isPaused=true;view?.delegate=nil
     }
     func applicationShouldTerminate(_ sender:NSApplication)->NSApplication.TerminateReply {
         shutdown()

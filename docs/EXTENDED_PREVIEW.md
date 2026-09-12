@@ -1,4 +1,4 @@
-# Rust native preview — 0.10.0 build 135
+# Rust native preview — 0.10.0 build 137
 
 An explicit development preview now starts the extended simulation in a separate
 child process and draws its copied geometry with the existing native Metal world
@@ -6,9 +6,9 @@ and sky pipelines, with copied actor/weapon frames through the sprite renderer.
 It uses the actual ordered id24res → Doom II → id1 resources,
 checks their session fingerprint and reads the UMAPINFO sky selection.
 
-This is a **manual simulation preview**, not playable Rust support. HUD, music,
+This is a **continuous development preview**, not full Rust campaign support. HUD, music,
 full Boom/ID24 presentation are not connected.
-The ordinary WAD picker still rejects Rust gameplay. Manual controls advance real
+The ordinary WAD picker still rejects Rust gameplay. Run and manual controls advance real
 simulation; displayed health/ammo are simulation state. No speedrun/upload work.
 
 ## Build and launch
@@ -16,8 +16,8 @@ simulation; displayed health/ammo are simulation state. No speedrun/upload work.
 The helper is packaged only with the explicit development build option:
 
 ```sh
-METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/audio-final" bash scripts/build.sh
-open -n "$PWD/build/audio-final/MetalDooM.app" --args \
+METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/continuous-final" bash scripts/build.sh
+open -n "$PWD/build/continuous-final/MetalDooM.app" --args \
   --rust-preview "/path/to/Ultimate Doom/rerelease" --map MAP01
 ```
 
@@ -33,11 +33,27 @@ tic; Use submits one use tic; Fire submits one attack tic; Fire 1 second submits
 raising: use Step 1 second to advance it. Each action uses its tick reply, which carries sprite/material state and
 geometry only when world values change. The background scene builder reuses
 unchanged meshes and decoded resources; Metal uploads new textures only.
-Sound events play at their copied 35 Hz offsets after each manual batch; controls
-wait for its event timeline to finish. Sound toggles explicit voice mute. Sample
-tails finish naturally while simulation is stopped. There is no automatic simulation clock. Closing the preview cancels its child,
-drains the serial queue, reaps the process and removes its private scratch/log
-folder before completing app termination. Existing app instances are unaffected.
+Run starts a 35-tics/s target clock. WASD moves/strafe, arrows turn/move, Shift
+runs, E/Space uses, F fires, 1–7 selects a weapon, and clicking captures horizontal
+mouse aim (subsequent clicks fire). Escape or Pause releases input and stops all
+sounds. Losing app/window focus or minimizing also pauses; resuming is explicit.
+There is no vertical look or interpolation yet.
+
+Both continuous and finite manual actions submit **one tic at a time**. Each
+prepared scene and that tic's sound events are applied on the main queue together,
+with audio starting before the next display refresh. This aligns scene updates
+and event delivery, not sample-accurate hardware presentation. Manual buttons
+remain disabled until their finite command count completes; Pause can interrupt
+it, and Sound stays usable. Finite actions may leave natural sample tails;
+explicit Pause stops them.
+
+Only one worker request is in flight. A delayed reply slows simulation; there
+is no catch-up command queue, tic dropping or input sampled far in advance. Pause
+cancels the next wakeup. A pending reply can still present its already-computed
+tic, silently, before Run becomes available; it never starts another request.
+Resuming clears held/queued input and resets the pacing deadline. Closing cancels
+the child, drains the serial queue, reaps the process and removes private scratch
+before app termination. Existing app instances are unaffected.
 
 The initial camera is derived from the engine's standing spawn viewheight and
 ceiling clamp, because the per-tic viewz has not yet been computed at tic zero.
@@ -64,7 +80,10 @@ physical floors/ceilings, side offsets and switch texture identities are copied;
 control-sector lighting, fake floors, sky transfers, translucency still need their full presentation adapters. Wall/flat animation
 uses the worker's current translation tables. See [materials and caching](EXTENDED_MATERIALS.md).
 Unchanged scenes reuse meshes, but any geometry change rebuilds the whole mesh.
-This is not a measured real-time update strategy, especially for MAP13.
+A 140-tic worker/CPU preparation sample averages 12.52 ms on MAP01, 210.57 ms
+on MAP13 and 4.27 ms on MAP16; each changed geometry every tic. MAP13 cannot sustain
+35 tics/s with this strategy. These timings exclude native Metal upload/drawing;
+finer topology/material/light updates are the next performance milestone.
 
 ## Process and protocol
 
@@ -114,16 +133,22 @@ canaries and nine malformed sprite packets. Wrong resource base identity rejects
 The previous MBF21/Rust suite passes with twelve private exports. Audio checks add
 FIFO canaries/drain/overflow, left/right sources, thirteen malformed audio/order
 packets and byte-identical simulation snapshots over 200 tics with capture off/on.
-Worker logs: `build/audio134-worker-validation.log`, `build/rust134-validation.log`;
-final build 135 only refines the parent's explicit voice mute. Native audio checks
-are in `build/audio135-native-validation.log`, with classic PCM regression in
-`build/classic135-audio-validation.log`. See [audio details](EXTENDED_AUDIO.md).
+Worker code/protocol are unchanged from build 135. Prior full worker/core logs:
+`build/audio134-worker-validation.log`, `build/rust134-validation.log`.
 
-Native build 135 verifies its Sound toggle, MAP16 switch opening after Step → Use
-→ Step (35→36→71), muted firing to tic 106/ammo 47, controls waiting for playback
-and becoming available again. The final preview is left on MAP16 with Sound on.
-Native mixer tests render both actual Rust weapons, pickups, switch/movement sounds,
-stereo, mute and stop; a device-output tap measures nonzero PCM. Physical speaker
-audibility is unverified. Prior animation/pistol checks remain in VALIDATION.md.
-Music, full presentation, continuous gameplay and campaign/save acceptance remain
-work ahead. Audio audition is deliberately separate from a real-time simulation clock.
+New `scripts/test-extended-playback.sh /path/to/rerelease` checks clock deadlines,
+slow work, one in-flight request, exact finite command lengths, pause/resume,
+and 140 consecutive prepared scene/audio tics on MAP01, MAP13 and MAP16. Native
+`scripts/test-extended-audio.sh` additionally checks immediate synchronized PCM,
+pause with a pending reply, duplicate rejection and mute/resume. Logs:
+`build/continuous136-validation.log`, `build/continuous136-audio-validation.log`.
+
+Intermediate build 136 verifies manual frames (tic 14 then exactly 35),
+continuous MAP16 keyboard use/fire (opening geometry and ammo 50→49), Escape pause
+and minimizing pause. A closed test's app/worker processes exit and scratch is
+removed. Final build 137 verifies Escape interrupting a manual step at tic 4, another
+35-tic step ending at 39, muted firing to 74/ammo 47, then Run/Escape ending at 91.
+The final candidate is left paused on MAP01 with Sound on. Native audio regressions
+still cover both Rust weapons, pickups, switches and a device-output tap; physical
+speaker audibility remains unverified. Music, full presentation, campaign/save
+acceptance and large-map performance remain work ahead.

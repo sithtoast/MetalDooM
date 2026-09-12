@@ -62,7 +62,8 @@ Translucent metadata is carried but sprites still render opaque. Per-state
 TRANMAPs, fixed-colormap palette effects, corpse mirroring enhancements,
 control-sector lighting and fake-floor clipping are not yet adapted. The preview
 has health/ammo text but no gameplay HUD; build 135 adds [sound effects](EXTENDED_AUDIO.md). Build 133 [reuses unchanged scenes](EXTENDED_MATERIALS.md), but any geometry change
-still rebuilds the whole mesh; a continuous simulation clock remains pending.
+still rebuilds the whole mesh. Build 137 adds a continuous clock and per-tic audio;
+large-map performance and presentation interpolation remain pending.
 
 `scripts/test-extended-worker.sh` checks complete-copy canaries, nine malformed
 packets, all sixteen actual Rust maps at startup/tic 35, and eight directional

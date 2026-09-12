@@ -4,6 +4,22 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Continuous Rust preview (build 137)
+
+- Add Run/Pause, WASD/arrows, Shift running, mouse aiming, E use, F fire and 1–7
+  weapon selection. Present each worker tic and its native sound events together;
+  manual step/fire batches now show intermediate frames instead of jumping ahead.
+- Target 35 tics/s with one request in flight. Slow work slows simulation without
+  queuing catch-up input. Escape/focus loss/minimizing stops playback and audio;
+  closing also cancels/reaps the child and removes its session scratch.
+- Validate exact manual lengths, pause during pending work, consecutive scene/PCM
+  timing, mute/resume, and native MAP16 switch/fire controls. Measure 140 tics each
+  on MAP01/13/16: MAP13 still averages 211 ms for worker/CPU scene preparation and
+  needs finer geometry updates. Preserve prior bundles; version remains 0.10.0.
+- Build and verify native 0.10.0/build 137. Music, full campaign presentation and
+  saves remain pending; the ordinary Rust picker guard remains. Preserve the
+  intermediate build 136; final 137 also lets Escape interrupt manual steps. No push.
+
 ## 0.10.0 refinement — Rust sound effects preview (build 135)
 
 - Play actual worker sound effects through native AVAudioEngine voices: firing,

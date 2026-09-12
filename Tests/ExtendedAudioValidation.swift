@@ -31,6 +31,43 @@ private final class Meter {
             }
             return (peak,left,right)
         }
+        do {
+            let w=ExtendedWorker();defer{w.close()}
+            let files=[base,fixtures.appendingPathComponent("render-materials.wad")]
+            let first=try w.start(executable:exe,paths:files,map:1,base:0,profile:0)
+            let p=try ExtendedSoundPlayer(resources:classic,offline:true)
+            try p.present(first.audio,audible:false)
+            var heard:[Int]=[]
+            for tic in 1...70 {
+                let state=try w.tick(buttons:tic>35 ? 1:0)
+                let before=p.sound.scheduledSounds
+                try p.present(state.audio)
+                let starts=state.audio.events.filter{$0.operation==1}
+                guard p.sound.scheduledSounds-before==starts.count else { throw PortError("Audio delayed past its scene tic.") }
+                for e in starts where e.name=="DSPISTOL" { heard.append(e.tic) }
+                if !starts.isEmpty { guard try measure(p.sound).0>0.001 else { throw PortError("Synchronized tic produced no PCM.") } }
+            }
+            guard heard==[39,53,67] else { throw PortError("Single-tic sound timeline changed.") }
+            p.stop()
+            let before=p.sound.scheduledSounds
+            // A reply already in flight at Pause still updates the scene cursor,
+            // without restarting audio. Resuming must accept the very next tic.
+            let paused=try w.tick(buttons:1)
+            try p.present(paused.audio,audible:false)
+            RunLoop.current.run(until:Date().addingTimeInterval(0.05))
+            guard p.sound.scheduledSounds==before,!p.sound.engine.isRunning else { throw PortError("Paused reply restarted sound.") }
+            var rejected=false
+            do { try p.present(paused.audio) } catch { rejected=true }
+            guard rejected else { throw PortError("Duplicate scene replayed sound.") }
+            p.muted=true
+            for _ in 0..<20 { try p.present(w.tick(buttons:1).audio) }
+            guard p.sound.scheduledSounds==before else { throw PortError("Muted synchronized scene played sound.") }
+            p.muted=false
+            for _ in 0..<20 { try p.present(w.tick(buttons:1).audio) }
+            guard p.sound.scheduledSounds>before else { throw PortError("Resume/unmute failed to play future sounds.") }
+            p.stop()
+            print("PASS synchronized scene/PCM at exact pistol tics 39/53/67, duplicate rejection, pending-pause suppression, mute/resume")
+        }
         let player=try ExtendedSoundPlayer(resources:classic,offline:true);try player.prepare(firing.audio);try player.sound.setActive(true)
         player.apply(pistol[0]);let pcm=try measure(player.sound)
         guard pcm.0>0.01,pcm.0<=1 else { throw PortError("Invalid native pistol PCM.") }

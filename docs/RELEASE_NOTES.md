@@ -5,7 +5,7 @@ Requires Apple Silicon and macOS 14 or later. This is an early preview.
 
 ## Install
 
-The current local development app is **0.10.0 build 135**, ad-hoc signed and
+The current local development app is **0.10.0 build 137**, ad-hoc signed and
 unnotarized. No new release package was produced. The previous **0.9.0 build 124**
 distribution was separately Developer ID signed, accepted by Apple and stapled.
 GitHub workflow assets remain unnotarized. For unnotarized previews, macOS may
@@ -16,15 +16,19 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.10.0 — Rust development foundations
 
-Final successful local build: **135**.
+Final successful local build: **137**.
 
-Build 135 adds native [sound effects](EXTENDED_AUDIO.md) to the explicit Rust
-preview. Actual worker events drive firing, charge/impact, pickup, switch and
-moving-sector samples, with stereo positioning and a Sound toggle. Manual batches
-retain event spacing; music and synchronized continuous play remain ahead.
-All sixteen scene checks, actual Rust weapon PCM and classic audio regressions
-pass. Actors, weapons, animated materials and cached scene updates remain available.
-The ordinary picker still rejects Rust pending full campaign/save acceptance.
+Build 137 adds continuous Run/Pause, WASD/arrow movement, mouse aiming, keyboard
+fire/use and weapon selection to the explicit Rust preview. Scenes and sounds
+advance together one tic at a time, targeting 35 tics/s with one worker request
+in flight. Manual buttons now show intermediate frames too. Escape, focus loss
+and minimizing pause playback, release input and stop sounds.
+
+Pacing/cancellation and native synchronized PCM tests pass, including actual Rust
+weapons and switch sounds. MAP01/MAP16 update costs fit the simulation budget in
+local CPU checks; MAP13's full geometry rebuilds average 211 ms per tic and still
+need optimization. Music, full presentation, campaign progression and saves
+remain ahead. The ordinary picker still rejects Rust.
 
 ANIMATED and SWITCHES now drive engine material animation and native switch
 texture preload, including pairs without SW1/SW2 names. SIGIL II's flame sequence
