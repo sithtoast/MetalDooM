@@ -19,8 +19,9 @@ is published by these instructions.
 
 Choose **Open WAD…**, select the base IWAD and any supported add-ons in load order,
 then start a game. Supported campaign targets are Doom/Ultimate Doom, Doom II,
-TNT: Evilution, The Plutonia Experiment and standard SIGIL Episode 5.
-General MAPINFO/UMAPINFO/DeHackEd mods, SIGIL II, Legacy of Rust and Doom 64 are
+TNT: Evilution, The Plutonia Experiment, standard SIGIL Episode 5, and the validated
+KEX editions of No Rest for the Living, Master Levels and SIGIL II.
+General MAPINFO/UMAPINFO/DeHackEd mods, Legacy of Rust and Doom 64 are
 not supported. See [the player guide](../PLAYER_GUIDE.md) for controls and [development notes](DEVELOPMENT.md) for compatibility details.
 
 ## Collect a useful bug report

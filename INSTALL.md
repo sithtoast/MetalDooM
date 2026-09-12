@@ -1,4 +1,4 @@
-# Installing MetalDooM 0.8.0
+# Installing MetalDooM 0.9.0
 
 Requires an Apple Silicon Mac and macOS 14 or later.
 
@@ -10,7 +10,9 @@ Apple's instructions: https://support.apple.com/102445
 
 Choose Open WAD… and supply your own Doom/Ultimate Doom, Doom II, TNT or Plutonia
 IWAD. Standard SIGIL can be added as a PWAD with Ultimate Doom. No game data is
-included. Restart the app to change the WAD stack.
+included. The validated rerelease nerve.wad and masterlevels.wad use Doom II;
+sigil2.wad uses Ultimate Doom. Load one campaign add-on at a time. Use Open WAD
+to change games. See docs/KEX_SUPPORT.md for exact edition boundaries.
 
 See PLAYER_GUIDE.md for controls and BUG_REPORT.md for reports. When reporting a bug,
 include Diagnostics → Copy Diagnostic Report; never attach commercial WADs.

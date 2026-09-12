@@ -2,19 +2,124 @@
 
 ## Where to resume
 
-The active repository is `/Users/wmh/Dev/MetalDooM`, on `codex/metal-experiments`.
-The saved project for this conversation points to
-`/Users/wmh/Documents/ChatGPT/MetalDooM`, a separate outer repository used for
-staging. Do not commit that outer repository or copy its staging tree over newer
-source. Open the active Dev repository in the next chat and inspect its status.
+Active checkout: `/Users/wmh/Dev/MetalDooM`, branch **codex/resolution-kex**,
+branched from main `bb6f707`. This change is a local **0.9.0** feature milestone.
+`Info.plist` remains the semantic-version source; latest successful app build is
+**124**. Recheck git status/log and running app before continuing. Nothing was
+pushed and the existing v0.8.0 tag was not moved.
 
-The active experiment is on `codex/metal-experiments`; check Git status/log before
-continuing. The user selected **ray-traced ambient occlusion**. It is implemented
-as a per-session View menu option, with classic rendering still the default.
+## Latest refinement — Optional Minimal HUD portrait (build 124)
 
-Current version: **0.8.0**, successful local app **build 115**. `Info.plist` owns
-the semantic version; `scripts/build.sh` increments `BUILD_NUMBER` for app builds.
-This is an experimental branch, not a published release. No push was requested.
+Options → HUD → Doomguy portrait and View → Doomguy Portrait in Minimal HUD control
+a remembered, default-off portrait. It uses the engine faceIndex and the same
+42 face patches as Classic, drawn with a shadow beside health. Counters shift right
+when enabled; disabling restores the prior Minimal pixels. It scales with HUD size,
+leaving world and weapon unchanged. Classic ignores this preference. Version stays
+0.9.0 as another refinement of the unreleased HUD/resolution feature milestone.
+
+## Latest refinement — Transparent Minimal HUD (build 123)
+
+Options → HUD → HUD style and View → HUD Style select remembered Classic / Minimal.
+Classic remains the default. Minimal overlays native WAD health/armor on the left,
+current ammo on the right and both owned cards/skulls above it, with black pixel
+shadows and no background panel. The world fills the entire bottom strip. The
+shared 25/50/75/100% setting controls artwork only in Minimal; its weapon uses a
+bottom-anchored 200-line canvas independent of HUD size. Original Classic rendering
+restores exactly. This is another refinement within unreleased 0.9.0.
+
+## Latest refinement — HUD status-bar size (build 122)
+
+The user found the health/status bar too large in fullscreen. Options → HUD and
+View → HUD Status Bar Size now offer persistent 25/50/75/100% sizes. Default 100%
+restores the original; smaller sizes keep the complete bar centered and reclaim
+vertical world space. Nearest-sampled artwork stays native-output sized regardless
+of world scale. The minimum is one output pixel per source pixel. This refines
+unreleased 0.9.0; no new semantic release/tag was made.
+
+## Resolution enhancements
+
+The user chose **both** sharper output and upscaling performance. Implemented:
+
+- Native-size drawable and native weapon/HUD/menu/intermission composition.
+- World scales 50/75/100/150/200%; optional device-gated MetalFX spatial below
+  native, nearest fallback, four-tap filtered supersampling above native.
+- HDR linearization around MetalFX, preserving the existing final EDR mapping;
+  native weapon invisibility snapshot, world effects before scaling, original
+  camera aspect, buffer replacement on resize/format/mode changes.
+- Esc → Options → Display and View → Graphics Presets controls; console scale
+  values and benchmark identity updated. No temporal scaling/frame generation.
+
+See `docs/RESOLUTION.md`. Pixel tests preserve the HUD exactly and restore Classic
+exactly. Full Metal/effects/ceiling regressions pass. Local 2200×1520 Medium HDR
+GPU medians: native 5.672 ms; MetalFX 75% 4.571 ms; 50% 3.119 ms. Small-scene
+MetalFX overhead can be slower than native. These are paused-scene GPU samples,
+not sustained gameplay FPS. Physical HDR and cross-display backing-scale changes
+remain unverified. API/device checks used the local macOS 27 SDK and M5 Pro.
+
+## Additional KEX campaigns
+
+The user explicitly chose **bundled single-player content**; multiplayer and the
+online add-on catalog are outside this work. Three dedicated rerelease profiles
+are implemented: **No Rest for the Living**, **Master Levels**, **SIGIL II**.
+Load Doom II + nerve.wad/masterlevels.wad, or Ultimate Doom + sigil2.wad, one
+campaign add-on at a time. All 39 maps pass resource, music-decoding, progression,
+secret-route and save tests. Boss tests cover disabled MAP07 behavior, Master
+Levels tag-666 floors and SIGIL II's 9,000-health spider/disabled boss exit.
+SIGIL II's extra FLMWAL01–03 animation is registered in the engine animation table.
+
+The profiles use full-file hashes of the installed rerelease editions; renamed
+files work, other/edited editions stay rejected. Metadata supplies names, music,
+skies and ending text; this is not general UMAPINFO/DeHackEd support. Campaign maps
+are filtered in selectors and engine loads/saves. Inherited base demos are disabled
+for these profiles. See `docs/KEX_SUPPORT.md` for the complete inventory and limits.
+
+**Legacy of Rust remains unsupported.** Its GAMECONF declares ID24, extended
+actors/states/weapons, MBF21 rules, animated/switch resources and intermission
+animation. Do not assume the id1* family is one additive load order; GAMECONF's
+pwadfiles/dehfiles are null. Audit id24res/extras and optional resource/music
+replacements before defining the next implementation milestone. There are 17 map
+blocks in installed id1.wad despite its 16-level description. Do not claim complete
+KEX support or relax rejection guards based on loading a level.
+
+Installed data remains under:
+`/Users/wmh/Library/Application Support/CrossOver/Bottles/Steam/drive_c/Program Files (x86)/Steam/steamapps/common/Ultimate Doom/rerelease/`.
+Never commit these files, generated fixtures or bundles.
+
+## Validation and workflow
+
+Build 124 at `build/hud-portrait-preview/MetalDooM.app` is the current NRFTL MAP01
+preview, fullscreen with remembered Minimal style, 50% size and portrait enabled.
+Native menu layout, on/off controls and portrait persistence after restart were
+checked. Existing game instances were preserved; older preview notes are historical.
+Original Ultimate Doom and KEX Doom II GPU suites pass, including all 42 faces,
+portrait toggle/Classic restoration, native pixel masks across sizes/scales, HDR
+and invisibility. Evidence is in `build/hud-portrait*-validation`.
+
+See the newest `docs/VALIDATION.md` entry. Useful commands:
+
+```sh
+bash scripts/build.sh
+bash scripts/test-kex-campaign.sh BASE.wad CAMPAIGN.wad
+AO_RESOLUTION=1 bash scripts/test-ambient-occlusion.sh IWAD.wad
+AO_PROFILE=1 AO_RESOLUTION_PROFILE=1 AO_VALIDATION_LAYER=0 bash scripts/test-ambient-occlusion.sh IWAD.wad
+```
+
+Native icon generation and Metal GPU access required permitted host execution;
+sandbox failures were environment boundaries. KEX tests report normal exit-code
+failures rather than Swift top-level crash dialogs. The early Master Levels test
+incorrectly expected a tag-667 floor in MAP20; the installed map has none, and the
+test was corrected to recognize the declared no-op. This was a test correction,
+not a gameplay fix.
+
+Honor AGENTS.md: update CHANGELOG and current docs, validate final running version/
+build and commit locally for each change. New feature milestone = minor version;
+refinements stay on the chosen release. Do not push unless asked. Keep unrelated
+work intact; no WADs, generated bundles, or signing material in Git.
+
+The following sections retain historical implementation and validation context.
+Their branch/release/preview statements describe those earlier steps; the current
+checkout and next priorities above take precedence. Do not assume old preview
+processes are still running.
 
 Main also supplies the compact level-stats HUD (kills/items/secrets and a whole-second
 clock), optional campaign par time and independent secret notifications. Keep its
@@ -34,8 +139,9 @@ missing renderer/effects types. `test-input.sh` had a stale explicit source list
 GameView now lives unchanged in `Sources/GameView.swift`; the input check compiles
 that view alone. `test-audio.sh` likewise compiles only its WAD/audio dependencies.
 Input, console, testing-metrics and Ultimate Doom audio checks pass locally, as
-does the full 0.8.0 build 115. GitHub must rerun against the new local fix commit;
-no hosted CI success or new push has been claimed. No gameplay/version change.
+does the full 0.8.0 build 115. Fix commit `b7d6441` is now included in local main
+through merge `c47a4a2`. Hosted CI results have not been independently inspected.
+No gameplay/version change was made for that test-maintenance fix.
 Native build 115 loads E1M1 and opens its pause menu with Escape; the isolated
 validation preview was then closed.
 
@@ -324,9 +430,9 @@ confirm its build number, not just compiler success.
 
 ## Publishing and signing
 
-The remote is the user's GitHub repository, `sithtoast/MetalDooM`. The assistant
-has not pushed these changes. The user may have pushed independently; live remote
-state, current tags and hosted Actions completion have not been checked here.
+The remote is the user's GitHub repository, `sithtoast/MetalDooM`. The user pushed the experiment branch; local main now contains merge `c47a4a2`
+and local tag `v0.8.0`. Remote tag/release state and hosted Actions completion
+have not been independently checked. The assistant has not pushed this handoff.
 
 On clean `main`:
 

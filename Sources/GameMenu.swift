@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import AppKit
+import MetalFX
 
 // Native accessible controls over the paused Metal view, with original IWAD art.
 final class GameMenu: NSView {
@@ -128,9 +129,9 @@ final class GameMenu: NSView {
     }
     private func newGame() {
         if app.wad?.maps.contains("MAP01")==true { chosenMap="MAP01"; chooseSkill(); return }
-        let names=["Knee-Deep in the Dead","The Shores of Hell","Inferno","Thy Flesh Consumed","SIGIL"]
-        let items=(1...5).filter { app.wad?.maps.contains("E\($0)M1")==true }.map { i in
-            ClassicMenuCanvas.Item(title:names[i-1],patch:"M_EPI\(i)",x:48,y:CGFloat(63+(i-1)*16),action:{ [weak self] in
+        let names=["Knee-Deep in the Dead","The Shores of Hell","Inferno","Thy Flesh Consumed","SIGIL","SIGIL II"]
+        let items=(1...6).filter { app.wad?.maps.contains("E\($0)M1")==true }.enumerated().map { row,i in
+            ClassicMenuCanvas.Item(title:names[i-1],patch:"M_EPI\(i)",x:48,y:CGFloat(63+row*16),action:{ [weak self] in
                 self?.chosenMap="E\(i)M1"; self?.chooseSkill()
             })
         }
@@ -195,16 +196,31 @@ final class GameMenu: NSView {
         classic.footer="ENTER APPLY   ESC BACK   CMD-SHIFT-E CLASSIC / MEDIUM"
         classic.needsDisplay=true
     }
-    private func hudOptions() {
+    func refreshHUD() { if page=="HUD" { hudOptions(selected:classic?.selected ?? 0) } }
+    private func hudOptions(selected:Int=0) {
         canvas("HUD",art:[("M_OPTTTL",108,15)],items:[
-            .init(title:"Level stats",patch:"",x:48,y:64,action:{},value:{ [weak self] in self?.app.levelStatsVisible == true ? "ON" : "OFF" },
+            .init(title:"HUD style",patch:"",x:48,y:40,action:{},value:{ [weak self] in self?.app.renderer.hudStyle.title.uppercased() ?? "CLASSIC" },
+                adjust:{ [weak self] _ in
+                    guard let self else { return }
+                    self.app.applyHUDStyle(self.app.renderer.hudStyle == .classic ? .minimal:.classic)
+                }),
+            .init(title:"Status bar size",patch:"",x:48,y:58,action:{},value:{ [weak self] in "\(self?.app.renderer.hudSizePercent ?? 100)%" },
+                adjust:{ [weak self] step in
+                    guard let self else { return }
+                    let values=SpriteRenderer.hudSizes
+                    let index=values.firstIndex(of:self.app.renderer.hudSizePercent) ?? 3
+                    self.app.applyHUDSize(values[(index+step+values.count)%values.count])
+                }),
+            .init(title:"Doomguy portrait",patch:"",x:48,y:76,action:{},value:{ [weak self] in self?.app.renderer.minimalHUDPortrait == true ? "ON":"OFF" },
+                adjust:{ [weak self] _ in self?.app.toggleMinimalHUDPortrait() }),
+            .init(title:"Level stats",patch:"",x:48,y:94,action:{},value:{ [weak self] in self?.app.levelStatsVisible == true ? "ON" : "OFF" },
                 adjust:{ [weak self] _ in self?.app.toggleLevelStats() }),
-            .init(title:"Par time",patch:"",x:48,y:88,action:{},value:{ [weak self] in self?.app.parTimeVisible == true ? "ON" : "OFF" },
+            .init(title:"Par time",patch:"",x:48,y:112,action:{},value:{ [weak self] in self?.app.parTimeVisible == true ? "ON" : "OFF" },
                 adjust:{ [weak self] _ in self?.app.toggleParTime() }),
-            .init(title:"Secret notice",patch:"",x:48,y:112,action:{},value:{ [weak self] in self?.app.secretNotifications == true ? "ON" : "OFF" },
+            .init(title:"Secret notice",patch:"",x:48,y:130,action:{},value:{ [weak self] in self?.app.secretNotifications == true ? "ON" : "OFF" },
                 adjust:{ [weak self] _ in self?.app.toggleSecretNotifications() }),
-            .init(title:"Back",patch:"",x:48,y:144,action:{ [weak self] in self?.options() })
-        ],labels:[("PAR REQUIRES LEVEL STATS",40,172),("LEFT/RIGHT ADJUST   ESC BACK",40,188)],back:{ [weak self] in self?.options() })
+            .init(title:"Back",patch:"",x:48,y:148,action:{ [weak self] in self?.options() })
+         ],selected:selected,labels:[("MINIMAL SHOWS THE WORLD BEHIND HUD",16,168),("PORTRAIT OPTION IS FOR MINIMAL",24,178),("LEFT/RIGHT ADJUST   ESC BACK",40,188)],back:{ [weak self] in self?.options() })
     }
     private func audioOptions() {
         canvas("Audio",art:[("M_SVOL",60,25)],items:[
@@ -234,10 +250,10 @@ final class GameMenu: NSView {
             }),
             .init(title:"Fullscreen",patch:"",x:48,y:72,action:{},value:{ [weak self] in self?.app.window.styleMask.contains(.fullScreen)==true ? "ON" : "OFF" },
                 adjust:{ [weak self] _ in self?.app.window.toggleFullScreen(nil) }),
-            .init(title:"Render scale",patch:"",x:48,y:92,action:{},value:{ [weak self] in "\(Int((self?.app.view.renderScale ?? 1)*100))%" },
+            .init(title:"World scale",patch:"",x:48,y:92,action:{},value:{ [weak self] in "\(Int((self?.app.view.renderScale ?? 1)*100))%" },
                 adjust:{ [weak self] step in
-                    guard let self else { return }; let values: [CGFloat]=[0.5,0.75,1]
-                    let i=((values.firstIndex(of:self.app.view.renderScale) ?? 2)+step+3)%3
+                    guard let self else { return }; let values: [CGFloat]=[0.5,0.75,1,1.5,2]
+                    let i=((values.firstIndex(of:self.app.view.renderScale) ?? 2)+step+5)%5
                     self.app.view.renderScale=values[i]; UserDefaults.standard.set(Double(values[i]),forKey:"renderScale"); self.updateResolutionText()
                 }),
             .init(title:"Frame limit",patch:"",x:48,y:112,action:{},value:{ [weak self] in "\(self?.app.view.preferredFramesPerSecond ?? 120) FPS" },
@@ -246,7 +262,8 @@ final class GameMenu: NSView {
                     let i=((values.firstIndex(of:self.app.view.preferredFramesPerSecond) ?? 2)+step+3)%3
                     self.app.view.preferredFramesPerSecond=values[i]; UserDefaults.standard.set(values[i],forKey:"frameLimit")
                 }),
-            .init(title:"Back",patch:"",x:48,y:136,action:{ [weak self] in self?.options() })
+            .init(title:"Upscaling",patch:"",x:48,y:132,enabled:MTLFXSpatialScalerDescriptor.supportsDevice(app.renderer.device),action:{},value:{ [weak self] in self?.app.view.metalFXEnabled == true ? "METALFX":"NEAREST" },adjust:{ [weak self] _ in self?.app.toggleMetalFX() }),
+            .init(title:"Back",patch:"",x:48,y:152,action:{ [weak self] in self?.options() })
         ],selected:selected,labels:[],back:{ [weak self] in self?.options() })
         updateResolutionText()
     }
@@ -257,8 +274,8 @@ final class GameMenu: NSView {
     func updateResolutionText() {
         guard page=="Display" else { return }
         let size=app.view.drawableSize
-        classic?.labels=[("RENDER: \(Int(size.width))X\(Int(size.height)) PIXELS",32,162),
-                         ("WINDOW SIZES IN MACOS POINTS",32,174),("LEFT/RIGHT ADJUST   ESC BACK",32,188)]
+        classic?.labels=[("OUTPUT: \(Int(size.width))X\(Int(size.height))",32,170),
+                         ("HUD AND MENUS: NATIVE RESOLUTION",32,179),("LEFT/RIGHT ADJUST   ESC BACK",32,188)]
         classic?.needsDisplay=true
     }
     private func slots(saving: Bool) {

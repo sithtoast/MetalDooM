@@ -17,9 +17,16 @@ source=(root/'Sources/main.swift').read_text().split('\nlet app = NSApplication.
 start=source.index('    func show(_ error: Error) {')
 end=source.index('    @objc func toggleMusic',start)
 source=source[:start]+'    func show(_ error: Error) { validationFail(String(describing:error)) }\n'+source[end:]
-(output/'Renderer.swift').write_text((root/'Sources/Renderer.swift').read_text()+"""
+# Suppress only HUD drawing for identical-scene transparency/pixel comparisons.
+renderer=(root/'Sources/Renderer.swift').read_text()
+renderer=renderer.replace('final class Renderer: NSObject, MTKViewDelegate {',
+    'final class Renderer: NSObject, MTKViewDelegate {\n    var validationHUDVisible=true')
+renderer=renderer.replace('                sprites.drawHUD(', '                if validationHUDVisible { sprites.drawHUD(')
+renderer=renderer.replace('percent:hudSizePercent,style:hudStyle,portrait:minimalHUDPortrait)', 'percent:hudSizePercent,style:hudStyle,portrait:minimalHUDPortrait) }')
+(output/'Renderer.swift').write_text(renderer+"""
 // Test-only bridge in this copied source file; not part of app builds.
 extension Renderer {
+    func validationHUD(_ state:MD_HUD) { hud=state }
     func validationLightPhase(_ tics:Int32) { hud.levelTics=tics }
     var validationWorldShader: String { worldShader }
     var validationMapName: String? { map?.name }
@@ -36,6 +43,9 @@ extension Renderer {
 }
 """)
 (output/'main.swift').write_text(source+'\n'+(root/'Tests/AOAlphaValidation.swift').read_text()+'\n'+(root/'Tests/WorldSamplingValidation.swift').read_text()+'\n'+(root/'Tests/AmbientOcclusionValidation.swift').read_text().replace('// Exercise map replacement', (root/'Tests/SceneEffectsValidation.swift').read_text()+'\n'+(root/'Tests/AdvancedEffectsValidation.swift').read_text()+'\n'+(root/'Tests/HDRVolumeValidation.swift').read_text()+'\n// Exercise map replacement'))
+if os.environ.get('AO_RESOLUTION') == '1':
+    setup=(root/'Tests/AmbientOcclusionValidation.swift').read_text().split('func measure(')[0]
+    (output/'main.swift').write_text(source+'\n'+setup+(root/'Tests/ResolutionValidation.swift').read_text())
 if os.environ.get('AO_PROFILE') == '1' or os.environ.get('AO_LIVE') == '1':
     setup=(root/'Tests/AmbientOcclusionValidation.swift').read_text().split('func frame()')[0]
     (output/'main.swift').write_text(source+'\n'+setup+(root/('Tests/EffectsLiveValidation.swift' if os.environ.get('AO_LIVE') == '1' else 'Tests/EffectsProfile.swift')).read_text())

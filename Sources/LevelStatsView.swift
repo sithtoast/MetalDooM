@@ -85,6 +85,31 @@ final class LevelStatsView: NSView {
 }
 
 extension App {
+    func applyMinimalHUDPortrait(_ visible:Bool) {
+        guard benchmark == nil else { return }
+        renderer.setMinimalHUDPortrait(visible)
+        UserDefaults.standard.set(visible,forKey:"minimalHUDPortrait")
+        gameMenu?.refreshHUD()
+    }
+    @objc func toggleMinimalHUDPortrait() { applyMinimalHUDPortrait(!renderer.minimalHUDPortrait) }
+    func applyHUDStyle(_ style:HUDStyle) {
+        guard benchmark == nil else { return }
+        renderer.setHUDStyle(style)
+        UserDefaults.standard.set(style.rawValue,forKey:"hudStyle")
+        gameMenu?.refreshHUD()
+    }
+    @objc func selectHUDStyle(_ sender:NSMenuItem) {
+        guard let style=HUDStyle(rawValue:sender.tag) else { return }
+        applyHUDStyle(style)
+    }
+    func applyHUDSize(_ percent:Int) {
+        guard benchmark == nil else { return }
+        renderer.setHUDSize(percent)
+        UserDefaults.standard.set(renderer.hudSizePercent,forKey:"hudStatusBarSize")
+        gameMenu?.refreshHUD()
+    }
+    @objc func selectHUDSize(_ sender:NSMenuItem) { applyHUDSize(sender.tag) }
+
     @objc func toggleLevelStats() { levelStatsVisible.toggle(); UserDefaults.standard.set(levelStatsVisible,forKey:"showLevelStats"); updateLevelStats() }
     @objc func toggleParTime() { parTimeVisible.toggle(); UserDefaults.standard.set(parTimeVisible,forKey:"showParTime"); updateLevelStats() }
     @objc func toggleSecretNotifications() { secretNotifications.toggle(); UserDefaults.standard.set(secretNotifications,forKey:"secretNotifications"); updateLevelStats() }

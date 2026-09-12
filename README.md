@@ -3,14 +3,15 @@
 Classic Doom on Apple Silicon, with native Metal rendering and gameplay powered
 by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
-**Version 0.8.0 · experimental source preview · not notarized.**
+**Version 0.9.0 · experimental source preview · not notarized.**
 
 This branch adds independently switchable AO, test/torch/projectile/muzzle
 lighting, sprite light reception, hard/soft world shadows, emissive surface
 lighting, bloom, embers, projectile trails, volumetric haze, optional smooth world
 textures and HDR display output.
-Try **View → Effects Presets → HDR Showcase**, or adjust individual switches.
-Separate graphics presets set resolution/frame cap, and custom effects can be
+Try **View → Effects Presets → Medium HDR**, or adjust individual switches.
+World scaling now includes optional MetalFX and 150/200% supersampling with a native-resolution HUD, adjustable size and a transparent Minimal style ([details](docs/RESOLUTION.md)).
+Separate graphics presets set world resolution/frame cap, and custom effects can be
 saved. Effects start in Classic. Local builds are ad-hoc signed; release packages
 use the separate signing workflow. See [Metal experiments](docs/METAL_EXPERIMENTS.md).
 
@@ -32,9 +33,10 @@ legally obtained game data. See [INSTALL.md](INSTALL.md) for package details.
 - Doom II
 - Final Doom: TNT: Evilution and The Plutonia Experiment
 - Standard SIGIL Episode 5, loaded with Ultimate Doom
+- Validated KEX rerelease editions of No Rest for the Living, Master Levels and SIGIL II ([loading and limits](docs/KEX_SUPPORT.md))
 
 Supported rerelease IWADs are labelled **KEX Edition**. Classic binary Doom maps
-are the focus; GZDoom mods, Boom/MBF extensions, SIGIL II, Legacy of Rust/ID24 and
+are the focus; GZDoom mods, Boom/MBF extensions, Legacy of Rust/ID24 and
 multiplayer are not supported. Full campaign playthrough coverage is still in progress.
 
 ## Playing

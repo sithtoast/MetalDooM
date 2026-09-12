@@ -8,19 +8,20 @@ final class IntermissionRenderer {
     private let depth: MTLDepthStencilState
     private let ultimate: Bool
     private let sigilStory: String
+    private let sigil2Story: String
     private let stories = (1...4).map { String(cString:MD_FinaleText(Int32($0))) }
     init(device: MTLDevice, wad: WAD) throws {
-        sigilStory=wad.sigilStory
+        sigilStory=wad.sigilStory;sigil2Story=wad.campaign?.story ?? ""
         ultimate = wad.lump("E4M1") != nil
         let descriptor = MTLDepthStencilDescriptor(); descriptor.depthCompareFunction = .always
         depth = device.makeDepthStencilState(descriptor:descriptor)!
         let art = try Art(wad:wad)
-        let flats = ["FLOOR4_8","SFLR6_1","MFLR8_4","MFLR8_3","SLIME16","RROCK14","RROCK07","RROCK17","RROCK13","RROCK19","FLOOR7_2"]
+        let flats = ["FLOOR4_8","SFLR6_1","MFLR8_4","MFLR8_3","SLIME16","RROCK14","RROCK07","RROCK17","RROCK13","RROCK19","FLOOR7_2","CEIL4_2"]
         let names = ["WISPLAT","WIURH0","WIURH1","WISUCKS","INTERPIC","WIMAP0","WIMAP1","WIMAP2","WIF","WIENTER","WIOSTK","WIOSTI","WISCRT2","WITIME","WIPAR","WIPCNT","WICOLON"]
             + (0...9).map { "WINUM\($0)" }
-            + (0...4).flatMap { episode in (0...8).map { "WILV\(episode)\($0)" } }
+            + (0...5).flatMap { episode in (0...8).map { "WILV\(episode)\($0)" } }
             + (0...31).map { String(format:"CWILV%02d",$0) }
-            + ["SIGILINT","SIGILEND","BOSSBACK","CREDIT","HELP2","VICTORY2","ENDPIC","PFUB1","PFUB2"] + flats
+            + ["SIGILIN2","SIGILINT","SIGILEND","BOSSBACK","CREDIT","HELP2","VICTORY2","ENDPIC","PFUB1","PFUB2"] + flats
             + (0...6).map { "END\($0)" }
             + wad.lumps.map(\.name).filter { $0.hasPrefix("WIA") || $0.hasPrefix("STCFN") }
         var castNames: [String]=[], inSprites=false
@@ -92,15 +93,15 @@ final class IntermissionRenderer {
             }
             return
         }
-        if state.phase==2 && state.commercial==0 && (1...5).contains(state.episode) {
+        if state.phase==2 && state.commercial==0 && (1...6).contains(state.episode) {
             // Clip tiled flats and scrolling artwork to the original logical screen.
             encoder.setScissorRect(MTLScissorRect(x:Int(ox),y:Int(oy),width:max(1,Int(320*scale)),height:max(1,Int(240*scale))))
             defer { encoder.setScissorRect(MTLScissorRect(x:0,y:0,width:Int(width),height:Int(height))) }
             if !finale.art {
-                let flat=["FLOOR4_8","SFLR6_1","MFLR8_4","MFLR8_3","FLOOR7_2"][Int(state.episode)-1]
+                let flat=["FLOOR4_8","SFLR6_1","MFLR8_4","MFLR8_3","FLOOR7_2","FLOOR7_2"][Int(state.episode)-1]
                 for y in stride(from:0,to:200,by:64) { for x in stride(from:0,to:320,by:64) { draw(flat,Float(x),Float(y)) } }
                 var x: Float=10, y: Float=10
-                for character in (state.episode==5 ? sigilStory:stories[Int(state.episode)-1]).prefix(finale.visibleCharacters).uppercased().unicodeScalars {
+                for character in (state.episode==6 ? sigil2Story:state.episode==5 ? sigilStory:stories[Int(state.episode)-1]).prefix(finale.visibleCharacters).uppercased().unicodeScalars {
                     if character.value==10 { x=10; y += 11; continue }
                     let name=String(format:"STCFN%03d",character.value)
                     let size=patches[name]?.width ?? 4
@@ -111,12 +112,12 @@ final class IntermissionRenderer {
                 draw("PFUB2",-Float(finale.scroll),0); draw("PFUB1",320-Float(finale.scroll),0)
                 if let frame=finale.endFrame { draw("END\(frame)",108,68) }
             } else {
-                draw(state.episode==5 ? "CREDIT" : state.episode==1 ? (ultimate ? "CREDIT":"HELP2") : state.episode==2 ? "VICTORY2":"ENDPIC",0,0)
+                draw(state.episode>=5 ? "CREDIT" : state.episode==1 ? (ultimate ? "CREDIT":"HELP2") : state.episode==2 ? "VICTORY2":"ENDPIC",0,0)
             }
             return
         }
         func level(_ map: Int32) -> String { state.commercial != 0 ? String(format:"CWILV%02d",map-1) : "WILV\(state.episode-1)\(map-1)" }
-        let background = state.episode==5 ? "SIGILINT" : state.commercial == 0 && state.episode <= 3 ? "WIMAP\(state.episode-1)" : "INTERPIC"
+        let background = state.episode==6 ? "SIGILIN2" : state.episode==5 ? "SIGILINT" : state.commercial == 0 && state.episode <= 3 ? "WIMAP\(state.episode-1)" : "INTERPIC"
         draw(background,0,0)
         for animation in sequence.animations(state) {
             let patch=patches[animation.name]

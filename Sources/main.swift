@@ -1,5 +1,6 @@
 import AppKit
 import MetalKit
+import MetalFX
 import UniformTypeIdentifiers
 
 let version = Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "development"
@@ -73,6 +74,19 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let viewItem=NSMenuItem(), viewMenu=NSMenu(title:"View")
             viewItem.submenu=viewMenu; menu.addItem(viewItem)
             addGraphicsMenus(to:viewMenu)
+            let hudStyleItem=NSMenuItem(title:"HUD Style",action:nil,keyEquivalent:"")
+            let hudStyleMenu=NSMenu(title:"HUD Style");hudStyleItem.submenu=hudStyleMenu;viewMenu.addItem(hudStyleItem)
+            for style in HUDStyle.allCases {
+                let item=hudStyleMenu.addItem(withTitle:style.title,action:#selector(selectHUDStyle(_:)),keyEquivalent:"")
+                item.tag=style.rawValue;item.target=self
+            }
+            viewMenu.addItem(withTitle:"Doomguy Portrait in Minimal HUD",action:#selector(toggleMinimalHUDPortrait),keyEquivalent:"").target=self
+            let hudSizeItem=NSMenuItem(title:"HUD Status Bar Size",action:nil,keyEquivalent:"")
+            let hudSizeMenu=NSMenu(title:"HUD Status Bar Size");hudSizeItem.submenu=hudSizeMenu;viewMenu.addItem(hudSizeItem)
+            for percent in SpriteRenderer.hudSizes {
+                let item=hudSizeMenu.addItem(withTitle:"\(percent)%"+(percent==100 ? " (Original)":""),action:#selector(selectHUDSize(_:)),keyEquivalent:"")
+                item.tag=percent;item.target=self
+            }
             statusBarMenuItem=viewMenu.addItem(withTitle:"Show Status Bar",action:#selector(toggleStatusBar),keyEquivalent:"")
             statusBarMenuItem?.target=self
             levelStatsMenuItem=viewMenu.addItem(withTitle:"Show Level Stats",action:#selector(toggleLevelStats),keyEquivalent:"")
@@ -133,8 +147,12 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             view.preferredFramesPerSecond = 120; view.framebufferOnly = false
             configureMetalHUD()
             renderer = try Renderer(view:view); view.delegate = renderer
+            renderer.setMinimalHUDPortrait(UserDefaults.standard.bool(forKey:"minimalHUDPortrait"))
+            renderer.setHUDStyle(HUDStyle(rawValue:UserDefaults.standard.integer(forKey:"hudStyle")) ?? .classic)
+            renderer.setHUDSize(UserDefaults.standard.object(forKey:"hudStatusBarSize") as? Int ?? 100)
             view.onEscape = { [weak self] in self?.openGameMenu() }
             view.onBlockedClick = { [weak self] in if self?.attractActive==true && self?.consoleVisible==false { self?.openGameMenu() } }
+            view.metalFXEnabled=(UserDefaults.standard.object(forKey:"metalFXSpatial") as? Bool ?? true) && MTLFXSpatialScalerDescriptor.supportsDevice(renderer.device)
             view.renderScale=CGFloat(UserDefaults.standard.object(forKey:"renderScale") as? Double ?? 1)
             view.preferredFramesPerSecond=UserDefaults.standard.object(forKey:"frameLimit") as? Int ?? 120
             menuKeyMonitor=NSEvent.addLocalMonitorForEvents(matching:.keyDown) { [weak self] event in
@@ -444,7 +462,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             switch try ConsoleCommand.parse(text) {
             case .simple(let name):
                 switch name {
-                case "help": return "help / clear / status / maps / map <name> / restart / close\nvolume <0–1> / musicvolume <0–1> / music on|off\nrender_scale <50|75|100> / fps <35|60|120> / fullscreen on|off\ngod / noclip / give all / give ammo (or classic cheat codes)\nMap and restart begin a fresh level; save your progress first."
+                case "help": return "help / clear / status / maps / map <name> / restart / close\nvolume <0–1> / musicvolume <0–1> / music on|off\nrender_scale <50|75|100|150|200> / fps <35|60|120> / fullscreen on|off\ngod / noclip / give all / give ammo (or classic cheat codes)\nMap and restart begin a fresh level; save your progress first."
                 case "give": return "Usage: give all | give ammo"
                 case "clear": console?.clear(); return ""
                 case "close": toggleConsole(); return ""
@@ -454,7 +472,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     endAttract();try renderer.reset(); return "Level restarted."
                 default:
                     let size=view.drawableSize
-                    return "\(appTitle)\n\(wad?.displayName ?? "No WAD") — \(summary)\n\(renderer.playerStatus)\nGPU: \(renderer.device.name)\nRender: \(Int(size.width))x\(Int(size.height)) at \(Int(view.renderScale*100))%; limit \(view.preferredFramesPerSecond) FPS\nEffects: \(renderer.effectsVolume); music: \(renderer.musicVolume) (\(renderer.musicEnabled ? "on" : "off"))"
+                    return "\(appTitle)\n\(wad?.displayName ?? "No WAD") — \(summary)\n\(renderer.playerStatus)\nGPU: \(renderer.device.name)\nOutput: \(Int(size.width))x\(Int(size.height)); world \(Int(view.renderScale*100))%; limit \(view.preferredFramesPerSecond) FPS\nEffects: \(renderer.effectsVolume); music: \(renderer.musicVolume) (\(renderer.musicEnabled ? "on" : "off"))"
                 }
             case .map(let name):
                 guard let wad else { throw ConsoleError("No WAD loaded.") }

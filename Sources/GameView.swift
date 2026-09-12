@@ -15,10 +15,17 @@ final class GameView: MTKView {
     var weaponQueued: Int32 = -1
     var continueQueued = false
     var onEscape: (() -> Void)?
-    var renderScale: CGFloat = 1 { didSet { updateResolution() } }
+    var renderScale: CGFloat = 1 { didSet {
+        if !renderScale.isFinite || renderScale < 0.5 || renderScale > 2 { renderScale=1 }
+        updateResolution()
+    } }
+    var metalFXEnabled = true
+    var worldSize: CGSize {
+        CGSize(width:max(1,(drawableSize.width*renderScale).rounded()),height:max(1,(drawableSize.height*renderScale).rounded()))
+    }
     func updateResolution() {
         autoResizeDrawable=false
-        let scale=(window?.backingScaleFactor ?? 2)*renderScale
+        let scale=(window?.backingScaleFactor ?? 2)
         drawableSize=CGSize(width:max(1,(bounds.width*scale).rounded()),height:max(1,(bounds.height*scale).rounded()))
     }
     override func layout() { super.layout(); updateResolution() }

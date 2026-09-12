@@ -4,6 +4,57 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.9.0 refinement — Optional Minimal HUD portrait (build 124)
+
+- Add a remembered Doomguy portrait toggle under Options → HUD and View →
+  Doomguy Portrait in Minimal HUD. It starts off and applies to Minimal only.
+- Show the original animated face beside health, including damage, glance, god
+  and death expressions, with a transparent background and pixel shadow. Portrait
+  and counters share HUD size; weapon size and world resolution remain independent.
+- Preserve the existing portrait-free Minimal layout when disabled and the Classic
+  status bar at all times. Continue the unreleased 0.9.0 HUD/resolution refinement.
+
+## 0.9.0 refinement — Transparent Minimal HUD (build 123)
+
+- Add remembered Classic / Minimal HUD styles under Options → HUD and View → HUD
+  Style. Minimal shows health and armor on the left, current ammo on the right,
+  and owned keys above ammo, using native-resolution WAD artwork with shadows.
+- Render the world behind the Minimal overlay through the bottom edge, eliminating
+  the black side areas of the smaller Classic bar. Retain 25/50/75/100% sizing;
+  Minimal HUD size changes leave the weapon and camera unchanged.
+- Preserve Classic art, world upscaling, supersampling, HDR and weapon invisibility.
+  Continue the unreleased 0.9.0 resolution feature release.
+
+## 0.9.0 refinement — Adjustable HUD status bar (build 122)
+
+- Add remembered 25/50/75/100% status-bar sizes under Options → HUD and
+  View → HUD Status Bar Size, including fullscreen use. 100% restores the original.
+- Keep health, armor, ammunition, face and KEX background artwork aligned and
+  centered at the bottom. Smaller bars give height back to the world viewport,
+  independently of world resolution, upscaling and effects.
+- Remain on the unreleased 0.9.0 resolution feature release.
+
+## 0.9.0 — World resolution and bundled KEX campaigns (build 120)
+
+- Keep weapon, HUD, menus and intermissions at native display resolution while
+  scaling the world to 50/75/100/150/200%; add optional MetalFX Spatial upscaling,
+  filtered supersampling and Sharp/Supersampled graphics presets.
+- Preserve HDR/EDR composition, effects, masked world sprites, weapon invisibility
+  and Classic restoration across resolution changes.
+- Add dedicated profiles for the validated KEX editions of No Rest for the Living,
+  Master Levels and SIGIL II: map/music/sky metadata, campaign routes and endings,
+  boss behavior, pars, exact-stack saves and SIGIL II flame-wall animation.
+- Keep campaign selectors and title/credit cycles separate from inherited base
+  maps/demos. Reject unvalidated editions and general extended resource tables.
+  Legacy of Rust/ID24 remains unsupported; document the remaining single-player scope.
+
+## Handoff update — no app rebuild (latest local build 115)
+
+- Refresh the main/merge/tag baseline and next-chat plan for resolution
+  enhancements and broader KEX rerelease support. Record installed WAD names,
+  existing compatibility boundaries, source pointers and validation expectations.
+  Documentation only; app behavior and semantic version remain unchanged.
+
 ## 0.8.0 · Build 115 — Repair pre-merge checks
 
 - Fix the no-WAD input check's stale renderer dependencies by moving the unchanged

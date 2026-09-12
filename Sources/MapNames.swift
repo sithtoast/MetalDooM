@@ -140,6 +140,7 @@ extension WAD {
         "Go 2 It",
     ]
     func mapTitle(_ map: String) -> String {
+        if let name=campaign?.value("levelname",map:map) { return "\(map): \(name)" }
         if isSigil, map.hasPrefix("E5M"), let number=Int(map.suffix(1)), (1...9).contains(number) {
             let names=["Baphomet's Demesne","Sheol","Cages of the Damned","Paths of Wretchedness","Abaddon's Void","Unspeakable Persecution","Nightmare Underworld","Halls of Perdition","Realm of Iblis"]
             return "\(map): \(names[number-1])"

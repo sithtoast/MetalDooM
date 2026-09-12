@@ -29,7 +29,7 @@ final class MusicPlayer {
         engine.attach(synth); engine.connect(synth,to:engine.mainMixerNode,format:nil)
         engine.mainMixerNode.outputVolume=0.7
         engine.prepare()
-        try select(Self.levelTrack(map))
+        try select(wad.campaign?.value("music",map:map) ?? Self.levelTrack(map))
     }
     deinit { sequencer?.stop(); engine.stop() }
     static func levelTrack(_ map: String) -> String {

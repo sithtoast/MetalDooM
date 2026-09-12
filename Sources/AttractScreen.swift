@@ -60,6 +60,9 @@ extension App {
         } else {
             attractElapsed += 0.1
             guard attractElapsed>=11 else { return }
+            if wad?.campaign != nil {
+                attractIndex += 1;showAttractPage(attractIndex%2==0 ? "TITLEPIC":"CREDIT");return
+            }
             let count=wad?.lump("DEMO4") != nil ? 4:3
             let demo="DEMO\(attractIndex%count+1)"
             do { try playDemo(demo) }
@@ -67,7 +70,7 @@ extension App {
         }
     }
     func playDemo(_ name:String) throws {
-        guard let wad, let bytes=wad.lump(name), bytes.count>=14 else { throw PortError("Missing or truncated demo: \(name)") }
+        guard let wad, wad.campaign==nil, let bytes=wad.lump(name), bytes.count>=14 else { throw PortError("Missing or truncated demo: \(name)") }
         let episode=Int(bytes.data[2]),number=Int(bytes.data[3])
         let map=wad.maps.contains("MAP01") ? String(format:"MAP%02d",number):"E\(episode)M\(number)"
         guard wad.maps.contains(map) else { throw PortError("Demo map is absent.") }

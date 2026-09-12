@@ -1,4 +1,4 @@
-# MetalDooM 0.8.0 — Apple Silicon preview
+# MetalDooM 0.9.0 — Apple Silicon preview
 
 A native Metal source port for classic Doom, powered by Chocolate Doom.
 Requires Apple Silicon and macOS 14 or later. This is an early preview.
@@ -13,7 +13,28 @@ and confirm. See INSTALL.md inside the ZIP.
 Supply your own Doom/Ultimate Doom, Doom II, TNT or Plutonia IWAD. Standard SIGIL
 Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
-## New in 0.8.0
+## New in 0.9.0
+
+Final local build: **124**.
+
+Minimal HUD now has an optional remembered Doomguy portrait beside health. Toggle
+it in Options → HUD or View → Doomguy Portrait in Minimal HUD; original face
+expressions and the selected HUD size apply.
+
+Choose Classic or Minimal under Options → HUD or View → HUD Style. The remembered
+Minimal style draws health, armor, ammo and keys over the full-height world, with
+shadowed WAD artwork and the same adjustable sizes.
+
+Options → HUD and View → HUD Status Bar Size now provide remembered 25/50/75/100%
+bar sizes for windowed/fullscreen play, reclaiming game-view height at smaller sizes.
+
+World-only MetalFX spatial upscaling and 150/200% supersampling preserve native
+HUD, weapon and menu resolution. No Rest for the Living, Master Levels and SIGIL II
+have dedicated profiles for the validated rerelease files, including progression,
+music, skies, saves and campaign-specific engine rules. See docs/RESOLUTION.md and
+docs/KEX_SUPPORT.md. Legacy of Rust/ID24 remains unsupported.
+
+## Previous 0.8.0 release
 
 Build 115 repairs the pre-merge input check and audio test's source dependencies.
 Gameplay and effects settings are unchanged.
@@ -71,14 +92,14 @@ reselect a built-in preset to adopt its new settings.
 - Fixed phantom imps caused by drawing invisible teleport destinations.
 - Shorter About credits and separate player, developer and testing guides.
 
-Local experimental build: **106**, version **0.8.0**. GPU checks cover the existing
+Historical 0.8.0 build-106 validation: GPU checks cover the existing
 AO/lighting regressions plus fog sources, density, wall occlusion, HUD isolation,
 linear EDR mapping, live headroom, preset restoration, resize and HDR/SDR switches.
 Native controls and HDR Showcase were inspected on the M5 Pro. Haze is a bounded
 single-scattering approximation; other displays/GPUs and sustained crowded-combat
 frame rates remain untested. Details are in docs/VALIDATION.md. GitHub
 artifacts use their own CI build number. Multiplayer, general GZDoom/Boom/MBF mods,
-SIGIL II and Legacy of Rust are not supported. Full manual campaign playthrough coverage remains ongoing.
+Legacy of Rust is not supported. Full manual campaign playthrough coverage remains ongoing.
 
 Attach the binary ZIP, matching source ZIP and SHA-256 files to the GitHub release.
 The source archive includes the vendored engine, build scripts and licenses.

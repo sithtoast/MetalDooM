@@ -20,6 +20,13 @@ func profile(_ label:String,_ preset:EffectsPreset) throws {
     print(String(format:"PROFILE %@: median %.3f ms, p95 %.3f ms, 2200x1520, %d GPU frames",label,sorted[16],sorted[30],sorted.count))
 }
 print("PROFILE: fixed camera, paused simulation, API validation \(ProcessInfo.processInfo.environment["MTL_DEBUG_LAYER"] ?? "default"), GPU duration excludes display pacing")
+if ProcessInfo.processInfo.environment["AO_RESOLUTION_PROFILE"] == "1" {
+    for factor:CGFloat in [1,0.75,0.5] {
+        subject.view.renderScale=factor;subject.view.drawableSize=CGSize(width:2200,height:1520)
+        subject.view.metalFXEnabled=true
+        try profile("Medium HDR \(Int(factor*100))% world / native output",EffectsPreset.builtins[3])
+    }
+} else {
 try profile("Classic",EffectsPreset())
 try profile("Medium",EffectsPreset.builtins[1])
 try profile("Medium HDR",EffectsPreset.builtins[3])
@@ -32,6 +39,7 @@ try profile("Medium HDR without volumetrics",preset)
 preset=EffectsPreset.builtins[3];preset.highRayQuality=true
 try profile("Medium HDR High",preset)
 try profile("Ludicrous",EffectsPreset.builtins[4])
+}
 subject.applicationWillTerminate(Notification(name:NSApplication.willTerminateNotification))
 subject.window.performClose(nil)
 }

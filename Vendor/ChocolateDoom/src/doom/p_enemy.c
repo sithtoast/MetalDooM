@@ -1670,6 +1670,8 @@ static boolean CheckBossEnd(mobjtype_t motype)
 //
 void A_BossDeath (mobj_t* mo)
 {
+    // MetalDooM: dedicated rerelease campaign boss actions.
+    if (MD_CampaignBossDeath(mo)) return;
     thinker_t*	th;
     mobj_t*	mo2;
     line_t	junk;

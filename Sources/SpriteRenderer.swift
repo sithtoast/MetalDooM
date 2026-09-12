@@ -7,6 +7,11 @@ private struct GPUPatch {
     let width: Float, height: Float, left: Float, top: Float
 }
 
+enum HUDStyle: Int, CaseIterable {
+    case classic, minimal
+    var title: String { self == .classic ? "Classic" : "Minimal" }
+}
+
 final class SpriteRenderer {
     private let device: MTLDevice
     private let art: Art
@@ -28,6 +33,18 @@ final class SpriteRenderer {
         for name in names {
             guard let patch = try art.patch(named:name) else { throw PortError("Missing HUD art: \(name).") }
             hudPatches[name] = try upload(patch)
+        }
+        // Minimal HUD labels reuse the WAD font. Shadow textures retain only alpha;
+        // uploads happen once, never in the frame loop.
+        let labelNames=Set("HEALTHARMOM".unicodeScalars.map { String(format:"STCFN%03d",$0.value) })
+        for name in labelNames {
+            if let patch=try art.patch(named:name) { hudPatches[name]=try upload(patch) }
+        }
+        for name in Array(hudPatches.keys) where name.hasPrefix("STT") || name.hasPrefix("STKEYS") || name.hasPrefix("STF") || labelNames.contains(name) {
+            guard let patch=try art.patch(named:name) else { continue }
+            var rgba=patch.image.rgba
+            for i in stride(from:0,to:rgba.count,by:4) { rgba[i]=0;rgba[i+1]=0;rgba[i+2]=0 }
+            hudPatches["shadow:"+name]=try upload(PatchImage(image:PixelImage(width:patch.image.width,height:patch.image.height,rgba:rgba),left:patch.left,top:patch.top))
         }
         // Decode all original sprite frames once, so engine animation changes do
         // not cause frame-time texture uploads or invisible missing frames.
@@ -76,7 +93,7 @@ final class SpriteRenderer {
             encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:6)
         }
     }
-    func drawWeapon(encoder: MTLRenderCommandEncoder, width: Double, height: Double, fuzz: Bool=false) {
+    func drawWeapon(encoder: MTLRenderCommandEncoder, width: Double, height: Double, fuzz: Bool=false, overlay: Bool=false) {
         var frames = [MD_WeaponSprite](repeating:MD_WeaponSprite(),count:2)
         let count = frames.withUnsafeMutableBufferPointer { MD_CopyWeaponSprites($0.baseAddress,2) }
         encoder.setDepthStencilState(hudDepth)
@@ -84,11 +101,14 @@ final class SpriteRenderer {
         encoder.setVertexBytes(&matrix,length:MemoryLayout<simd_float4x4>.stride,index:1)
         // Match the classic 320x168 view: the weapon is centered and clipped at
         // the status bar. Widescreen adds space beside it, not a stretched gun.
-        let scale = Float(height/168), originX = (Float(width)-320*scale)/2
+        let scale = Float(height/(overlay ? 200:168)), originX = (Float(width)-320*scale)/2
+        // Fullscreen HUD uses the 200-line canvas and bottom-anchors the weapon.
+        // Its scale is independent of the selected HUD percentage.
+        let originY: Float = overlay ? Float(height)-168*scale:0
         for frame in frames.prefix(Int(count)) where (frame.shadow != 0)==fuzz {
             guard let patch = patches[Int(frame.lump)] else { continue }
             let x0 = originX+(frame.x-patch.left)*scale
-            let y0 = (frame.y-patch.top-16)*scale
+            let y0 = originY+(frame.y-patch.top-16)*scale
             let x1 = x0+patch.width*scale, y1 = y0+patch.height*scale
             let u0: Float = frame.flip != 0 ? patch.width : 0, u1: Float = frame.flip != 0 ? 0 : patch.width
             func vertex(_ x: Float, _ y: Float, _ u: Float, _ v: Float) -> WorldVertex {
@@ -101,15 +121,24 @@ final class SpriteRenderer {
             encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:6)
         }
     }
-    static func hudHeight(width: Double) -> Double { 32*max(1,floor(width/320)) }
-    func drawHUD(encoder: MTLRenderCommandEncoder, state: MD_HUD, width: Double, height: Double) {
+    // Percent of the classic width-based size. Keep a one-pixel artwork minimum
+    // and a whole-pixel bar height so the world/HUD boundary cannot leave a seam.
+    static let hudSizes = [25,50,75,100]
+    static func hudPixelScale(width: Double, percent: Int = 100) -> Double {
+        let factor=Double(hudSizes.contains(percent) ? percent:100)/100
+        return max(1,(max(1,floor(width/320))*factor*32).rounded()/32)
+    }
+    static func hudHeight(width: Double, percent: Int = 100) -> Double { 32*hudPixelScale(width:width,percent:percent) }
+    func drawHUD(encoder: MTLRenderCommandEncoder, state: MD_HUD, width: Double, height: Double, percent: Int = 100, style: HUDStyle = .classic, portrait: Bool = false) {
         encoder.setDepthStencilState(hudDepth)
         encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:height,znear:0,zfar:1))
-        let scale = Float(max(1,floor(width/320))), originX = (Float(width)-320*scale)/2, originY = Float(height)-32*scale
+        let scale = Float(Self.hudPixelScale(width:width,percent:percent))
+        let originX: Float = style == .minimal ? 0:(Float(width)-320*scale)/2
+        let originY: Float = style == .minimal ? 0:Float(height)-32*scale
         // Identity transform lets the shared vertex shader draw screen-space quads.
         var matrix = matrix_identity_float4x4
         encoder.setVertexBytes(&matrix,length:MemoryLayout<simd_float4x4>.stride,index:1)
-        func draw(_ name: String, _ x: Float, _ y: Float) {
+        func patch(_ name: String, _ x: Float, _ y: Float) {
             guard let patch = hudPatches[name] else { return }
             let x0 = originX+(x-patch.left)*scale, y0 = originY+(y-patch.top)*scale
             let x1 = x0+patch.width*scale, y1 = y0+patch.height*scale
@@ -122,6 +151,10 @@ final class SpriteRenderer {
             encoder.setFragmentTexture(patch.texture,index:0)
             encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:6)
         }
+        func draw(_ name: String, _ x: Float, _ y: Float) {
+            if style == .minimal { patch("shadow:"+name,x+1,y+1) }
+            patch(name,x,y)
+        }
         func number(_ value: Int32, _ right: Float, _ y: Float, _ prefix: String) {
             guard value >= 0 else { return }
             var x = right
@@ -129,6 +162,39 @@ final class SpriteRenderer {
                 let name = "\(prefix)\(digit)"
                 x -= hudPatches[name]?.width ?? 0; draw(name,x,y)
             }
+        }
+        let index=max(0,min(41,Int(state.faceIndex))), pain=index/8, expression=index%8
+        let face: String
+        if index==41 { face="STFDEAD0" }
+        else if index==40 { face="STFGOD0" }
+        else if expression<3 { face="STFST\(pain)\(expression)" }
+        else { face=["STFTR\(pain)0","STFTL\(pain)0","STFOUCH\(pain)","STFEVL\(pain)","STFKILL\(pain)"][expression-3] }
+        if style == .minimal {
+            let w=Float(width)/scale, h=Float(height)/scale
+            func label(_ text: String, _ x: Float, _ y: Float) {
+                var cursor=x
+                for code in text.unicodeScalars {
+                    let name=String(format:"STCFN%03d",code.value)
+                    draw(name,cursor,y);cursor += (hudPatches[name]?.width ?? 4)
+                }
+            }
+            // Keep the animated portrait beside health, clear of the centered gun.
+            // Switching it off restores the original Minimal layout exactly.
+            let shift: Float = portrait ? 36:0
+            if portrait { draw(face,8,h-36) }
+            label("HEALTH",8+shift,h-38);number(max(0,state.health),50+shift,h-26,"STTNUM");draw("STTPRCNT",50+shift,h-26)
+            label("ARMOR",82+shift,h-38);number(state.armor,124+shift,h-26,"STTNUM");draw("STTPRCNT",124+shift,h-26)
+            // Melee weapons have readyAmmo < 0: omit the ammo group entirely.
+            if state.readyAmmo >= 0 {
+                label("AMMO",w-50,h-38);number(state.readyAmmo,w-8,h-26,"STTNUM")
+            }
+            // Show both card and skull when owned; no opaque backing panels.
+            for color in 0..<3 {
+                for kind in 0..<2 where state.keys & (1 << (color+kind*3)) != 0 {
+                    draw("STKEYS\(color+kind*3)",w-18-Float(2-color)*12,h-54-Float(kind)*10)
+                }
+            }
+            return
         }
         // Rerelease IWADs extend STBAR on both sides of the classic 320-wide
         // layout. Center that artwork without scaling its labels or moving the
@@ -139,12 +205,6 @@ final class SpriteRenderer {
         number(state.readyAmmo,44,3,"STTNUM")
         number(max(0,state.health),90,3,"STTNUM"); draw("STTPRCNT",90,3)
         number(state.armor,221,3,"STTNUM"); draw("STTPRCNT",221,3)
-        let index=max(0,min(41,Int(state.faceIndex))), pain=index/8, expression=index%8
-        let face: String
-        if index==41 { face="STFDEAD0" }
-        else if index==40 { face="STFGOD0" }
-        else if expression<3 { face="STFST\(pain)\(expression)" }
-        else { face=["STFTR\(pain)0","STFTL\(pain)0","STFOUCH\(pain)","STFEVL\(pain)","STFKILL\(pain)"][expression-3] }
         draw(face,143,0)
         for i in 0..<6 {
             let owned = state.weapons & (1 << (i+1)) != 0

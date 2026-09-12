@@ -65,9 +65,10 @@ extension App {
         let toggle=menu.addItem(withTitle:"Toggle Classic / Medium",action:#selector(toggleClassicMedium),keyEquivalent:"e")
         toggle.target=self;toggle.keyEquivalentModifierMask=[.command,.shift]
         let graphics=submenu("Graphics Presets")
-        for (i,title) in ["Performance — 50%, 120 FPS","Balanced — 75%, 120 FPS","Native — 100%, 120 FPS","Quiet — 75%, 60 FPS"].enumerated() {
+        for (i,title) in ["Performance — 50%, 120 FPS","Balanced — 75%, 120 FPS","Native — 100%, 120 FPS","Quiet — 75%, 60 FPS","Sharp — 150%, 120 FPS","Supersampled — 200%, 60 FPS"].enumerated() {
             let item=graphics.addItem(withTitle:title,action:#selector(selectGraphicsPreset(_:)),keyEquivalent:"");item.tag=i;item.target=self
         }
+        menu.addItem(withTitle:"MetalFX Spatial Upscaling",action:#selector(toggleMetalFX),keyEquivalent:"").target=self
         let quality=submenu("Ray Quality")
         for (i,title) in ["Balanced", "High"].enumerated() {
             let item=quality.addItem(withTitle:title,action:#selector(selectRayQuality(_:)),keyEquivalent:"");item.tag=i;item.target=self
@@ -99,7 +100,11 @@ extension App {
         }
         menu.addItem(.separator())
     }
-    static let graphicsPresets:[(CGFloat,Int)]=[(0.5,120),(0.75,120),(1,120),(0.75,60)]
+    static let graphicsPresets:[(CGFloat,Int)]=[(0.5,120),(0.75,120),(1,120),(0.75,60),(1.5,120),(2,60)]
+    @objc func toggleMetalFX() {
+        view.metalFXEnabled.toggle();UserDefaults.standard.set(view.metalFXEnabled,forKey:"metalFXSpatial")
+        gameMenu?.refreshDisplay()
+    }
     @objc func selectGraphicsPreset(_ sender:NSMenuItem) {
         guard Self.graphicsPresets.indices.contains(sender.tag) else { return }
         let (scale,fps)=Self.graphicsPresets[sender.tag]

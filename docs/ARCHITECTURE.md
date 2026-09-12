@@ -23,7 +23,7 @@ Swift owns native input/windowing and direct Metal rendering.
 
 ## Engine boundary
 
-The pinned upstream snapshot is unchanged. The host initializes its zone allocator,
+The pinned engine has narrow native integration changes; the 0.9.0 A_BossDeath hook delegates only recognized campaign overrides to Bridge.c. The host initializes its zone allocator,
 WAD directory, renderer resource metadata, and play subsystem, then starts a map
 with `G_InitNew`. Native input becomes `ticcmd_t`; original `P_Ticker` runs at 35 Hz.
 Original player and sector code handles motion, blocking, use traces, doors, and
@@ -210,7 +210,7 @@ preserved; keyboard input supports navigation, adjustment and save-name editing.
 gates the same update path as focus loss, freezing gameplay and intermission while
 rendering the paused scene. Escape releases pending gameplay input before opening.
 Classic controls select display and mixer settings; GameView sizes its Metal
-drawable explicitly using backing scale and render scale. The app owns a separate
+drawable using display backing scale; Renderer scales the world separately. The app owns a separate
 SoundPlayer decoding only five menu cues, so navigation remains audible while
 gameplay is paused. It follows effects volume and pauses on focus loss.
 
@@ -357,3 +357,10 @@ moving it changes uniforms rather than the acceleration structure. Sky, sprite,
 weapon and HUD shading remain independent. Both effects bypass fixed-colormap
 power-ups; ray failure clears both enable flags and restores classic rendering. See
 [Metal experiments](METAL_EXPERIMENTS.md) for controls and measurement boundaries.
+
+## Resolution and campaign profiles (0.9.0)
+
+See [world composition and scaling](RESOLUTION.md) and [campaign profiles](KEX_SUPPORT.md).
+The bridge registers SIGIL II's flame animation in the existing bounded animation table;
+normal engine ticks and save restoration drive it. Profile routing and boss overrides
+are per-process and keep the base engine behavior when no profile is configured.

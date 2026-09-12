@@ -35,8 +35,8 @@ import MetalKit
         menuOpened=false; view.keyDown(with:event(.keyDown,53,true)); precondition(!menuOpened)
         view.frame=NSRect(x:0,y:0,width:800,height:600); view.renderScale=1
         let full=view.drawableSize; view.renderScale=0.5
-        precondition(view.drawableSize.width==full.width/2 && view.drawableSize.height==full.height/2)
-        print("PASS: Escape opens menu once and clears gameplay input; render scale changes real drawable dimensions")
+        precondition(view.drawableSize==full && view.worldSize.width==full.width/2 && view.worldSize.height==full.height/2)
+        print("PASS: Escape opens menu once and clears gameplay input; world scale preserves native drawable dimensions")
         print("PASS: fire taps/holds and weapon selection survive tics and clear on focus release")
         print("PASS: native brief taps survive one tic, holds persist, use queues, and focus release clears input")
     }
