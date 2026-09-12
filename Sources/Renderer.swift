@@ -297,6 +297,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var previewSurfaceMesh:ExtendedMesh?,previewActors:[ExtendedSprite]=[]
     private var previewSurfaceFraction:Float=1
 
+    var extendedRustWeaponNames=true
     private var previewWeaponLabel:String?,previewAmmoLabel:String?
     private var previewSkies:[Int:SkyTransfer]=[:]
     private var previewTranslations:[MaterialKey:MaterialKey]=[:]
@@ -671,7 +672,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         previewPaletteIndex=UInt32(ui.palette);hud.fixedColorMap=Int32(ui.fixedMap)
         hud.health=Int32(ui.health);hud.armor=Int32(ui.armor);hud.readyAmmo=Int32(ui.readyAmmo);hud.readyWeapon=Int32(ui.weapon)
         hud.keys=ui.keys;hud.weapons=ui.weapons
-        previewWeaponLabel=ui.rustWeaponName;previewAmmoLabel=ui.rustAmmoName
+        previewWeaponLabel=extendedRustWeaponNames ? ui.rustWeaponName:ui.classicWeaponName;previewAmmoLabel=extendedRustWeaponNames ? ui.rustAmmoName:ui.classicAmmoName
         extendedPreview=true;hud.tick=Int32(scene.view.tic)
         hud.invisibility=weapons.contains{$0.shadow != 0} ? 129:0
         hudStyle = .minimal

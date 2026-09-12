@@ -117,7 +117,7 @@ struct WAD {
     // Diagnostic resources only. The worker owns map decoding and simulation;
     // normal gameplay refuses this PWAD-labelled resource view.
     init(previewResources paths: [URL], baseIndex: Int, profile: Int, identity: String) throws {
-        guard (1...32).contains(paths.count), paths.indices.contains(baseIndex), (0...1).contains(profile) else { throw PortError("Invalid preview resource plan.") }
+        guard (1...32).contains(paths.count), paths.indices.contains(baseIndex), (0...2).contains(profile) else { throw PortError("Invalid preview resource plan.") }
         let files=try paths.map { try WAD(url:$0) }
         var material=Data([77,69,83,69,83,83,50,0,UInt8(baseIndex),UInt8(profile),UInt8(paths.count),0,0,0,0,0])
         for file in files { material.append(contentsOf:SHA256.hash(data:file.sourceData[0])) }

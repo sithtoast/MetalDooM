@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Original sector-local sky transfers and floor/ceiling rotation controls."""
-import pathlib,runpy,struct,sys
+import json,pathlib,runpy,struct,sys
 out=pathlib.Path(sys.argv[1]);out.mkdir(parents=True,exist_ok=True)
 s=runpy.run_path(str(pathlib.Path(__file__).with_name('make_wall_palette_fixture.py')))
 name,wad=s['name'],s['wad']
-for mode,special in [('sky271',271),('sky272',272),('sky-scroll',271),('floor',2051),('ceiling',2052),('both',2053),('offset-both',2056)]:
+for mode,special in [('sky271',271),('sky272',272),('sky-scroll',271),('flatmap',0),('floor',2051),('ceiling',2052),('both',2053),('offset-both',2056)]:
  lumps=[]
  for label,body in s['room']:
   if label=='THINGS':body=struct.pack('<5h',-192,0,0,1,7)
@@ -20,7 +20,8 @@ for mode,special in [('sky271',271),('sky272',272),('sky-scroll',271),('floor',2
   if label=='VERTEXES' and mode=='offset-both':
    body=bytearray(body);struct.pack_into('<hh',body,4*4,192,-240)
   if label=='SECTORS':
-   body=struct.pack('<hh8s8shhh',0,128,name('F_SKY1' if mode.startswith('sky') else 'FLOOR0_1'),name('F_SKY1' if mode.startswith('sky') else 'CEIL1_1'),192,0,7)
+   body=struct.pack('<hh8s8shhh',0,128,name('F_SKY1' if mode.startswith('sky') else 'FLOOR0_1'),name('F_RSKY2' if mode=='flatmap' else 'F_SKY1' if mode.startswith('sky') else 'CEIL1_1'),192,0,7)
    body+=struct.pack('<hh8s8shhh',0,128,name('FLOOR0_1'),name('F_SKY1'),192,0,0)
   lumps.append((label,body))
+ if mode=='flatmap':lumps.append(('SKYDEFS',json.dumps({'type':'skydefs','version':'1.0.0','metadata':{},'data':{'skies':None,'flatmapping':[{'flat':'F_RSKY2','sky':'SKY2'}]}}).encode()))
  (out/f'sky-rotation-{mode}.wad').write_bytes(wad(lumps))

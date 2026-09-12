@@ -50,6 +50,8 @@ final class MusicPlayer {
         return state.commercial != 0 ? "D_DM2INT" : "D_INTER"
     }
     func select(_ name: String) throws {
+        // WAD names are case-insensitive, including engine-selected Doom II tracks.
+        let name=name.uppercased()
         guard let lump=wad.lump(name) else { throw PortError("Missing music: \(name).") }
         let midi=try MUS.midi(lump.data)
         if selectedBackend == "opl" {

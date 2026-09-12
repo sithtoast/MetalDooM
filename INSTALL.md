@@ -3,7 +3,7 @@
 Requires an Apple Silicon Mac and macOS 14 or later.
 
 Extract the release ZIP, drag MetalDooM.app to Applications, then open it.
-The current 0.10.0 build 157 is a local, ad-hoc-signed development preview and has
+The current 0.10.0 build 159 is a local, ad-hoc-signed development preview and has
 not been notarized. No new distribution ZIP was produced for this milestone.
 The previous 0.9.0 build 124 distribution was separately Developer ID signed,
 accepted by Apple and stapled; its notarization does not apply to newer builds.
@@ -22,7 +22,9 @@ Legacy of Rust remains unsupported in the ordinary picker. Version 0.10.0 includ
 an explicitly built Run/Pause preview of worlds, actors, weapons, HUD, level music, sound effects and native intermissions/finales through a separate
 simulation worker, with Restart, native completion/Continue and private Save/Load controls. See
 docs/EXTENDED_SAVES.md for save compatibility. See docs/EXTENDED_PREVIEW.md for launch instructions and
-docs/LEGACY_OF_RUST.md for the remaining work.
+docs/LEGACY_OF_RUST.md for the remaining work. The optional bundled single-player
+resource/weapon/texture/music plans and extras load order are documented in
+docs/EXTENDED_BUNDLED.md. Native lighting parity remains open.
 
 See PLAYER_GUIDE.md for controls and BUG_REPORT.md for reports. When reporting a bug,
 include Diagnostics → Copy Diagnostic Report; never attach commercial WADs.

@@ -5,7 +5,7 @@
 Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, branch
 **codex/legacy-of-rust**, based on fetched origin/main merge **afd7357**. Preserve
 `/Users/wmh/Dev/MetalDooM` and its release artifacts. Current feature version is
-**0.10.0**, final successful build **157**. This remains the same unreleased Rust
+**0.10.0**, final successful build **159**. This remains the same unreleased Rust
 feature; do not bump the minor version for each refinement.
 
 The explicit Rust preview now has **object/weapon blending, unified fuzz/translucent ordering and actor/moving-surface interpolation**, **sky transfers and flat rotation**, **fake floors and transferred lighting**, **translucent walls and palette effects**, **normal/additive/per-state actor translucency**, **camera/weapon interpolation during Run**, **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
@@ -15,13 +15,13 @@ with one-tic world/actor/weapon/material/audio/UI presentation. Manual buttons s
 tic too. Keep the ordinary Rust picker guard until full campaign acceptance.
 No speedrun/demo/upload work was requested; that idea remains a future aside.
 
-Read [skies/rotation](docs/EXTENDED_SKIES_ROTATION.md), [control sectors](docs/EXTENDED_CONTROL_SECTORS.md), [palette effects](docs/EXTENDED_PALETTES.md), [translucency](docs/EXTENDED_TRANSLUCENCY.md), [interpolation](docs/EXTENDED_INTERPOLATION.md), [scrolling flats](docs/EXTENDED_SCROLLING.md), [save/restore](docs/EXTENDED_SAVES.md), [preview/process contract](docs/EXTENDED_PREVIEW.md),
+Read [bundled content](docs/EXTENDED_BUNDLED.md) and [lighting baseline](docs/EXTENDED_LIGHTING.md), then [skies/rotation](docs/EXTENDED_SKIES_ROTATION.md), [control sectors](docs/EXTENDED_CONTROL_SECTORS.md), [palette effects](docs/EXTENDED_PALETTES.md), [translucency](docs/EXTENDED_TRANSLUCENCY.md), [interpolation](docs/EXTENDED_INTERPOLATION.md), [scrolling flats](docs/EXTENDED_SCROLLING.md), [save/restore](docs/EXTENDED_SAVES.md), [preview/process contract](docs/EXTENDED_PREVIEW.md),
 [campaign presentation](docs/EXTENDED_CAMPAIGN.md), [lifecycle](docs/EXTENDED_LIFECYCLE.md), [HUD/music](docs/EXTENDED_UI.md), [incremental geometry](docs/EXTENDED_MESH.md), [audio](docs/EXTENDED_AUDIO.md), [materials/cache](docs/EXTENDED_MATERIALS.md),
 [sprites](docs/EXTENDED_SPRITES.md), [geometry](docs/EXTENDED_GEOMETRY.md),
 [worker](docs/EXTENDED_ENGINE.md), [validation](docs/VALIDATION.md) and
 [roadmap](docs/LEGACY_OF_RUST.md).
 
-Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/blend-motion-final" bash scripts/build.sh`.
+Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/bundled-preview-final" bash scripts/build.sh`.
 Launch with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
 Only the explicit option packages/signs the helper/dylib and notices. Standard
 builds remain classic. Ordered resources are id24res → Doom II → id1, base index 1;
@@ -62,6 +62,44 @@ See EXTENDED_SKIES_ROTATION.md for exact coordinates and limits. Native projecti
 keeps its own perspective; optional software sky stretching and layered/procedural
 transferred skies remain unadapted (the latter reject explicitly).
 
+**Build159 adds explicit bundled single-player plans and named sky flats.**
+`--bundled-preview ROOT --content rust|doom2|resources|weapons|textures|music`
+selects a bounded resource role; `--extras` prepends extras before id24res/Doom II.
+Weapons uses id1-res then id1-weap; resource-only leaves classic weapon definitions.
+Music auditions D_IBEGIN or explicit `--track D_NAME`; no automatic Doom II track
+remap is invented. MAP01–32 saves restore using the plan's base/profile. Profile2
+permits the same audited ID24 fields as Rust while retaining 32 campaign maps.
+See EXTENDED_BUNDLED.md for exact order, acceptance boundaries and test commands.
+
+Named SKYDEFS F_RSKY1/2/3 planes now resolve without transfer sides; render-only
+plane names canonicalize to F_SKY1 while sky records preserve mapping/textures.
+MGE5/ABI2 and 18 exports remain. The native suite includes an independent named
+flat sky pixel oracle plus first/last maps of all six content plans with extras.
+All 352 map starts/tic35 preparations, 12 distinct resource identities, 24 map
+save/restore checks, 17 MIDI tracks and component weapon firing pass. This is
+bounded compatibility evidence, not full single-player campaign acceptance.
+
+Lighting: build/bundled-lighting-audit.json models 13,824 plane samples; 13,659
+RGB results differ from pinned Woof COLORMAP selection. No lighting shader change
+was made. Follow EXTENDED_LIGHTING.md for indexed textures, plane/scale tables,
+fake contrast/extralight, brightmaps/tints and matched-camera validation.
+Extras resources load, but carousel/SBARDEF/alternate H_ music presentation is
+still pending. Also keep layered/fire skies, software sky-stretch parity,
+full campaign/boss playtesting and sustained performance open. Multiplayer and
+speedrun/demo uploads are deferred. Earlier milestone remaining lists below
+are historical and do not replace these boundaries.
+
+Current candidate: `build/bundled-preview-final/MetalDooM.app`, **0.10.0/build159**;
+`build/build159.log`. The weapons + extras MAP01 session is paused at tic124,
+health100/ammo50, 43 actors/2,384 triangles, Sound/Music enabled, process87178/tool
+session18975. Running title, screenshot, strict signing and 18 exports verified;
+see the build159 section in VALIDATION.md.
+Preserve intermediate build158 at build/bundled-preview and build157 and all
+older bundles, private saves and paused processes. Build159 fixes lowercase
+engine music lookup found by native MAP32 testing. Native MAP32 save/restore
+and Run/Pause pass for Doom II, weapons and music with extras; the Rust lifecycle
+and classic native music suites also pass.
+
 **Build157 adds object/weapon blending and actor/moving-surface interpolation.**
 MSP5 keeps header32/weapon24, expands actor40→56, adds previous x/y/z/floor-z at
 40/44/48/52 and enables them with flag32. Endpoints are captured before the world
@@ -77,7 +115,7 @@ wall pegging, openings and actor clipping. Pause restores exact engine endpoints
 Animation, texture scroll/rotation and sky phases remain discrete; see
 EXTENDED_INTERPOLATION.md for conservative fake-flat/jump snap rules and costs.
 
-Current candidate: `build/blend-motion-final/MetalDooM.app`,0.10.0/build157;
+Previous candidate: `build/blend-motion-final/MetalDooM.app`,0.10.0/build157;
 `build/build157.log`. Actual MAP14 is paused at tic41, health100/ammo50,
 process49468/tool session8982. Running evidence and final checks are in VALIDATION.md.
 Preserve intermediate build156 at build/blend-motion-preview, paused MAP14 tic39,

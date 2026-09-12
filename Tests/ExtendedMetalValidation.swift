@@ -279,7 +279,25 @@ func runMeshMetalValidation() throws {
         print("PASS normal/additive/custom weapon pixels and custom weapon plus translucent flash slot order")
 
     }
-    for mode in ["sky271","sky272","sky-scroll","floor","ceiling","both","offset-both"] {
+    for content in BundledPreviewPlan.Content.allCases {
+        let plan=try BundledPreviewPlan(root:root,content:content,extras:true)
+        for map in [1,plan.mapLimit] {
+            let worker=ExtendedWorker();defer{worker.close()}
+            let initial=try worker.start(executable:exe,paths:plan.paths,map:map,base:plan.base,profile:plan.profile)
+            let resources=try WAD(previewResources:plan.paths,baseIndex:plan.base,profile:plan.profile,identity:worker.identity!)
+            let builder=try ExtendedSceneBuilder(resources:resources)
+            let first=try builder.prepare(initial)
+            let scene=try builder.prepare(worker.tick(count:35))
+            let (window,view,renderer)=try surface(0),(otherWindow,otherView,other)=try surface(650)
+            defer{view.delegate=nil;otherView.delegate=nil;window.close();otherWindow.close()}
+            renderer.extendedRustWeaponNames=plan.rustWeapons;other.extendedRustWeaponNames=plan.rustWeapons
+            try renderer.loadExtendedPreview(first);try renderer.loadExtendedPreview(scene)
+            try other.loadExtendedPreview(scene.validationReference())
+            guard try frame(view,renderer)==frame(otherView,other) else {throw PortError("Bundled profile differs from full reference: \(content.rawValue) MAP\(map)")}
+            print("PASS native \(content.rawValue) with extras MAP\(map), exact full-mesh reference pixels")
+        }
+    }
+    for mode in ["sky271","sky272","sky-scroll","flatmap","floor","ceiling","both","offset-both"] {
         let fixture=exe.deletingLastPathComponent().appendingPathComponent("fixtures/sky-rotation-\(mode).wad")
         let selected=[root.appendingPathComponent("doom2.wad"),fixture]
         let worker=ExtendedWorker();defer{worker.close()}

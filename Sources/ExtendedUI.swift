@@ -29,6 +29,8 @@ struct ExtendedUI {
               phase != 0 || health>0,phase != 1 || health<=0 else {throw PortError("Invalid level lifecycle snapshot")}
         keys=UInt32(cards);weapons=UInt32(owned);looping=flags==1;music=String(decoding:name,as:UTF8.self)
     }
+    var classicWeaponName:String { ["FIST","PISTOL","SHOTGUN","CHAINGUN","ROCKET LAUNCHER","PLASMA RIFLE","BFG 9000","CHAINSAW","SUPER SHOTGUN"][weapon] }
+    var classicAmmoName:String {ammoType<0 ? "":["BULLETS","SHELLS","CELLS","ROCKETS"][ammoType]}
     var rustWeaponName:String { ["FIST","PISTOL","SHOTGUN","CHAINGUN","ROCKET LAUNCHER","INCINERATOR","CALAMITY BLADE","CHAINSAW","SUPER SHOTGUN"][weapon] }
     var rustAmmoName:String { ammoType<0 ? "": ["BULLETS","SHELLS","FUEL","ROCKETS"][ammoType] }
 }

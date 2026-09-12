@@ -37,15 +37,20 @@ static void Flat(unsigned char **out, int index)
         I_Error("Invalid geometry flat index");
     Name(out, lumpinfo[firstflat + index].name);
 }
+// SKYDEFS maps named flats to skies without a transfer linedef. Canonicalize
+// their render-only plane name so native tessellation treats them as sky holes.
+static void PlaneFlat(unsigned char **out,int index,int sky) {
+    if(sky & PL_SKYFLAT)Name(out,"F_SKY1");else Flat(out,index);
+}
 static void Sky(unsigned char **p,int value) {
     if(!(value & PL_SKYFLAT)) {for(int i=0;i<7;i++)Word(p,0);return;}
     unsigned index=(unsigned)value & ~PL_SKYFLAT;
     if(index>=array_size(levelskies))I_Error("Invalid transferred sky index");
     const sky_t *sky=R_GetLevelsky(index);const skytex_t *t=&sky->background;
-    if(sky->type!=SkyType_Normal || !sky->side)I_Error("Unsupported layered or procedural transferred sky");
+    if(sky->type!=SkyType_Normal)I_Error("Unsupported layered or procedural transferred sky");
     Word(p,index+1);Texture(p,t->texture);
-    Word(p,((uint32_t)t->currx<<6)+(uint32_t)sky->side->textureoffset);
-    Word(p,(uint32_t)t->mid+(uint32_t)t->curry+(uint32_t)sky->side->rowoffset);
+    Word(p,((uint32_t)t->currx<<6)+(sky->side ? (uint32_t)sky->side->textureoffset:0));
+    Word(p,(uint32_t)t->mid+(uint32_t)t->curry+(sky->side ? (uint32_t)sky->side->rowoffset:0));
     Word(p,t->scalex);Word(p,t->scaley);
 }
 size_t ME_WriteGeometry(void *out, size_t capacity)
@@ -81,11 +86,11 @@ size_t ME_WriteGeometry(void *out, size_t capacity)
         ME_RenderSector(&sectors[i],1,&back,&unused1,&unused2);
         const sector_t *s=&front;
         Word(&p,s->floorheight); Word(&p,s->ceilingheight); Word(&p,s->lightlevel);
-        Flat(&p,s->floorpic); Flat(&p,s->ceilingpic);
+        PlaneFlat(&p,s->floorpic,s->floorsky); PlaneFlat(&p,s->ceilingpic,s->ceilingsky);
         Word(&p,s->floor_xoffs); Word(&p,s->floor_yoffs);
         Word(&p,s->ceiling_xoffs); Word(&p,s->ceiling_yoffs);
         Word(&p,MAX(0,MIN(255,fl))); Word(&p,MAX(0,MIN(255,cl)));
-        Word(&p,back.floorheight); Word(&p,back.ceilingheight); Flat(&p,back.ceilingpic);
+        Word(&p,back.floorheight); Word(&p,back.ceilingheight); PlaneFlat(&p,back.ceilingpic,back.ceilingsky);
         fixed_t bottom,top;ME_SectorClip(&sectors[i],&bottom,&top);Word(&p,bottom);Word(&p,top);
         Word(&p,s->floor_rotation);Word(&p,s->ceiling_rotation);
         Sky(&p,s->floorsky);Sky(&p,s->ceilingsky);

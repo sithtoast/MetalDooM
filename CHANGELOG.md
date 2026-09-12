@@ -4,6 +4,23 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — bundled single-player content (build 159)
+
+- Add explicit Doom II resource, weapon, texture and music preview plans, with
+  optional extras loaded before ID24 support resources and the base IWAD.
+  Keep the original Rust launch order and ordinary picker acceptance rules.
+- Support named SKYDEFS flats without transfer linedefs, fixing rerelease Doom II
+  preview rejection and retaining each plane's actual sky texture/mapping.
+- Restore MAP01–32 saves with the selected resource profile/base; choose Doom II
+  or Rust weapon labels correctly and audition named music-pack MIDI tracks.
+  Resolve engine music names case-insensitively. Preserve intermediate build158.
+- Validate 352 map starts, component weapon pickups/firing, all merged textures,
+  native profile/sky pixels and save/playback regressions. Add a reproducible
+  indexed-lighting baseline; software lighting parity remains open.
+- Deliver local signed 0.10.0/build159 as the same unreleased feature version.
+  Extras menus/SBARDEF/alternate music, full campaign acceptance and remaining
+  sky/lighting work are still pending. Multiplayer is deferred.
+
 ## 0.10.0 refinement — Rust blending and world interpolation (build 157)
 
 - Apply custom object and weapon blend tables with engine precedence, preserving

@@ -1,6 +1,6 @@
 # Legacy of Rust development and ID24 evidence
 
-Status: **0.10.0 build 157 native preview with sky transfers/flat rotation, fake floors/transferred lighting, translucent walls and palette effects, object/state/weapon blend tables, shared fuzz/transparent ordering, camera/weapon/actor/moving-surface interpolation, scrolling floors/ceilings, Save/Load, restart, normal/secret transitions, animated intermissions, stories, credits, custom cast, HUD, music and sound; full Rust campaign support remains pending.**
+Status: **0.10.0 build 159 native preview with sky transfers/flat rotation, fake floors/transferred lighting, translucent walls and palette effects, object/state/weapon blend tables, shared fuzz/transparent ordering, camera/weapon/actor/moving-surface interpolation, scrolling floors/ceilings, Save/Load, restart, normal/secret transitions, animated intermissions, stories, credits, custom cast, HUD, music and sound; full Rust campaign support remains pending.**
 First campaign acceptance remains fully playable bundled single-player Rust.
 Multiplayer and the online add-on catalog are outside scope. General ID24
 conformance is a separate target and must never be inferred from this campaign.
@@ -32,9 +32,10 @@ The campaign GAMECONF specifies `doom2.wad`, `id24`, `commercial`, and null
 The ID24 specification recommends placing its supporting resources before the
 IWAD. The intended baseline is therefore **id24res → Doom II → id1**. The reference
 GAMECONF setup additionally places `extras` before `id24res`. These are the
-specified orders, not a captured trace of KEX's proprietary launcher. The current
-MetalDooM stack API assumes the base IWAD is first; a future session planner must
-separate game identity from pre-IWAD resource placement and hash the whole order.
+specified orders, not a captured trace of KEX's proprietary launcher. The explicit
+worker preview now separates the base IWAD index from resource order and hashes
+ordered bytes, base and profile. Build 159 adds the six bounded single-player
+plans and optional extras described in EXTENDED_BUNDLED.md.
 [ID24 supporting data](https://github.com/doom-cross-port-collab/id24/blob/e96a9e1c9ee34621b03a4894f4053c2a3426496e/version_0_99_2_md/ID24_formal_specification_0.99.2.md),
 [GAMECONF setup](https://github.com/doom-cross-port-collab/id24/blob/e96a9e1c9ee34621b03a4894f4053c2a3426496e/version_0_99_2_md/GAMECONF.md).
 
@@ -57,7 +58,9 @@ Byte comparisons establish why sibling names must not imply dependencies:
 
 Comparison counts are directory entries against id1's last same-name lump, not a
 claim that blindly concatenating directories produces a valid resource namespace.
-No dependency or sibling resource is automatically loaded by this milestone.
+The explicit plans load only their listed dependencies. The ordinary picker does
+not automatically load these packs. Extras presentation and exact native lighting
+remain open; see EXTENDED_BUNDLED.md and EXTENDED_LIGHTING.md.
 
 ## Seventeen map blocks, sixteen campaign maps
 

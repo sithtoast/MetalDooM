@@ -25,7 +25,7 @@ static uint32_t LE32(const unsigned char *p)
     return (uint32_t)p[0] | (uint32_t)p[1]<<8 | (uint32_t)p[2]<<16 | (uint32_t)p[3]<<24;
 }
 const ME_Session *ME_CurrentSession(void) { return &session; }
-int ME_RustProbeEnabled(void) { return session.profile == ME_PROFILE_RUST_PROBE; }
+int ME_RustProbeEnabled(void) { return session.profile == ME_PROFILE_RUST_PROBE || session.profile == ME_PROFILE_BUNDLED_COMPONENTS; }
 void ME_ApplySessionOptions(void)
 {
     if (comp_soul_value >= 0) default_comp[comp_soul] = comp[comp_soul] = comp_soul_value;
@@ -158,7 +158,7 @@ static void ParseWadConfig(Wad *w)
 }
 void ME_PlanSession(const ME_Config *config)
 {
-    if (config->base_wad_index >= config->wad_count || config->profile > ME_PROFILE_RUST_PROBE)
+    if (config->base_wad_index >= config->wad_count || config->profile > ME_PROFILE_BUNDLED_COMPONENTS)
         I_Error("Invalid base WAD index or worker profile");
     memset(&session,0,sizeof(session));
     session.profile = config->profile; session.base_wad_index = config->base_wad_index;

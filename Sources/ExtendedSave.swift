@@ -13,7 +13,7 @@ struct ExtendedSave {
               let root=try JSONSerialization.jsonObject(with:payload) as? [String:Any],
               let version=root["native_version"] as? Int,version==1,
               let identity=root["identity"] as? String,identity.count==64,identity.utf8.allSatisfy({(48...57).contains($0)||(97...102).contains($0)}),
-              let map=root["map"] as? Int,(1...16).contains(map),let skill=root["skill"] as? Int,(1...5).contains(skill),
+              let map=root["map"] as? Int,(1...32).contains(map),let skill=root["skill"] as? Int,(1...5).contains(skill),
               let tic=root["tic"] as? Int,(0..<Int(Int32.max)).contains(tic) else {throw PortError("Invalid Rust save metadata")}
         self.payload=payload;self.identity=identity;self.map=map;self.skill=skill;self.tic=tic;self.engine=engine
     }

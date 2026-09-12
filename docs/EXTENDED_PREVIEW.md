@@ -1,4 +1,4 @@
-# Rust native preview — 0.10.0 build 157
+# Rust native preview — 0.10.0 build 159
 
 An explicit development preview now starts the extended simulation in a separate
 child process and draws its copied geometry with the existing native Metal world
@@ -83,7 +83,7 @@ The sprite renderer accepts copied records and caches uploaded patches; it never
 queries the classic engine in preview mode. See [sprite details](EXTENDED_SPRITES.md).
 The copied geometry resolves fake floors and transferred lighting for the camera;
 see [control sectors](EXTENDED_CONTROL_SECTORS.md). Sky transfers and flat rotation are described in EXTENDED_SKIES_ROTATION.md.
-Per-object translucency remains separate work. Wall/flat animation
+Object/weapon blending and ordering are covered in EXTENDED_TRANSLUCENCY.md. Wall/flat animation
 uses the worker's current translation tables. See [materials and caching](EXTENDED_MATERIALS.md).
 Build 139 caches static clipping/stitching, updates affected wall/sector chunks,
 and retains unchanged Metal material buffers. MAP13's 140-tic worker/CPU mean
@@ -96,11 +96,16 @@ worker-selected metadata and original artwork. A separate 35 Hz presentation
 clock supports counting stats, entering markers, stories, credits and the custom
 cast without ticking the simulation. Pause/Restart also work during presentation.
 
+Build 159 adds optional bundled Doom II content profiles, extras resource loading
+and named SKYDEFS flat support; see EXTENDED_BUNDLED.md. Native lighting remains
+approximate; the initial indexed-lighting audit is in EXTENDED_LIGHTING.md.
+
 ## Process and protocol
 
 Worker ABI 2 has additive `ME_CopyView`, `ME_CopyPresentation`, `ME_CopyMaterials`, `ME_EnableAudio` and
 `ME_CopyAudio`, plus `ME_CopyUI`, bringing the
-private export count to fifteen with `ME_Advance` and `ME_CopyCampaign`. No existing structure layout changes. `Engine/Worker/main.c` links only
+private export count to eighteen with `ME_Advance`, `ME_CopyCampaign`,
+`ME_CopySave`, `ME_RestoreSave` and `ME_CopyBlendTables`. No existing structure layout changes. `Engine/Worker/main.c` links only
 the isolated dylib; the Swift app never loads it. `scripts/build-extended-worker.sh`
 produces both beside each other, using an executable-relative dylib path.
 

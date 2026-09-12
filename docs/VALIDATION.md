@@ -1,5 +1,62 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 159: bundled single-player profiles
+
+Candidate: `build/bundled-preview-final/MetalDooM.app`; build log `build/build159.log`.
+Same unreleased 0.10.0 feature version; all earlier bundles/private saves preserved.
+The bundle and running window both report **0.10.0/build159**. Deep/strict
+codesign verification passes for the app, helper and dylib; the dylib exposes the
+same 18 private ABI2 functions. Native CLI launch uses weapons + extras on MAP01
+(process **87178**, tool session **18975**). Run advanced to tic124; Pause restored
+manual controls. Health100/ammo50, 43 actors, 2,384 triangles, Sound/Music checked.
+A native screenshot shows the world, actors, pistol and HUD. Candidate log:
+`build/bundled-preview-final/run159.log`. No claim of a full playthrough follows.
+
+- `build/bundled-validation.log`: all six content plans with/without extras;
+  352 maps at spawn/tic35, 12 distinct identities, first/last-map save/future-state
+  checks (24 total, eight continued tics each), all 1,831 merged textures in each
+  resource/weapon/texture plan, all 17 MIDI tracks, transparent extras TNT1A0.
+  Separate id1-res/id1-weap pickup/firing fixtures exercise both replacement
+  weapons, resource sprite decoding and ammo consumption with/without extras.
+- `build/bundled-metal-validation.log`: native first/last maps of all six profiles
+  with extras match independent full geometry; named-flat sky has 5,116 projected
+  pixel probes. Existing blends/fuzz/weapon tables, transferred/control sectors,
+  scrolling, camera/actor/door/lift interpolation and stopped-mover tests pass.
+  These comparisons use native shaders, not software-renderer pixel acceptance.
+- `build/bundled-worker-validation.log`, `build/bundled-protocol-validation.log`:
+  existing Rust maps, sprites, weapons, audio, malformed snapshots and process
+  deadline/boundary checks pass with the new worker.
+- `build/bundled-save-validation.log`: Rust native keyframes/future state,
+  malformed save, C copy canaries and Swift envelope regressions pass.
+- `build/bundled-save-app-validation.log`: native Rust fixture plus actual MAP32
+  Doom II, weapons and music plans with extras. Each passes two fresh-worker
+  restores, HUD/music/paused controls, corrupt-save/write failure preservation,
+  continued Run/Pause and close during restore. This catches the default Doom II
+  lowercase music names and exercises the explicit music-pack audition track.
+- `build/bundled-lifecycle-app-validation.log`: normal/secret completion, repeated
+  restart, stories/credits/cast and teardown pass after resource-plan refactoring.
+- `build/bundled-classic-music-validation.log`: all 35 original Doom II tracks,
+  lowercase selection, native audible/silent mixer output, pitch reset, routing,
+  pause/resume, mute and natural looping pass after music-name normalization.
+- `build/bundled-lighting-audit.json`: 13,659 of 13,824 modeled palette/plane-light
+  samples differ from pinned Woof COLORMAP output. This is a modeled baseline,
+  not GPU measurement; see EXTENDED_LIGHTING.md.
+
+During test development, the new native profile case omitted initial scene/GPU
+state before a delta; it now exercises the proper initial-load/update sequence.
+The save-app script initially ran the new cases before recompiling its injected
+fixture harness; this caused a test-only forced-unwrap trap. The script now
+compiles first and injects an optional fixture only for the Rust fixture case.
+Both app harnesses were updated to inject resources through the new plan.
+Native MAP32 startup then found lowercase engine music names (D_ultima);
+MusicPlayer now performs case-insensitive WAD lookup. Build158 remains an
+intermediate signed candidate; build159 contains the music fix.
+
+Full campaign/boss playtesting, sustained performance, extras carousel/SBARDEF/
+H_ music selection, layered/fire skies, software sky stretch and ordinary native
+lighting parity remain open. Multiplayer is deferred. No new notarization,
+distribution package or push is claimed.
+
 ## 2026-09-12 — 0.10.0 build 157: blending and world interpolation
 
 Final candidate: `build/blend-motion-final/MetalDooM.app`; `build/build157.log`.

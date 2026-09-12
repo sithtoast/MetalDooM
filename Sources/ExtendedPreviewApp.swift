@@ -10,6 +10,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     private let queue=DispatchQueue(label:"MetalDooM.extended-preview")
     private var worker=ExtendedWorker(),pendingWorker:ExtendedWorker?
     private var workerExecutable:URL?
+    private var plan:BundledPreviewPlan!
     private var saveButton:NSButton!,loadButton:NSButton!
     private var audioPlayer:ExtendedSoundPlayer?
     private var soundToggle:NSButton!, musicToggle:NSButton!, runButton:NSButton!, restartButton:NSButton!, continueButton:NSButton!
@@ -27,16 +28,10 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     private var sceneBuilder:ExtendedSceneBuilder?, buttons:[NSButton]=[], closed=false
     func applicationDidFinishLaunching(_ notification:Notification) {
         do {
-            let args=CommandLine.arguments
-            guard let flag=args.firstIndex(of:"--rust-preview"), flag+1<args.count else { throw PortError("Supply the rerelease directory after --rust-preview.") }
-            let root=URL(fileURLWithPath:args[flag+1],isDirectory:true)
-            var map=1
-            if let option=args.firstIndex(of:"--map") {
-                guard option+1<args.count, let number=Int(args[option+1].uppercased().replacingOccurrences(of:"MAP",with:"")), (1...16).contains(number) else { throw PortError("Choose MAP01–MAP16.") }
-                map=number
-            }
+            let parsed=try BundledPreviewPlan.arguments(CommandLine.arguments)
+            plan=parsed.0;let map=parsed.1
             window=NSWindow(contentRect:NSRect(x:0,y:0,width:1100,height:760),styleMask:[.titled,.closable,.miniaturizable,.resizable],backing:.buffered,defer:false)
-            window.title="\(appTitle) — Rust world preview — \(String(format:"MAP%02d",map))"
+            window.title="\(appTitle) — \(plan.title) — \(String(format:"MAP%02d",map))"
             window.delegate=self;window.isReleasedWhenClosed=false
             // Manual buttons deliberately block gameplay input, but Escape must
             // still interrupt their finite sequence (including button focus).
@@ -57,7 +52,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             view.colorPixelFormat = .bgra8Unorm;view.depthStencilPixelFormat = .depth32Float
             view.clearColor=MTLClearColorMake(0,0,0,1);view.preferredFramesPerSecond=60
             view.inputBlocked=true;view.framebufferOnly=false
-            renderer=try Renderer(view:view);view.delegate=renderer
+            renderer=try Renderer(view:view);renderer.extendedRustWeaponNames=plan.rustWeapons;view.delegate=renderer
             view.onEscape={ [weak self] in self?.pause() }
             renderer.onError={ [weak self] error in self?.failed(error) }
             let controls=NSStackView();controls.orientation = .horizontal;controls.spacing=8
@@ -89,14 +84,14 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             submenu.addItem(withTitle:"Quit preview",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q")
             item.submenu=submenu;menu.addItem(item);NSApp.mainMenu=menu
             window.center();window.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true)
-            let paths=["id24res.wad","doom2.wad","id1.wad"].map{root.appendingPathComponent($0)}
+            let paths=plan.paths,base=plan.base,profile=plan.profile
             let executable=Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MetalDooMWorker")
             workerExecutable=executable
             queue.async { [self] in
                 do {
-                    let state=try worker.start(executable:executable,paths:paths,map:map,base:1)
+                    let state=try worker.start(executable:executable,paths:paths,map:map,base:base,profile:profile)
                     guard let identity=worker.identity else { throw PortError("Missing worker identity.") }
-                    let resources=try WAD(previewResources:paths,baseIndex:1,profile:1,identity:identity)
+                    let resources=try WAD(previewResources:paths,baseIndex:base,profile:profile,identity:identity)
                     let builder=try ExtendedSceneBuilder(resources:resources);self.sceneBuilder=builder
                     let scene=try builder.prepare(state)
                     DispatchQueue.main.async { [weak self] in self?.presentInitial(scene) }
@@ -214,7 +209,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     private func display(_ scene:ExtendedScene,audible:Bool) throws {
         try renderer.loadExtendedPreview(scene)
         let ui=scene.view.ui;levelUI=ui
-        window.title="\(appTitle) — Rust world preview — \(String(format:"MAP%02d",ui.map))"
+        window.title="\(appTitle) — \(plan.title) — \(String(format:"MAP%02d",ui.map))"
         completion.isHidden=ui.playing
         if ui.phase==1 {completion.stringValue="You died. Restart level, or press E, Space or Return."}
         else if ui.phase>=2 {
@@ -224,8 +219,8 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             continueButton.title="Continue to \(String(format:"MAP%02d",ui.nextMap))"
         }
         if ui.musicGeneration != musicGeneration {
-            if musicPlayer==nil { musicPlayer=try MusicPlayer(wad:scene.resources,map:scene.copiedGeometry.map.name,track:ui.music,backend:"apple") }
-            else { try musicPlayer?.select(ui.music) }
+            if musicPlayer==nil { musicPlayer=try MusicPlayer(wad:scene.resources,map:scene.copiedGeometry.map.name,track:plan.track ?? ui.music,backend:"apple") }
+            else { try musicPlayer?.select(plan.track ?? ui.music) }
             musicPlayer?.looping=ui.looping;musicPlayer?.enabled=musicToggle.state == .on
             musicGeneration=ui.musicGeneration;musicPlayer?.update(active:clock.busy && audible)
         }
@@ -281,7 +276,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         if campaign.stage == .complete {changeLevel(restart:false);return}
         let track=campaign.music
         if campaignTrack != track.0 {
-            try musicPlayer?.select(track.0);musicPlayer?.looping=track.1
+            try musicPlayer?.select(plan.track ?? track.0);musicPlayer?.looping=track.1
             campaignTrack=track.0;musicPlayer?.update(active:campaignRunning)
         }
         musicPlayer?.update(active:campaignRunning)
@@ -311,7 +306,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
                     do {
                         // New world/tic-zero snapshots must not reuse old mesh, sprite,
                         // audio sequence or input state. Resource identity stays fixed.
-                        let renderer=try Renderer(view:self.view)
+                        let renderer=try Renderer(view:self.view);renderer.extendedRustWeaponNames=self.plan.rustWeapons
                         renderer.onError={ [weak self] in self?.failed($0) }
                         self.renderer=renderer;self.view.delegate=renderer
                         self.audioPlayer=nil;self.musicPlayer=nil;self.musicGeneration=0
@@ -370,7 +365,8 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             do {
                 guard let identity=worker.identity else {throw PortError("Missing resource identity")}
                 let saved=try ExtendedSave.read(url,engine:ExtendedSave.engineIdentity(executable:executable),identity:identity)
-                _=try candidate.start(executable:executable,paths:resources.sourceURLs,map:saved.map,base:1,profile:1,skill:saved.skill)
+                guard (1...plan.mapLimit).contains(saved.map) else {throw PortError("Saved map is outside this content profile")}
+                _=try candidate.start(executable:executable,paths:resources.sourceURLs,map:saved.map,base:plan.base,profile:plan.profile,skill:saved.skill)
                 let state=try candidate.restore(saved.payload)
                 guard state.ui.playing,state.tic==saved.tic,state.ui.map==saved.map,state.geometry != nil else {throw PortError("Restored state does not match save")}
                 let builder=try ExtendedSceneBuilder(resources:resources),scene=try builder.prepare(state)
@@ -379,9 +375,9 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
                     do {
                         // Prepare every fallible native resource before retiring the
                         // current worker. Bad saves leave that paused game intact.
-                        let renderer=try Renderer(view:self.view);try renderer.loadExtendedPreview(scene)
+                        let renderer=try Renderer(view:self.view);renderer.extendedRustWeaponNames=self.plan.rustWeapons;try renderer.loadExtendedPreview(scene)
                         let audio=try ExtendedSoundPlayer(resources:resources,initialTic:state.tic);try audio.prepare(state.audio)
-                        let music=try MusicPlayer(wad:resources,map:scene.copiedGeometry.map.name,track:state.ui.music,backend:"apple")
+                        let music=try MusicPlayer(wad:resources,map:scene.copiedGeometry.map.name,track:self.plan.track ?? state.ui.music,backend:"apple")
                         music.looping=state.ui.looping;music.enabled=self.musicToggle.state == .on;music.update(active:false)
                         renderer.onError={ [weak self] in self?.failed($0) }
                         let previous=self.worker;self.worker=candidate;self.pendingWorker=nil;self.sceneBuilder=builder

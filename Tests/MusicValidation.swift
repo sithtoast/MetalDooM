@@ -47,6 +47,7 @@ import AVFoundation
         player.enabled=true; player.update(active:true); precondition(player.isPlaying)
         try player.select(inter); precondition(player.trackName==inter && player.isPlaying)
         try player.select(second); precondition(player.trackName==second && player.isPlaying)
+        try player.select(second.lowercased()); precondition(player.trackName==second && player.isPlaying)
         let lock=NSLock(); var peak: Float=0
         player.engine.mainMixerNode.installTap(onBus:0,bufferSize:1024,format:nil) { buffer,_ in
             var value: Float=0

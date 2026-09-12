@@ -5,6 +5,10 @@ by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
 **Version 0.10.0 · experimental source preview · local builds are not notarized.**
 
+Build 159 adds explicit [bundled single-player content plans](docs/EXTENDED_BUNDLED.md)
+for resources, weapons, textures and music, optional extras, and named sky-flat
+compatibility. [Lighting parity work](docs/EXTENDED_LIGHTING.md) now has a measured
+baseline; ordinary native lighting is still approximate.
 Build 157 adds object/weapon blending, shared fuzz/translucent ordering and
 [actor/moving-surface interpolation](docs/EXTENDED_INTERPOLATION.md) during Run.
 Build 155 added [sky transfers and flat rotation](docs/EXTENDED_SKIES_ROTATION.md).

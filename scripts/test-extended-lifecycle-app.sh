@@ -11,7 +11,7 @@ import sys
 root,out=map(Path,sys.argv[1:])
 main=(root/'Sources/main.swift').read_text().split('\nlet app = NSApplication.shared\n')[0]
 (out/'main.swift').write_text(main+'\n'+(root/'Tests/ExtendedLifecycleAppValidation.swift').read_text())
-s=(root/'Sources/ExtendedPreviewApp.swift').read_text().replace('let paths=["id24res.wad","doom2.wad","id1.wad"].map{root.appendingPathComponent($0)}','let paths=["id24res.wad","doom2.wad","id1.wad"].map{root.appendingPathComponent($0)}+[URL(fileURLWithPath:ProcessInfo.processInfo.environment["LIFECYCLE_FIXTURE"]!)]')
+s=(root/'Sources/ExtendedPreviewApp.swift').read_text().replace('plan.paths','(plan.paths+[URL(fileURLWithPath:ProcessInfo.processInfo.environment["LIFECYCLE_FIXTURE"]!)])')
 s=s.replace('Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MetalDooMWorker")','URL(fileURLWithPath:ProcessInfo.processInfo.environment["LIFECYCLE_WORKER"]!)')
 s+='''
 extension ExtendedPreviewApp {

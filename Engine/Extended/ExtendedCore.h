@@ -8,7 +8,7 @@
  * copied values. No Woof pointers/types cross this boundary. No unload/reinitialization
  * or save contract yet: terminate the worker to reclaim a session (also after
  * an error). This core is NOT selected by the MetalDooM gameplay UI. */
-enum { ME_PROFILE_MBF21 = 0, ME_PROFILE_RUST_PROBE = 1 };
+enum { ME_PROFILE_MBF21 = 0, ME_PROFILE_RUST_PROBE = 1, ME_PROFILE_BUNDLED_COMPONENTS = 2 };
 /* RUST_PROBE is an explicit development opt-in, NOT ID24 compatibility. */
 typedef struct {
     uint32_t abi_version;
