@@ -14,19 +14,26 @@ func runMeshMetalValidation() throws {
         let renderer=try Renderer(view:view);view.delegate=renderer
         renderer.onError={error in fputs("FAIL renderer: \(error)\n",stderr);exit(1)}
         window.contentView=view;window.orderFront(nil)
-        view.autoResizeDrawable=false;view.drawableSize=CGSize(width:640,height:400)
+        view.layoutSubtreeIfNeeded();view.updateResolution()
         return (window,view,renderer)
     }
     func frame(_ view:GameView,_ renderer:Renderer) throws -> Data {
-        guard let drawable=view.currentDrawable else { throw PortError("No validation drawable") }
-        let texture=drawable.texture,w=texture.width,h=texture.height
-        view.draw()
-        let buffer=renderer.device.makeBuffer(length:w*h*4,options:.storageModeShared)!
-        let command=renderer.queue.makeCommandBuffer()!,encoder=command.makeBlitCommandEncoder()!
-        encoder.copy(from:texture,sourceSlice:0,sourceLevel:0,sourceOrigin:MTLOrigin(x:0,y:0,z:0),sourceSize:MTLSize(width:w,height:h,depth:1),to:buffer,destinationOffset:0,destinationBytesPerRow:w*4,destinationBytesPerImage:w*h*4)
-        encoder.endEncoding();command.commit();command.waitUntilCompleted()
-        guard command.status == .completed else { throw PortError("GPU readback failed") }
-        return Data(bytes:buffer.contents(),count:w*h*4)
+        try autoreleasepool {
+            view.layoutSubtreeIfNeeded()
+            view.updateResolution()
+            view.releaseDrawables()
+            guard let drawable=view.currentDrawable else { throw PortError("No validation drawable") }
+            let texture=drawable.texture,w=texture.width,h=texture.height
+            guard w==Int(view.drawableSize.width),h==Int(view.drawableSize.height) else {throw PortError("Unexpected drawable dimensions \(w)x\(h)")}
+            view.draw()
+            let buffer=renderer.device.makeBuffer(length:w*h*4,options:.storageModeShared)!
+            let command=renderer.queue.makeCommandBuffer()!,encoder=command.makeBlitCommandEncoder()!
+            encoder.copy(from:texture,sourceSlice:0,sourceLevel:0,sourceOrigin:MTLOrigin(x:0,y:0,z:0),sourceSize:MTLSize(width:w,height:h,depth:1),to:buffer,destinationOffset:0,destinationBytesPerRow:w*4,destinationBytesPerImage:w*h*4)
+            encoder.endEncoding();command.commit();command.waitUntilCompleted()
+            guard command.status == .completed else { throw PortError("GPU readback failed") }
+            RunLoop.current.run(until:Date().addingTimeInterval(0.001))
+            return Data(bytes:buffer.contents(),count:w*h*4)
+        }
     }
     for number in [1,13,16] {
         let worker=ExtendedWorker();defer{worker.close()}
@@ -49,6 +56,26 @@ func runMeshMetalValidation() throws {
             if [0,1,5,12,36,40,71].contains(tic) {
                 try oracleRenderer.loadExtendedPreview(scene.validationReference())
                 let actual=try frame(view,renderer),expected=try frame(oracleView,oracleRenderer)
+                if number==1 && tic==0 {
+                    renderer.validationHUDVisible=false
+                    let hidden=try frame(view,renderer)
+                    renderer.validationHUDVisible=true
+                    let restored=try frame(view,renderer)
+                    guard restored==actual else {
+                        let differing=stride(from:0,to:actual.count,by:4).filter{actual[$0..<$0+4] != restored[$0..<$0+4]}
+                        throw PortError("HUD restoration changed \(differing.count) pixels, first \(differing.first ?? -1), last \(differing.last ?? -1)")
+                    }
+                    var left=0,right=0
+                    let width=Int(view.drawableSize.width),height=Int(view.drawableSize.height)
+                    guard actual.count==width*height*4,hidden.count==actual.count else {throw PortError("HUD drawable size changed")}
+                    for pixel in 0..<(width*height) where actual[pixel*4..<pixel*4+4] != hidden[pixel*4..<pixel*4+4] {
+                        let x=pixel%width,y=pixel/width
+                        guard y>=height*3/5 else { throw PortError("HUD changed world pixels above its bottom region") }
+                        if x<width/2 {left+=1} else {right+=1}
+                    }
+                    guard left>20,right>20 else {throw PortError("Missing visible health/armor or weapon/ammo HUD")}
+                    print("PASS native \(width)x\(height) HUD pixels left \(left), right \(right), bottom-only composition and exact restoration")
+                }
                 guard actual==expected else {
                     let count=zip(actual,expected).filter{$0 != $1}.count
                     throw PortError("MAP\(number) tic\(tic): \(count) GPU bytes differ from full reference mesh")

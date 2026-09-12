@@ -1,8 +1,8 @@
 # Incremental Rust geometry — 0.10.0 build 139
 
 The preview retains a fixed map's BSP layout and updates the surfaces affected by
-current sector/side values. The simulation, ABI and MVW4/MGE1 wire layouts are
-unchanged. Every triangle is retained; the native comparison uses the old complete
+current sector/side values. This build-139 optimization left simulation, ABI and
+wire layouts unchanged. Build 140 adds MUI1/MVW5; the MGE1 geometry format is unchanged. Every triangle is retained; the native comparison uses the old complete
 mesh as its reference.
 
 ## Copied data and invalidation

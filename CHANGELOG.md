@@ -4,6 +4,25 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust HUD and level music (build 140)
+
+- Add native minimal health, armor, keys, weapon and ammo display from copied
+  extended player state. Label Rust weapons and Fuel, hide ammo for melee, and
+  reuse original WAD art with lazy actor-frame uploads.
+- Play the worker-selected UMAPINFO/BEX level track through native Apple MIDI.
+  Add a Music checkbox independent of Sound; follow Run/Pause, finite steps and
+  focus loss, resume the score without restarting, and retain the classic backend
+  preference. Copy the loop flag and support nonlooping MIDI completion.
+- Add the bounded MUI1 snapshot and strict MVW5 envelope without changing existing
+  C structures or geometry/sprite/material/sound payloads. Preserve engine isolation.
+- Pass all 16 map track/HUD checks, inventory pickups, native PCM/lifecycle,
+  malformed/copy/worker/core regressions, 21 exact Metal reference comparisons,
+  native HUD restoration and classic MIDI/OPL/HUD regressions.
+- Verify signed 0.10.0/build 140 in the native MAP01 preview: live bullet count,
+  separate Music/Sound controls, melee HUD and Escape pause. Preserve prior builds.
+  Same unreleased Rust feature; full campaign, JSON presentation and saves remain
+  ahead. No push, distribution package or physical-speaker acceptance.
+
 ## 0.10.0 refinement — Faster Rust geometry updates (build 139)
 
 - Cache static BSP clipping, stitched flat triangles and wall edges. Rebuild only

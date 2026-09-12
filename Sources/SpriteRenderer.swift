@@ -20,12 +20,12 @@ final class SpriteRenderer {
     private var things: [MD_Thing] = []
     private var previewWeapons:[MD_WeaponSprite]?
     private let hudDepth: MTLDepthStencilState
-    init(device: MTLDevice, wad: WAD, preload: Bool = true) throws {
+    init(device: MTLDevice, wad: WAD, preload: Bool = true, hudOnly:Bool=false) throws {
         self.device = device; art = try Art(wad:wad)
         let state = MTLDepthStencilDescriptor(); state.depthCompareFunction = .always; state.isDepthWriteEnabled = false
         guard let depth = device.makeDepthStencilState(descriptor:state) else { throw PortError("Cannot create HUD depth state.") }
         hudDepth = depth
-        if !preload { return }
+        if !preload && !hudOnly { return }
         let names = ["STBAR","STARMS","STTPRCNT","STFDEAD0","STFGOD0"]
             + (0...9).flatMap { ["STTNUM\($0)","STYSNUM\($0)"] }
             + (2...7).map { "STGNUM\($0)" }
@@ -38,7 +38,7 @@ final class SpriteRenderer {
         }
         // Minimal HUD labels reuse the WAD font. Shadow textures retain only alpha;
         // uploads happen once, never in the frame loop.
-        let labelNames=Set("HEALTHARMOM".unicodeScalars.map { String(format:"STCFN%03d",$0.value) })
+        let labelNames=Set((hudOnly ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ":"HEALTHARMOM").unicodeScalars.map { String(format:"STCFN%03d",$0.value) })
         for name in labelNames {
             if let patch=try art.patch(named:name) { hudPatches[name]=try upload(patch) }
         }
@@ -48,6 +48,7 @@ final class SpriteRenderer {
             for i in stride(from:0,to:rgba.count,by:4) { rgba[i]=0;rgba[i+1]=0;rgba[i+2]=0 }
             hudPatches["shadow:"+name]=try upload(PatchImage(image:PixelImage(width:patch.image.width,height:patch.image.height,rgba:rgba),left:patch.left,top:patch.top))
         }
+        if !preload { return }
         // Decode all original sprite frames once, so engine animation changes do
         // not cause frame-time texture uploads or invisible missing frames.
         var inSprites = false
@@ -142,7 +143,7 @@ final class SpriteRenderer {
         return max(1,(max(1,floor(width/320))*factor*32).rounded()/32)
     }
     static func hudHeight(width: Double, percent: Int = 100) -> Double { 32*hudPixelScale(width:width,percent:percent) }
-    func drawHUD(encoder: MTLRenderCommandEncoder, state: MD_HUD, width: Double, height: Double, percent: Int = 100, style: HUDStyle = .classic, portrait: Bool = false) {
+    func drawHUD(encoder: MTLRenderCommandEncoder, state: MD_HUD, width: Double, height: Double, percent: Int = 100, style: HUDStyle = .classic, portrait: Bool = false,weaponLabel:String?=nil,ammoLabel:String?=nil) {
         encoder.setDepthStencilState(hudDepth)
         encoder.setViewport(MTLViewport(originX:0,originY:0,width:width,height:height,znear:0,zfar:1))
         let scale = Float(Self.hudPixelScale(width:width,percent:percent))
@@ -197,14 +198,19 @@ final class SpriteRenderer {
             if portrait { draw(face,8,h-36) }
             label("HEALTH",8+shift,h-38);number(max(0,state.health),50+shift,h-26,"STTNUM");draw("STTPRCNT",50+shift,h-26)
             label("ARMOR",82+shift,h-38);number(state.armor,124+shift,h-26,"STTNUM");draw("STTPRCNT",124+shift,h-26)
+            func rightLabel(_ text:String,_ y:Float) {
+                let span=text.unicodeScalars.reduce(Float(0)) { $0+(hudPatches[String(format:"STCFN%03d",$1.value)]?.width ?? 4) }
+                label(text,w-8-span,y)
+            }
+            if let weaponLabel { rightLabel(weaponLabel,h-52) }
             // Melee weapons have readyAmmo < 0: omit the ammo group entirely.
             if state.readyAmmo >= 0 {
-                label("AMMO",w-50,h-38);number(state.readyAmmo,w-8,h-26,"STTNUM")
+                if let ammoLabel { rightLabel(ammoLabel,h-38) } else { label("AMMO",w-50,h-38) };number(state.readyAmmo,w-8,h-26,"STTNUM")
             }
             // Show both card and skull when owned; no opaque backing panels.
             for color in 0..<3 {
                 for kind in 0..<2 where state.keys & (1 << (color+kind*3)) != 0 {
-                    draw("STKEYS\(color+kind*3)",w-18-Float(2-color)*12,h-54-Float(kind)*10)
+                    draw("STKEYS\(color+kind*3)",w-18-Float(2-color)*12,h-(weaponLabel == nil ? 54:68)-Float(kind)*10)
                 }
             }
             return

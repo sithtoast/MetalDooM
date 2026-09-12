@@ -151,7 +151,7 @@ import Foundation
                 guard rejected else { throw PortError("Malformed material snapshot accepted.") }
             }
             var view=try Data(contentsOf:executable.deletingLastPathComponent().appendingPathComponent("initial-view.mvw"))
-            let b=Bytes(data:view),offset=52+(try b.i32(36))+(try b.i32(40))+8
+            let b=Bytes(data:view),offset=56+(try b.i32(36))+(try b.i32(40))+8
             view.replaceSubrange(offset..<offset+4,with:words([1]))
             var rejected=false;do { _=try ExtendedView(data:view) } catch { rejected=true }
             guard rejected else { throw PortError("Mismatched material tic accepted.") }

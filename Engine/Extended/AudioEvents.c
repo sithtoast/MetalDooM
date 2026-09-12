@@ -72,7 +72,7 @@ static void start(const mobj_t *origin,int id) {
     if(slot<0){slot=0;for(int i=1;i<CHANNELS;i++)if(channels[i].priority>channels[slot].priority)slot=i;if(next.priority>channels[slot].priority)return;}
     channels[slot]=next;event(slot,1,lumpinfo[lump].name,next.volume,next.pan);
 }
-void S_Start(void){count=0;memset(channels,0,sizeof(channels));}
+void S_Start(void){count=0;memset(channels,0,sizeof(channels));ME_StartLevelMusic();}
 void S_StopSound(const mobj_t *origin){if(enabled)for(int i=0;i<CHANNELS;i++)if(channels[i].active && channels[i].origin==origin){stop(i);break;}}
 void S_UnlinkSound(mobj_t *origin){if(enabled && origin)for(int i=0;i<CHANNELS;i++)if(channels[i].active && channels[i].origin==origin){channels[i].x=origin->x;channels[i].y=origin->y;channels[i].origin=NULL;}}
 void S_StartSoundPitch(const mobj_t *origin,int id,pitchrange_t range){start(origin,id);}

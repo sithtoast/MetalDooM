@@ -13,3 +13,6 @@ size_t ME_WriteMaterials(void *out, size_t capacity);
 void ME_AudioEnable(void);
 void ME_AudioTick(void);
 size_t ME_WriteAudio(void *out,size_t capacity);
+
+void ME_StartLevelMusic(void);
+size_t ME_WriteUI(void *out,size_t capacity);

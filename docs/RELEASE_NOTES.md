@@ -5,7 +5,7 @@ Requires Apple Silicon and macOS 14 or later. This is an early preview.
 
 ## Install
 
-The current local development app is **0.10.0 build 139**, ad-hoc signed and
+The current local development app is **0.10.0 build 140**, ad-hoc signed and
 unnotarized. No new release package was produced. The previous **0.9.0 build 124**
 distribution was separately Developer ID signed, accepted by Apple and stapled.
 GitHub workflow assets remain unnotarized. For unnotarized previews, macOS may
@@ -16,7 +16,14 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.10.0 — Rust development foundations
 
-Final successful local build: **139**.
+Final successful local build: **140**.
+
+Build 140 adds worker-selected level music through native Apple MIDI and a minimal
+HUD showing health, armor, keys, weapon name, ammo type and count. Music follows
+Run/Pause, finite steps and focus loss, with an independent Music checkbox.
+All sixteen Rust map tracks decode; native PCM and classic music/HUD regressions
+pass. The copied MUI1 snapshot uses the new strict MVW5 worker body. This does not
+implement Rust's JSON HUD or intermission/finale presentation. See EXTENDED_UI.md.
 
 Build 139 caches static BSP clipping/stitching and updates only affected wall/sector
 chunks and material buffers. Exact comparisons reuse validated copied topology;
@@ -28,7 +35,7 @@ All 21 native GPU comparisons match the old full meshes pixel-for-pixel. CPU
 parity covers all 32 Doom II and 16 Rust maps, plus moving MAP16 geometry, lights,
 wall offsets, materials and sky changes. Continuous Run/Pause, keyboard/mouse and
 tic-aligned sound remain available. Timing samples do not establish sustained
-full-rate campaign play; music, HUD, full ID24 presentation, progression and saves
+full-rate campaign play; full ID24 presentation, progression and saves
 remain ahead. The ordinary picker still rejects Rust. See EXTENDED_MESH.md.
 
 ANIMATED and SWITCHES now drive engine material animation and native switch

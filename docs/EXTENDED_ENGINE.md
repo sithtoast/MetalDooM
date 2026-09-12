@@ -1,10 +1,10 @@
 # Experimental extended simulation worker
 
-The **0.10.0 build 139** development milestone includes copied geometry, sprite
-frames, material animations and sound events, explicit session planning, three Rust-required ID24 fields, an explicit
+The **0.10.0 build 140** development milestone includes copied geometry, sprite
+frames, material animations, sound events, HUD and level music, explicit session planning, three Rust-required ID24 fields, an explicit
 [native preview](EXTENDED_PREVIEW.md), and headless tests with the actual Rust
 patch/resources. The normal app still uses Chocolate Doom; its Rust rejection
-remains in place. **Legacy of Rust is not playable in the GUI yet.**
+remains in place. **Full Legacy of Rust campaign play is not accepted yet.**
 
 ## Reproduce
 
@@ -55,7 +55,7 @@ Profiles are explicit development choices:
   The copied session still reports the declared ID24 requirement. This profile
   does **not** advertise full ID24 conformance or silently relabel it as MBF21.
 
-The dylib exports exactly twelve `ME_` functions, keeping both engine and helper
+The dylib exports exactly thirteen `ME_` functions, keeping both engine and helper
 symbols private. One `ME_Tick` consumes one 35 Hz command. Movement, attack/use
 and validated weapon-change bits are accepted; special command bits and invalid
 weapon indices fail. Player/actor snapshots copy values, messages and selected
@@ -69,14 +69,15 @@ can be attempted once. Fatal engine errors stay inside the guarded C call and
 invalidate the session; terminate the worker after completion/error to reclaim
 its allocations. There is no teardown/restart API or extended save format yet.
 The separate [preview worker protocol](EXTENDED_PREVIEW.md) now carries copied
-views/geometry, named actor/weapon frames and material translations/sound events. Do not load the dylib into the Swift app process.
+views/geometry, named actor/weapon frames and material translations/sound events and HUD/music selection. Do not load the dylib into the Swift app process.
 
 Simulation uses directly initialized defaults and an explicit seed, without
 reading the user's Woof config. Upstream code owns physics, actors, weapons,
 damage and map thinkers. Native services provide filesystem access/diagnostics.
 The optional [audio adapter](EXTENDED_AUDIO.md) copies sound effects to the parent
-for native playback; non-opted-in probes retain only the request count. Music
-remains absent and ambient sound requests fail. UMAPINFO is parsed before map setup, including Rust's
+for native playback; non-opted-in probes retain only the request count. The
+[UI adapter](EXTENDED_UI.md) copies player inventory and music selection for native
+HUD/MIDI presentation. Ambient sound requests fail. UMAPINFO is parsed before map setup, including Rust's
 boss-action overrides; episode hooks preserve the simulation flag without adding
 a menu. Routes/finale metadata are copied, but their execution/presentation is
 not implemented by this worker.
@@ -140,7 +141,7 @@ The development build option packages an independently signed helper/dylib. The
 native app renders Rust world geometry and skies through copied process data.
 Build 132 adds `ME_CopyPresentation`, the ninth private export, and native actor/
 weapon rendering with manual firing. See the [sprite contract](EXTENDED_SPRITES.md).
-Music and complete presentation remain ahead. The classic app and
+At that milestone music and complete presentation remained ahead. The classic app and
 normal picker remain unchanged. All older previews and the primary release are
 preserved. No package or upload.
 
@@ -156,7 +157,9 @@ controls and pause handling; worker/protocol remain unchanged.
 Build 139 adds [partial geometry/material updates](EXTENDED_MESH.md), with a
 roughly tenfold MAP13 CPU improvement and exact native pixel comparisons. Engine
 source and protocol remain unchanged.
-Next: music/HUD and targeted real-monster/map-special parity.
+Build 140 adds the thirteenth export, `ME_CopyUI`, carrying authoritative HUD and
+music selection in MUI1/MVW5. Native Apple MIDI and a minimal HUD are connected.
+Next: death/restart, campaign presentation and targeted monster/map-special parity.
 Campaign transitions, boss/secret exits, JSON presentation and versioned saves
 remain acceptance gates. Keep the ordinary GUI Rust guard until native campaign
 play is validated.

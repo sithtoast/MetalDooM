@@ -27,12 +27,12 @@ frame offsets and the phase calculated by `P_UpdateSpecials` before the simulati
 tic increments. Swift checks lengths, versions, count, names, namespaces, duplicate
 keys, nonidentity records and agreement with the view's tic.
 
-## MVW4 and geometry reuse
+## MVW5 and geometry reuse
 
-The framed MEQ1/MER1 envelope is unchanged. The current view body is MVW4 with a
-52-byte header: MMT1 count at byte 44, MSA1 audio count at byte 48. Payloads are
-optional MGE1, required MSP1/MMT1/MSA1, in that order, with exact length/tic checks.
-Build 133 originally introduced MMT1 through MVW3; build 135 added audio/MVW4.
+The framed MEQ1/MER1 envelope is unchanged. The current view body is MVW5 with a
+56-byte header: MMT1 count at byte 44, MSA1 audio count at byte 48, MUI1 at byte 52. Payloads are
+optional MGE1, required MSP1/MMT1/MSA1/MUI1, in that order, with exact length/tic checks.
+Build 133 originally introduced MMT1 through MVW3; build 135 added audio/MVW4; build 140 adds HUD/music through MUI1/MVW5.
 
 Startup and explicit geometry requests return full geometry. Tick requests also
 copy current geometry in the worker, but send it only if geometry values changed.

@@ -10,7 +10,7 @@ xcrun swiftc -swift-version 5 -O -target arm64-apple-macosx14.0 -framework AVFou
  -module-cache-path "$PROJECT_DIR/build/module-cache" -import-objc-header "$PROJECT_DIR/Engine/Bridge.h" \
  "$PROJECT_DIR/Sources/WAD.swift" "$PROJECT_DIR/Sources/Geometry.swift" "$PROJECT_DIR/Sources/ExtendedGeometry.swift" \
  "$PROJECT_DIR/Sources/ExtendedPresentation.swift" "$PROJECT_DIR/Sources/ExtendedMaterials.swift" \
- "$PROJECT_DIR/Sources/ExtendedAudio.swift" "$PROJECT_DIR/Sources/ExtendedWorker.swift" \
+ "$PROJECT_DIR/Sources/ExtendedAudio.swift" "$PROJECT_DIR/Sources/ExtendedUI.swift" "$PROJECT_DIR/Sources/ExtendedWorker.swift" \
  "$PROJECT_DIR/Sources/SoundPlayer.swift" "$PROJECT_DIR/Sources/ExtendedSoundPlayer.swift" \
  "$PROJECT_DIR/Tests/ExtendedAudioValidation.swift" "$OUT/audio-classic-link/libDoom.a" \
  -Xlinker -dead_strip -o "$OUT/validate-audio"

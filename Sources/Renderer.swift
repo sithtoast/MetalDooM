@@ -283,6 +283,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var animatedIDs: [MaterialKey:Int32] = [:]
     private var animatedWalls: [Int32:MTLTexture] = [:], animatedFlats: [Int32:MTLTexture] = [:]
     private var extendedPreview = false
+    private var previewWeaponLabel:String?,previewAmmoLabel:String?
     private var previewTranslations:[MaterialKey:MaterialKey]=[:]
     private var engineReady = false
     private var previousPlayer = MD_Player(), currentPlayer = MD_Player()
@@ -558,7 +559,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         sky=textures[MaterialKey(name:scene.view.sky,flat:false)]
         previewTranslations=scene.view.materials.translations
         position=SIMD2(scene.view.x,scene.view.y);eyeZ=scene.view.eyeZ;yaw=scene.view.angle;pitch=0
-        if sprites == nil { sprites=try SpriteRenderer(device:device,wad:scene.resources,preload:false) }
+        if sprites == nil { sprites=try SpriteRenderer(device:device,wad:scene.resources,preload:false,hudOnly:true) }
         let actors=scene.view.presentation.actors.map { source -> MD_Thing in
             var value=MD_Thing()
             value.x=source.x;value.y=source.y;value.z=source.z;value.floorZ=source.floorZ;value.light=source.light
@@ -572,6 +573,10 @@ final class Renderer: NSObject, MTKViewDelegate {
             value.fullbright=source.flags&2 != 0 ? 1:0;value.shadow=source.flags&4 != 0 ? 1:0;return value
         }
         try sprites?.setPreview(things:actors,weapons:weapons,images:scene.spritePatches)
+        let ui=scene.view.ui
+        hud.health=Int32(ui.health);hud.armor=Int32(ui.armor);hud.readyAmmo=Int32(ui.readyAmmo);hud.readyWeapon=Int32(ui.weapon)
+        hud.keys=ui.keys;hud.weapons=ui.weapons
+        previewWeaponLabel=ui.rustWeaponName;previewAmmoLabel=ui.rustAmmoName
         extendedPreview=true;hud.tick=Int32(scene.view.tic)
         hud.invisibility=weapons.contains{$0.shadow != 0} ? 129:0
         hudStyle = .minimal
@@ -901,7 +906,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                     encoder.setRenderPipelineState(spritePipeline)
                 }
                 encoder.setFragmentBytes(&noPower,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
-                if !extendedPreview { sprites.drawHUD(encoder:encoder,state:hud,width:width,height:height,percent:hudSizePercent,style:hudStyle,portrait:minimalHUDPortrait) }
+                sprites.drawHUD(encoder:encoder,state:hud,width:width,height:height,percent:hudSizePercent,style:hudStyle,portrait:extendedPreview ? false:minimalHUDPortrait,weaponLabel:previewWeaponLabel,ammoLabel:previewAmmoLabel)
             }
         }
         encoder.endEncoding()

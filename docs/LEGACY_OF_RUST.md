@@ -1,6 +1,6 @@
 # Legacy of Rust development and ID24 evidence
 
-Status: **0.10.0 build 139 continuous native preview with cached geometry, keyboard/mouse controls and sound; full Rust campaign support remains pending.**
+Status: **0.10.0 build 140 continuous native preview with cached geometry, keyboard/mouse controls, HUD, level music and sound; full Rust campaign support remains pending.**
 First campaign acceptance remains fully playable bundled single-player Rust.
 Multiplayer and the online add-on catalog are outside scope. General ID24
 conformance is a separate target and must never be inferred from this campaign.
@@ -145,8 +145,8 @@ before resource/game initialization, not guessed separately by Swift and C.
    [cached scene updates](EXTENDED_MATERIALS.md). Build 137 adds continuous one-tic
    scene/audio playback and Run/Pause. Build 139 adds [incremental geometry](EXTENDED_MESH.md)
    with measured MAP13 CPU improvement and exact GPU parity. Build 135 adds native
-   [sound effects](EXTENDED_AUDIO.md). Music, full presentation and native
-   gameplay remain required. Validate targeted combat/map behavior, not just startup.
+   [sound effects](EXTENDED_AUDIO.md). Build 140 adds [native HUD and level MIDI](EXTENDED_UI.md).
+   Full presentation and campaign gameplay remain required. Validate targeted combat/map behavior, not just startup.
 4. **Campaign and persistence:** episodes, boss/secret routes, native interlevel
    animations and finale, music and extended saves. Test each route and restore
    during projectiles, charge attacks, moving sectors, switches and transitions.

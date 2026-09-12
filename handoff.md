@@ -5,22 +5,22 @@
 Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, branch
 **codex/legacy-of-rust**, based on fetched origin/main merge **afd7357**. Preserve
 `/Users/wmh/Dev/MetalDooM` and its release artifacts. Current feature version is
-**0.10.0**, final successful build **139**. This remains the same unreleased Rust
+**0.10.0**, final successful build **140**. This remains the same unreleased Rust
 feature; do not bump the minor version for each refinement.
 
-The explicit Rust preview now has **cached geometry and selective Metal updates**,
-plus Run/Pause and keyboard/mouse controls, with
-one-tic world/actor/weapon/material/audio presentation. Manual buttons show every
+The explicit Rust preview now has **native level MIDI and a minimal HUD**, plus
+cached geometry, selective Metal updates, Run/Pause and keyboard/mouse controls,
+with one-tic world/actor/weapon/material/audio/UI presentation. Manual buttons show every
 tic too. Keep the ordinary Rust picker guard until full campaign acceptance.
 No speedrun/demo/upload work was requested; that idea remains a future aside.
 
 Read [preview/process contract](docs/EXTENDED_PREVIEW.md),
-[incremental geometry](docs/EXTENDED_MESH.md), [audio](docs/EXTENDED_AUDIO.md), [materials/cache](docs/EXTENDED_MATERIALS.md),
+[HUD/music](docs/EXTENDED_UI.md), [incremental geometry](docs/EXTENDED_MESH.md), [audio](docs/EXTENDED_AUDIO.md), [materials/cache](docs/EXTENDED_MATERIALS.md),
 [sprites](docs/EXTENDED_SPRITES.md), [geometry](docs/EXTENDED_GEOMETRY.md),
 [worker](docs/EXTENDED_ENGINE.md), [validation](docs/VALIDATION.md) and
 [roadmap](docs/LEGACY_OF_RUST.md).
 
-Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/mesh-final" bash scripts/build.sh`.
+Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/ui-preview" bash scripts/build.sh`.
 Launch with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
 Only the explicit option packages/signs the helper/dylib and notices. Standard
 builds remain classic. Ordered resources are id24res → Doom II → id1, base index 1;
@@ -46,6 +46,39 @@ diagnostics only. Finite steps allow natural sample tails; explicit pause stops
 voices/mixer. Closing/error cancels future work; termination reaps the child and
 removes scratch. Sound mute stops/skips voices; unmute only plays future starts.
 
+**Build 140 adds HUD and level music.** `UISnapshot.c` copies health, armor, keys,
+nine-weapon/four-ammo inventory and the worker-selected UMAPINFO/BEX music name,
+loop flag and generation. `ExtendedUI` validates the fixed 92-byte MUI1 snapshot
+and outer view/MSP1 consistency. The native minimal HUD shows Rust weapon names
+and Fuel, uses original WAD art, and hides ammo for melee. It does not implement
+SBARDEF JSON, arbitrary IDs or full power-up/stats presentation.
+
+MusicPlayer accepts an instance-local explicit track/backend. Rust uses Apple MIDI
+without changing the classic OPL/Apple preference; no whole-song OPL prerender
+blocks a scene update. Run/finite steps resume music; finite completion, Pause,
+Escape, focus loss and errors pause it. Music and Sound have independent session
+checkboxes. Identical worker music selection does not restart a track. Score
+playback is real-time while active, not time-stretched with slow simulation.
+Full MUSINFO trigger/alternate formats/intermission/finale behavior is unaccepted.
+
+Final candidate `build/ui-preview/MetalDooM.app`, **0.10.0/build 140**, log
+`build/build140.log`. Host deep/strict signature and bundled version pass; native
+CUA title agrees. MAP01 displays health100/armor0/PISTOL/BULLETS50; a 35-tic step
+then music-muted firing ends at tic70/ammo47, Sound on. Music restored, Run +
+weapon1 then Escape ends at tic179, FIST with no ammo group, health100/armor0,
+Music/Sound on and Paused. Previous preview instances remain preserved.
+
+New validation logs: `ui140-native.log` (all 16 map music selections, MIDI durations,
+armor/two-key pickups, PCM/lifecycle and malformed UI); `ui140-worker.log` and
+`ui140-core.log` (protocol/audio/sprites/materials, MBF21/ID24/Rust probes);
+`ui140-classic-music.log` and `ui140-classic-hud.log` (shared native regression).
+Native music PCM peak0.07998366; physical speaker hearing remains unverified.
+`ui140-metal.log` passes native 1280×800 HUD composition/restoration and all 21
+reference GPU comparisons. `ui140-effects.log` and `ui140-classic-opl.log` pass
+native Rust effects and classic OPL/backend switching. The Metal test now uses
+actual Retina drawable dimensions after fixing its test-only size mismatch.
+Details are in VALIDATION.md.
+
 **Build 139 completes the first geometry optimization.** `ExtendedGeometry` reuses
 validated static arrays only after exact identity/count/static-byte matches and
 validates changed side/sector records. `GeometryTopology` caches BSP clipping,
@@ -64,12 +97,12 @@ GPU images across MAP01/13/16. Initial prototype was 17.64 ms CPU; final sample
 had the live preview open. Do not present this as sustained full campaign rate.
 Full MGE1 copy/compare and whole changed-material uploads remain future costs.
 
-**Next: music/HUD and campaign presentation**, alongside targeted monster/map
+**Next: death/restart and campaign presentation**, alongside targeted monster/map
 special parity. Keep measuring actual continuous scenes before promising 35 tics/s
 across maps. Scrolling flats, interpolation/bob, palette/translucency/control-sector/
 sky effects, death/restart, episode/boss/secret routes and saves remain outstanding.
 
-Final tests: `mesh139-performance.log`, `mesh139-parity.log`,
+Geometry milestone tests: `mesh139-performance.log`, `mesh139-parity.log`,
 `mesh139-geometry.log`, `mesh139-worker.log`, `mesh139-metal.log`,
 `mesh139-classic.log`, all under build/. Reference parity covers 32 Doom II + 16
 Rust maps, six dynamic samples on each of MAP01/13/16, synthetic height/light/
@@ -79,7 +112,7 @@ CPU tests normalize only sub-micro-unit zeros; the optimized code has determinis
 ties. Native GPU tests compare actual unmodified vertices and match every pixel.
 Unchanged material buffers retain identity; MAP13 retains 6,130/7,776 observations.
 
-Final candidate `build/mesh-final/MetalDooM.app`, **139**, log `build/build139.log`.
+Previous candidate `build/mesh-final/MetalDooM.app`, **139**, log `build/build139.log`.
 Host deep/strict signature and bundled plist pass; native CUA title matches.
 MAP13 shows all **508,713 triangles**, Step displays tic 12 then exactly 35,
 Run/E/F reaches 46/ammo 49 and Escape pauses at 280. Left **MAP13 tic 280,
@@ -114,29 +147,31 @@ That earlier app was left **MAP01 tic 91, health 100, ammo 47, Sound on, Paused*
 Host process identity: app PID 40471, its bundled worker PID 40500.
 Run is ready for the user; do not automatically leave combat running.
 
-Worker ABI 2 remains twelve private exports; engine source and wire layouts are
-unchanged. The Swift geometry decoder adds the validated cache described above. Opt-in `ME_EnableAudio` precedes init and `ME_CopyAudio` copies/drains MSA1
-only on complete copy. MVW4 header52 has optional MGE1, required MSP1/MMT1/MSA1.
+Worker ABI 2 now has thirteen private exports: `ME_CopyUI` adds MUI1 HUD/music
+without changing existing structures or MGE1/MSP1/MMT1/MSA1. The new outer MVW5
+header56 includes UI size at offset52; payloads are optional MGE1 followed by
+required MSP1/MMT1/MSA1/MUI1. Old outer versions reject. `ME_EnableAudio` precedes
+init; `ME_CopyAudio` drains only on complete copy, while UI copies never drain.
 One separate process owns each session; never load its dylib in the Swift app.
 Existing capture has 32 origin/singularity channels, DMX samples, fixed normal
 pitch, Euclidean attenuation and safe unlink positions. Capture consumes no RNG.
 Missing/invalid samples, ambient/random/loop definitions and overflow fail.
-Music/ambient playback remains absent; sound_events is requests, not audibility.
+Ambient playback remains absent; sound_events is requests, not audibility.
 
-Next complete music/HUD/campaign presentation, scrolling
+Next complete death/restart/campaign presentation, scrolling
 flats, bob/interpolation, palette/TRANMAP translucency, control-sector/fake-floor/
 sky effects, targeted monster/map-special parity, boss/secret routes, JSON
 presentation and versioned saves. Death/restart and full campaign play remain
 unaccepted; use a fresh explicitly launched session for now.
 
-Preserve all older candidates: `build/mesh-preview` (138), `build/continuous-final`
+Preserve all older candidates: `build/mesh-final` (139), `build/mesh-preview` (138), `build/continuous-final`
 (137), `build/continuous-preview` (136), `build/audio-final`
 (135), `build/audio-preview` (134), `build/material-preview` (133), `build/actor-preview`
 (132), `build/geometry-milestone` (129), `build/rust-milestone` (128),
 `build/extended-milestone` (127), `build/MetalDooM.app` (126).
 The 0.9.0 build 124 release was separately notarized in a prior task (Apple request
 121f1db9-34a4-4f5f-aeb3-599a59de0727); release ZIP remains in primary checkout
-`build/releases/MetalDooM-0.9.0-build124/`. Builds 126–139 are ad-hoc signed,
+`build/releases/MetalDooM-0.9.0-build124/`. Builds 126–140 are ad-hoc signed,
 unnotarized and unpackaged. No push/publish/upload/Apple submission performed.
 
 The remaining sections are historical.

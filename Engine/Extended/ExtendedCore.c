@@ -246,3 +246,9 @@ size_t ME_CopyAudio(void *out,size_t capacity)
     entered=1;if(setjmp(error_boundary)){entered=0;return 0;}
     size_t result=ME_WriteAudio(out,capacity);entered=0;return result;
 }
+
+size_t ME_CopyUI(void *out,size_t capacity) {
+    if(!ready || failed)return 0;
+    entered=1;if(setjmp(error_boundary)){entered=0;return 0;}
+    size_t result=ME_WriteUI(out,capacity);entered=0;return result;
+}

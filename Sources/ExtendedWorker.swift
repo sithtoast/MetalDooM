@@ -6,22 +6,25 @@ struct ExtendedView {
     let geometry: ExtendedGeometry?
     let presentation: ExtendedPresentation
     let materials: ExtendedMaterials
+    let ui:ExtendedUI
     let audio: ExtendedAudio
     init(data: Data,previousGeometry:ExtendedGeometry?=nil) throws {
-        let bytes=Bytes(data:data); try bytes.check(0,52)
-        guard data.prefix(4) == Data("MVW4".utf8) else { throw PortError("Invalid worker view header.") }
-        let size=try bytes.i32(36), spriteSize=try bytes.i32(40), materialSize=try bytes.i32(44),audioSize=try bytes.i32(48)
-        guard size >= 0, spriteSize>=32, materialSize>=16, audioSize>=16, data.count == 52+size+spriteSize+materialSize+audioSize else { throw PortError("Invalid worker state lengths.") }
+        let bytes=Bytes(data:data); try bytes.check(0,56)
+        guard data.prefix(4) == Data("MVW5".utf8) else { throw PortError("Invalid worker view header.") }
+        let size=try bytes.i32(36), spriteSize=try bytes.i32(40), materialSize=try bytes.i32(44),audioSize=try bytes.i32(48),uiSize=try bytes.i32(52)
+        guard size >= 0, spriteSize>=32, materialSize>=16, audioSize>=16,uiSize==92, data.count == 56+size+spriteSize+materialSize+audioSize+uiSize else { throw PortError("Invalid worker state lengths.") }
         tic=try bytes.i32(4); health=try bytes.i32(24)
         guard tic >= 0 else { throw PortError("Invalid worker tic.") }
         x=Float(try bytes.i32(8))/65536; y=Float(try bytes.i32(12))/65536; eyeZ=Float(try bytes.i32(16))/65536
         angle=Float(UInt32(bitPattern:Int32(try bytes.i32(20)))) * 2 * .pi/4294967296
         sky=try bytes.name(28)
         guard !sky.isEmpty, data[28..<36].prefix(while:{$0 != 0}).allSatisfy({(33...126).contains($0)}) else { throw PortError("Invalid worker sky.") }
-        geometry=size == 0 ? nil:try ExtendedGeometry(data:Data(data[52..<52+size]),previous:previousGeometry)
-        presentation=try ExtendedPresentation(data:Data(data[(52+size)..<(52+size+spriteSize)]))
-        materials=try ExtendedMaterials(data:Data(data[(52+size+spriteSize)..<(52+size+spriteSize+materialSize)]))
-        audio=try ExtendedAudio(data:Data(data[(52+size+spriteSize+materialSize)...]))
+        geometry=size == 0 ? nil:try ExtendedGeometry(data:Data(data[56..<56+size]),previous:previousGeometry)
+        presentation=try ExtendedPresentation(data:Data(data[(56+size)..<(56+size+spriteSize)]))
+        materials=try ExtendedMaterials(data:Data(data[(56+size+spriteSize)..<(56+size+spriteSize+materialSize)]))
+        audio=try ExtendedAudio(data:Data(data[(56+size+spriteSize+materialSize)..<(56+size+spriteSize+materialSize+audioSize)]))
+        ui=try ExtendedUI(data:Data(data.suffix(uiSize)))
+        guard ui.tic==tic,ui.health==health,ui.weapon==presentation.readyWeapon,ui.readyAmmo==presentation.ammo else { throw PortError("Worker HUD/view disagree") }
         guard audio.tic==tic else { throw PortError("Worker audio/view tics differ.") }
         guard materials.tic==tic else { throw PortError("Worker material/view tics differ.") }
         guard presentation.tic==tic else { throw PortError("Worker sprite/view tics differ.") }
@@ -136,7 +139,7 @@ final class ExtendedWorker {
         let header=try read(16,deadline:deadline), bytes=Bytes(data:header)
         guard header.prefix(4)==Data("MER1".utf8), UInt32(bitPattern:Int32(try bytes.i32(4)))==sequence else { throw PortError("Invalid worker reply sequence.") }
         let status=try bytes.i32(8),size=try bytes.i32(12)
-        guard (0...1).contains(status), size>=0, size<=160*1024*1024+52, status==0 || size<=2048 else { throw PortError("Invalid worker reply length/status.") }
+        guard (0...1).contains(status), size>=0, size<=160*1024*1024+56, status==0 || size<=2048 else { throw PortError("Invalid worker reply length/status.") }
         let body=try read(size,deadline:deadline)
         guard status==0 else { throw PortError(String(decoding:body,as:UTF8.self)) }
         let result=try ExtendedView(data:body,previousGeometry:previousGeometry)

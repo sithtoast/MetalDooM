@@ -9,7 +9,8 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     private let queue=DispatchQueue(label:"MetalDooM.extended-preview")
     private let worker=ExtendedWorker()
     private var audioPlayer:ExtendedSoundPlayer?
-    private var soundToggle:NSButton!, runButton:NSButton!
+    private var soundToggle:NSButton!, musicToggle:NSButton!, runButton:NSButton!
+    private var musicPlayer:MusicPlayer?,musicGeneration=0
     private var clock=ExtendedPlaybackClock(), wake:DispatchWorkItem?
     private var playbackGeneration=0, manualTag:Int?, ready=false, stopped=false
     private var keyMonitor:Any?
@@ -49,6 +50,8 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             }
             soundToggle=NSButton(checkboxWithTitle:"Sound",target:self,action:#selector(toggleSound))
             soundToggle.state = .on;controls.addArrangedSubview(soundToggle)
+            musicToggle=NSButton(checkboxWithTitle:"Music",target:self,action:#selector(toggleMusic))
+            musicToggle.state = .on;controls.addArrangedSubview(musicToggle)
             runButton=NSButton(title:"Run",target:self,action:#selector(toggleRunning))
             runButton.isEnabled=false
             let transport=NSStackView(views:[runButton,mode]);transport.spacing=12
@@ -83,7 +86,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         guard ready,!stopped,!clock.busy else { return }
         manualTag=sender.tag
         clock.start(now:ProcessInfo.processInfo.systemUptime,steps:sender.tag<=2 ? 8:(sender.tag==5 || sender.tag==8) ? 35:1)
-        updateControls();schedule()
+        updateControls();musicPlayer?.update(active:true);schedule()
     }
     @objc private func toggleRunning() {
         if clock.running { pause();return }
@@ -91,12 +94,12 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         manualTag=nil;view.releaseMouse();turnHeld=0
         clock.start(now:ProcessInfo.processInfo.systemUptime)
         view.inputBlocked=false;window.makeFirstResponder(view)
-        updateControls();schedule()
+        updateControls();musicPlayer?.update(active:true);schedule()
     }
     private func pause() {
         clock.pause();wake?.cancel();wake=nil;playbackGeneration+=1
         view?.inputBlocked=true;view?.releaseMouse();turnHeld=0
-        audioPlayer?.stop();updateControls()
+        audioPlayer?.stop();musicPlayer?.update(active:false);updateControls()
     }
     private func updateControls() {
         let available=ready && !closed && !stopped
@@ -146,7 +149,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
                     guard let self,!self.closed,!self.stopped else { return }
                     do {
                         try self.display(scene,audible:self.playbackGeneration==token)
-                        self.clock.finish();self.updateControls();self.schedule()
+                        self.clock.finish();self.musicPlayer?.update(active:self.clock.busy);self.updateControls();self.schedule()
                     } catch { self.failed(error) }
                 }
             } catch { DispatchQueue.main.async { [weak self] in self?.failed(error) } }
@@ -159,6 +162,13 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     }
     private func display(_ scene:ExtendedScene,audible:Bool) throws {
         try renderer.loadExtendedPreview(scene)
+        let ui=scene.view.ui
+        if ui.musicGeneration != musicGeneration {
+            if musicPlayer==nil { musicPlayer=try MusicPlayer(wad:scene.resources,map:scene.copiedGeometry.map.name,track:ui.music,backend:"apple") }
+            else { try musicPlayer?.select(ui.music) }
+            musicPlayer?.looping=ui.looping;musicPlayer?.enabled=musicToggle.state == .on
+            musicGeneration=ui.musicGeneration;musicPlayer?.update(active:clock.busy && audible)
+        }
         if audioPlayer==nil { audioPlayer=try ExtendedSoundPlayer(resources:scene.resources) }
         audioPlayer?.muted=soundToggle.state != .on
         try audioPlayer?.present(scene.view.audio,audible:audible)
@@ -166,6 +176,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     }
     func applicationDidResignActive(_ notification:Notification) { pause() }
     func windowDidResignKey(_ notification:Notification) { pause() }
+    @objc private func toggleMusic() { musicPlayer?.enabled=musicToggle.state == .on;musicPlayer?.update(active:clock.busy) }
     @objc private func toggleSound() { audioPlayer?.muted=soundToggle.state != .on }
     private func failed(_ error:Error) {
         guard !closed else { return }
@@ -176,7 +187,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     private func shutdown() {
         guard !closed else { return };closed=true;pause()
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor);self.keyMonitor=nil }
-        worker.cancel();view?.isPaused=true;view?.delegate=nil
+        worker.cancel();musicPlayer=nil;view?.isPaused=true;view?.delegate=nil
     }
     func applicationShouldTerminate(_ sender:NSApplication)->NSApplication.TerminateReply {
         shutdown()

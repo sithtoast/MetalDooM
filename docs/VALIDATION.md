@@ -1,5 +1,60 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 140: Rust HUD and native level MIDI
+
+Final candidate `build/ui-preview/MetalDooM.app`, **0.10.0/build 140**,
+`build/build140.log`. Host deep/strict signature verification covers the app,
+worker and dylib; bundled plist and running CUA title agree. Version remains
+0.10.0 as a refinement of the unreleased Rust feature. Previous candidates and
+the primary notarized 0.9.0/build 124 release remain preserved.
+
+Passed checks (logs under build/):
+
+- `ui140-native.log`: all 16 worker track names match independently read UMAPINFO;
+  every supplied score decodes into Apple's MIDI player with positive duration;
+  initial HUD health100/armor0/ammo50/keys0 and stable music generation after 35
+  tics. The original pickup fixture adds armor100 and two key bits. C complete-copy
+  canaries and sixteen malformed MUI1 cases plus view/tic mismatch pass.
+- The same suite renders a short original MIDI fixture through the native mixer,
+  peak **0.07998366**. Nonloop completion, natural looping, paused position,
+  resume, independent enablement and unchanged classic Apple/OPL preference pass.
+  Physical speaker audibility and every complete Rust score playback are unverified.
+- `ui140-metal.log`: native **1280×800** HUD-visible/hidden/restored readbacks;
+  28,316 changed health/armor pixels and 17,860 weapon/ammo pixels, confined to
+  the bottom HUD region, with exact restoration. All **21** optimized/full-reference
+  GPU comparisons across MAP01/13/16 pass with Metal API validation. Unchanged
+  material buffers retain identity. Native load means 0.50/3.22/0.25 ms respectively;
+  these remain isolated scene-load measurements, not full frame timing.
+- The new HUD test initially caught its own conflicting requested 640×400 versus
+  GameView's restored 1280×800 Retina drawable. It now settles layout, uses native
+  resolution, releases stale drawables, asserts dimensions and reads actual pixels.
+  No application change was needed for that test failure.
+- `ui140-worker.log`: current MVW5 protocol, deadline/cancellation, all-map resources,
+  sprite/material/audio malformed boundaries, FIFO/canaries and capture RNG parity.
+  `ui140-core.log`: exact thirteen private exports and MBF21/session/ID24/all-map/
+  actual Rust weapon and fuel pickup regressions.
+- `ui140-effects.log`: actual Rust Incinerator/Blade PCM, pickups, MAP16 switches,
+  stereo/stop/mute/cancellation, one-tic synchronization and pending-reply pause;
+  native device-output tap peak **0.49497473**.
+- `ui140-classic-music.log`: all 35 Doom II tracks, native PCM/volume, measured
+  controller/pitch reset, pause/resume/mute/track change/natural looping.
+  `ui140-classic-opl.log`: deterministic OPL PCM, invalid bank, native pause/resume,
+  mute and track-preserving Apple/OPL switching.
+- `ui140-classic-hud.log`: Classic/Minimal layouts, health/armor/ammo and six keys,
+  all face states and portrait toggle, HUD sizing, world-scale independence,
+  MetalFX/supersampling, HDR/SDR transitions and exact restoration.
+
+Native CUA MAP01: Step shows tic14 then stops at35. Music off with Sound on plus
+Fire 1 second ends at70, bullets50→47; the rendered HUD and diagnostic state agree.
+Music on, Run and weapon1 switch to FIST; Escape pauses at179 with the ammo group
+hidden. Final state: health100/armor0, Sound/Music enabled, Paused. The toolbar fits
+and weapon/world presentation remains visible. Tests establish the sequencer's
+pause/mute behavior; screenshots alone do not establish audibility.
+
+New protocol/presentation details: EXTENDED_UI.md. Full SBARDEF/sky/palette effects,
+MUSINFO triggers, intermission/finale/campaign routing, death/restart and versioned
+saves remain unaccepted. The ordinary Rust picker guard stays. No push/package.
+
 ## 2026-09-12 — 0.10.0 build 139: Incremental geometry and Metal reuse
 
 Final candidate `build/mesh-final/MetalDooM.app`, **0.10.0/build 139**,

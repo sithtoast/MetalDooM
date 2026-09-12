@@ -5,13 +5,12 @@ by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
 **Version 0.10.0 · experimental source preview · local builds are not notarized.**
 
-Build 139 speeds up the explicit [Rust preview](docs/EXTENDED_PREVIEW.md) by
-caching static geometry and updating affected walls, sectors and Metal buffers.
-MAP13 worker/CPU preparation falls from 210.6 to 20.6 ms per tic in local checks;
-21 GPU comparisons match the old meshes pixel-for-pixel. Run/Pause, keyboard/mouse
-controls and synchronized [sound effects](docs/EXTENDED_AUDIO.md) remain available.
-Music and full campaign play remain ahead; the ordinary picker still rejects Rust.
-See [geometry caching](docs/EXTENDED_MESH.md) and the [remaining milestones](docs/LEGACY_OF_RUST.md).
+Build 140 adds [native music and a minimal HUD](docs/EXTENDED_UI.md) to the explicit
+[Rust preview](docs/EXTENDED_PREVIEW.md): health, armor, keys, weapon and ammo, plus
+engine-selected level MIDI with independent Music/Sound toggles and Run/Pause.
+The preceding geometry optimization retains selective Metal updates and roughly
+tenfold MAP13 CPU improvement. Full campaign play remains ahead; the ordinary
+picker still rejects Rust. See the [remaining milestones](docs/LEGACY_OF_RUST.md).
 The previous 0.9.0 build 124 was separately notarized; that release is preserved.
 
 This branch adds independently switchable AO, test/torch/projectile/muzzle

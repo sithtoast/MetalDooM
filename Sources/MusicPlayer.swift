@@ -4,6 +4,9 @@ import AVFoundation
 // Main-thread sequencer with Apple's DLS synth and an independent volume mixer.
 final class MusicPlayer {
     private let wad: WAD
+    private let backendOverride:String?
+    private var selectedBackend:String { backendOverride ?? Self.preferredBackend }
+    var looping=true { didSet { opl?.player.numberOfLoops=looping ? -1:0 } }
     let engine=AVAudioEngine()
     private let synth=AVAudioUnitMIDIInstrument(audioComponentDescription:AudioComponentDescription(
         componentType:kAudioUnitType_MusicDevice,componentSubType:kAudioUnitSubType_DLSSynth,
@@ -24,12 +27,12 @@ final class MusicPlayer {
     var position: Double { opl?.player.currentTime ?? sequencer?.currentPositionInSeconds ?? 0 }
     var duration: Double { opl?.player.duration ?? sequencer?.tracks.map(\.lengthInSeconds).max() ?? 0 }
     var isPlaying: Bool { opl?.player.isPlaying ?? sequencer?.isPlaying ?? false }
-    init(wad: WAD, map: String) throws {
-        self.wad=wad
+    init(wad: WAD, map: String,track:String?=nil,backend:String?=nil) throws {
+        self.wad=wad;backendOverride=backend
         engine.attach(synth); engine.connect(synth,to:engine.mainMixerNode,format:nil)
         engine.mainMixerNode.outputVolume=0.7
         engine.prepare()
-        try select(wad.campaign?.value("music",map:map) ?? Self.levelTrack(map))
+        try select(track ?? wad.campaign?.value("music",map:map) ?? Self.levelTrack(map))
     }
     deinit { sequencer?.stop(); engine.stop() }
     static func levelTrack(_ map: String) -> String {
@@ -49,9 +52,10 @@ final class MusicPlayer {
     func select(_ name: String) throws {
         guard let lump=wad.lump(name) else { throw PortError("Missing music: \(name).") }
         let midi=try MUS.midi(lump.data)
-        if Self.preferredBackend == "opl" {
+        if selectedBackend == "opl" {
             let next=try OPLPlayer(wad:wad,midi:midi)
             pause();sequencer=nil;opl=next;backend="opl";trackName=name;loopCount=0;previousOPLPosition=0
+            next.player.numberOfLoops=looping ? -1:0
             next.player.volume=volume
             update(active:active);return
         }
@@ -78,9 +82,9 @@ final class MusicPlayer {
     }
     func update(active: Bool) {
         self.active=active
-        if backend != Self.preferredBackend, !trackName.isEmpty {
+        if backend != selectedBackend, !trackName.isEmpty {
             do { try select(trackName) } catch {
-                UserDefaults.standard.set(backend,forKey:"musicBackend")
+                if backendOverride == nil { UserDefaults.standard.set(backend,forKey:"musicBackend") }
                 DispatchQueue.main.async { Self.onError?(error) }
             }
         }
@@ -96,6 +100,7 @@ final class MusicPlayer {
         do {
             if !engine.isRunning { try engine.start() }
             if position >= duration {
+                if !looping { pause();return }
                 sequencer.stop(); resetSynth(); sequencer.currentPositionInSeconds=0; loopCount += 1
             }
             if !sequencer.isPlaying { try sequencer.start() }

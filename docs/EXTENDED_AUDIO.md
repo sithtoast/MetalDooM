@@ -1,9 +1,9 @@
-# Rust sound effects preview — build 137
+# Rust sound effects preview — build 140
 
 The Rust development preview plays sound effects from the worker's actual gameplay
 calls, including pistol fire, Rust weapon charge/fire/impact, pickups, switches
 and moving sectors. The Sound checkbox starts enabled; turning it off stops
-current voices and suppresses new starts. Music remains pending.
+current voices and suppresses new starts. Level music uses the separate [MUI1 adapter](EXTENDED_UI.md).
 
 ## Engine adapter and capture
 
@@ -16,7 +16,7 @@ consume RNG or advance additional simulation tics.
 extended sound table and linked descriptors to actual WAD names, including BEX
 remaps and explicit no-prefix names. It validates DMX PCM headers/durations and
 fails on missing resources, unsupported formats, random/ambient definitions or
-loops. Ambient hooks and music are not implemented. No game sounds are bundled.
+loops. Ambient effects hooks are not implemented. No game sounds are bundled.
 
 There are 32 channels. A new sound replaces the same origin/singularity class;
 otherwise it uses an available channel, or a lower-priority one when full. The
@@ -33,7 +33,7 @@ rumble, ambient loops, alternate sound formats and reverb are not reproduced.
 The existing `sound_events` snapshot value still counts gameplay requests, not
 the number of audible voices or PCM samples.
 
-## MSA1 FIFO and MVW4
+## MSA1 FIFO and MVW5
 
 `ME_CopyAudio` is a whole-buffer draining copy: NULL/undersized calls return the
 required size and preserve the FIFO; a successful complete copy consumes it.
@@ -48,10 +48,10 @@ Only starts carry a name; stop parameters are zero. Events retain FIFO order,
 including ties, and their tics cannot exceed the packet tic. Updates may occur
 at the end of a tick batch. Swift validates these constraints and exact lengths.
 
-ABI 2 now has twelve private exports; existing struct/MGE1/MSP1/MMT1 layouts are
-unchanged. The MEQ1/MER1 envelope is unchanged. The MVW4 view header has 52 bytes,
-adding audio byte count at offset 48 after the previous fields. Payload order is
-optional MGE1, required MSP1, required MMT1, required MSA1. Aggregate payload stays
+ABI 2 now has thirteen private exports; existing struct/MGE1/MSP1/MMT1 layouts are
+unchanged. The MEQ1/MER1 envelope is unchanged. The MVW5 view header has 56 bytes,
+with audio byte count at offset 48 and UI byte count at offset 52. Payload order is
+optional MGE1, required MSP1, required MMT1, required MSA1, required MUI1. Aggregate payload stays
 within 160 MiB. All snapshot tics must agree. Geometry queries do not replay audio
 already consumed by a tick reply; protocol versions are intentionally strict.
 

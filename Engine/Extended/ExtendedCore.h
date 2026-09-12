@@ -73,3 +73,6 @@ ME_API size_t ME_CopyMaterials(void *out, size_t capacity);
 ME_API int ME_EnableAudio(void);
 /* MSA1 FIFO: NULL/undersized queries preserve events; a complete copy drains. */
 ME_API size_t ME_CopyAudio(void *out,size_t capacity);
+
+/* MUI1 HUD/music presentation; complete-copy semantics, no state drain. */
+ME_API size_t ME_CopyUI(void *out,size_t capacity);

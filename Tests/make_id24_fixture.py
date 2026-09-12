@@ -115,3 +115,8 @@ Unknown 2 = 0
 [CODEPTR]
 Frame 1101 = PlaySound
 ''').encode())])
+# Native HUD/music presentation: owned armor/cards plus a short deterministic MIDI.
+score=b'\x00\xc0\x00\x00\x90\x3c\x64\x60\x80\x3c\x00\x00\xff\x2f\x00'
+midi=b'MThd'+struct.pack('>IHHH',6,0,1,96)+b'MTrk'+struct.pack('>I',len(score))+score
+hud_things=struct.pack('<20h',*player,-110,0,0,2018,7,-110,0,0,5,7,-110,0,0,6,7)
+write('ui-pickups',replace_room(hud_things)+[('D_UITEST',midi),('UMAPINFO',b'map MAP01 { music = "D_UITEST" }')])

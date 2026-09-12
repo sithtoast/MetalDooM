@@ -82,8 +82,6 @@ void ST_ResetCarousel(void){}
 void ST_ResetMessages(void){}
 void ST_Start(void){}
 void WS_Reset(void){}
-void S_ChangeMusInfoMusic(int lump,int looping){}
-void S_ChangeMusic(int music,int looping){}
 void S_InitListener(const struct mobj_s *listener){}
 void S_Reset(void){}
 void S_ResumeMusic(void){}

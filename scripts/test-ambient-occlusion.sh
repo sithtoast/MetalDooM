@@ -21,8 +21,7 @@ source=source[:start]+'    func show(_ error: Error) { validationFail(String(des
 renderer=(root/'Sources/Renderer.swift').read_text()
 renderer=renderer.replace('final class Renderer: NSObject, MTKViewDelegate {',
     'final class Renderer: NSObject, MTKViewDelegate {\n    var validationHUDVisible=true')
-renderer=renderer.replace('                sprites.drawHUD(', '                if validationHUDVisible { sprites.drawHUD(')
-renderer=renderer.replace('percent:hudSizePercent,style:hudStyle,portrait:minimalHUDPortrait)', 'percent:hudSizePercent,style:hudStyle,portrait:minimalHUDPortrait) }')
+renderer='\n'.join('                if validationHUDVisible { '+line.strip()+' }' if line.strip().startswith('sprites.drawHUD(') else line for line in renderer.split('\n'))
 (output/'Renderer.swift').write_text(renderer+"""
 // Test-only bridge in this copied source file; not part of app builds.
 extension Renderer {

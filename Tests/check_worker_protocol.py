@@ -9,7 +9,7 @@ def read(p):
     head = p.stdout.read(16)
     assert len(head) == 16, head
     magic, seq, status, length = struct.unpack('<4sIII', head)
-    assert magic == b'MER1' and length <= 160*1024*1024+52
+    assert magic == b'MER1' and length <= 160*1024*1024+56
     body = p.stdout.read(length)
     assert len(body) == length
     return seq, status, body
@@ -19,13 +19,13 @@ with tempfile.TemporaryDirectory() as cache:
         p = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
             initial = read(p)
-            assert initial[:2] == (0, 0) and initial[2][:4] == b'MVW4'
-            geometry, presentation, materials, audio = struct.unpack_from('<IIII', initial[2], 36)
-            sprite_data = initial[2][52+geometry:52+geometry+presentation]
+            assert initial[:2] == (0, 0) and initial[2][:4] == b'MVW5'
+            geometry, presentation, materials, audio, ui = struct.unpack_from('<IIIII', initial[2], 36)
+            sprite_data = initial[2][56+geometry:56+geometry+presentation]
             assert len(sprite_data) == presentation and sprite_data[:4] == b'MSP1'
             (pathlib.Path(executable).parent / 'initial-presentation.msp').write_bytes(sprite_data)
             (pathlib.Path(executable).parent / 'initial-view.mvw').write_bytes(initial[2])
-            assert len(initial[2]) == 52+geometry+presentation+materials+audio and initial[2][52+geometry+presentation:][:4] == b'MMT1'
+            assert len(initial[2]) == 56+geometry+presentation+materials+audio+ui and initial[2][56+geometry+presentation:][:4] == b'MMT1'
             if mode == 'eof':
                 p.stdin.close()
                 assert p.wait(timeout=3) == 0

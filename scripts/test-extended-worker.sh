@@ -22,6 +22,6 @@ cmp "$OUT/audio-state-0.bin" "$OUT/audio-state-1.bin"
 python3 "$PROJECT_DIR/Tests/check_worker_protocol.py" "$OUT/MetalDooMWorker" "$1"
 xcrun swiftc -swift-version 5 -O -target arm64-apple-macosx14.0 -module-cache-path "$PROJECT_DIR/build/module-cache" \
  "$PROJECT_DIR/Sources/WAD.swift" "$PROJECT_DIR/Sources/Geometry.swift" "$PROJECT_DIR/Sources/ExtendedGeometry.swift" \
- "$PROJECT_DIR/Sources/ExtendedAudio.swift" "$PROJECT_DIR/Sources/ExtendedMaterials.swift" "$PROJECT_DIR/Sources/ExtendedPresentation.swift" "$PROJECT_DIR/Sources/ExtendedWorker.swift" "$PROJECT_DIR/Sources/ExtendedMesh.swift" "$PROJECT_DIR/Sources/ExtendedScene.swift" \
+ "$PROJECT_DIR/Sources/ExtendedAudio.swift" "$PROJECT_DIR/Sources/ExtendedMaterials.swift" "$PROJECT_DIR/Sources/ExtendedPresentation.swift" "$PROJECT_DIR/Sources/ExtendedUI.swift" "$PROJECT_DIR/Sources/ExtendedWorker.swift" "$PROJECT_DIR/Sources/ExtendedMesh.swift" "$PROJECT_DIR/Sources/ExtendedScene.swift" \
  "$PROJECT_DIR/Tests/ExtendedWorkerValidation.swift" -o "$OUT/validate-worker"
 "$OUT/validate-worker" "$OUT/MetalDooMWorker" "$1" "$2"
