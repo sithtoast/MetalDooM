@@ -4,6 +4,22 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust custom actor blend tables (build 150)
+
+- Render patched per-state translucency tables, including fullbright actors and
+  actors without the ordinary translucent flag. Preserve fuzz precedence.
+- Load a bounded table bank once per worker, with stable shared table IDs through
+  delayed state changes, restart and fresh-worker Save/Load.
+- Reject malformed table lengths, oversized banks and invalid table references.
+  Custom per-object tables, weapon blending and translucent walls remain separate
+  work; native RGB lighting is still not software-renderer pixel parity.
+- Validate exact custom GPU pixels and overlap order, shared/default table
+  selection, state transitions, save continuation, the 64-table boundary, all
+  sixteen Rust maps and existing HUD/scrolling/interpolation/save regressions.
+- Verify the final app signature, version and build, and live MAP01 Run/input/Pause
+  with world/pistol/HUD intact. Keep this unreleased refinement on 0.10.0, local
+  and ad-hoc signed; preserve earlier bundles for their matching private saves.
+
 ## 0.10.0 refinement — Rust translucent actors (build 149)
 
 - Draw ordinary translucent actors and additive glowing actors with the engine's

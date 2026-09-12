@@ -63,12 +63,12 @@ typedef struct {
 } ME_View;
 ME_API int ME_CopyView(ME_View *out);
 
-/* MSP3 resolved sprite/weapon values, same whole-buffer semantics as geometry. */
+/* MSP4 resolved sprite/weapon values, same whole-buffer semantics as geometry. */
 ME_API size_t ME_CopyPresentation(void *out, size_t capacity);
 
 /* MMT1 animation translations, same whole-buffer semantics as geometry. */
 ME_API size_t ME_CopyMaterials(void *out, size_t capacity);
-/* MBL1 palette and normal/additive lookup tables, immutable for the session. */
+/* MBL2 palette and bounded lookup table bank, immutable for the session. */
 ME_API size_t ME_CopyBlendTables(void *out, size_t capacity);
 
 /* Opt in before initialization. Headless probes remain capture-free by default. */

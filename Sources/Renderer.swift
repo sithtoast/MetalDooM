@@ -600,7 +600,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             value.fullbright=source.flags&2 != 0 ? 1:0;value.shadow=source.flags&4 != 0 ? 1:0;return value
         }
         try sprites?.setPreview(things:actors,weapons:weapons,images:scene.spritePatches,
-            blend:scene.view.presentation.actors.map {$0.flags&16 != 0 ? 2:$0.flags&8 != 0 ? 1:0},tables:scene.view.blendTables)
+            blend:scene.view.presentation.actors.map(\.blendTable),tables:scene.view.blendTables)
         let ui=scene.view.ui
         hud.health=Int32(ui.health);hud.armor=Int32(ui.armor);hud.readyAmmo=Int32(ui.readyAmmo);hud.readyWeapon=Int32(ui.weapon)
         hud.keys=ui.keys;hud.weapons=ui.weapons

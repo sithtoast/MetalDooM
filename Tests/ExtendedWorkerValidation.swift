@@ -45,16 +45,16 @@ import Foundation
         do {
             let worker=ExtendedWorker();defer{worker.close()}
             let initial=try worker.start(executable:executable,paths:[base,fixtures.appendingPathComponent("blend-actors.wad")],map:1,base:0,profile:0)
-            guard initial.presentation.actors.map({$0.flags & 30})==[8,26,12],let tables=initial.blendTables else {throw PortError("Incorrect normal/additive/shadow modes")}
+            guard initial.presentation.actors.map({$0.flags & 30})==[8,26,4],let tables=initial.blendTables else {throw PortError("Incorrect normal/additive/shadow modes")}
             for bg in 0..<256 {for fg in 0..<256 {guard tables.normal[bg*256+fg]==UInt8((bg+2*fg)/3) else {throw PortError("TRANMAP bytes changed")}}}
             guard tables.normal != tables.additive else {throw PortError("Additive table missing")}
             let repeated=try worker.geometry()
             guard repeated.tic==0,repeated.blendTables?.additive==tables.additive else {throw PortError("Blend copy changed simulation or tables")}
             func words(_ values:[UInt32])->Data {Data(values.flatMap {v in (0..<4).map{UInt8(truncatingIfNeeded:v>>(8*$0))}})}
-            let packet=Data("MBL1".utf8)+words([1,768,2])+Data(tables.palette+tables.normal+tables.additive)
+            let packet=Data("MBL2".utf8)+words([2,768,2])+Data(tables.palette+tables.normal+tables.additive)
             _=try ExtendedBlendTables(data:packet)
             var cases=[Data(packet.prefix(15)),Data(packet.dropLast()),packet+Data([0])]
-            for (offset,value) in [(0,UInt32(0)),(4,2),(8,767),(12,3)] {
+            for (offset,value) in [(0,UInt32(0)),(4,1),(8,767),(12,65)] {
                 var d=packet;d.replaceSubrange(offset..<offset+4,with:words([value]));cases.append(d)
             }
             for invalid in cases {
@@ -63,7 +63,47 @@ import Foundation
             }
             print("PASS exact TRANMAP bytes, separate additive table, actor selection, stable copied state and 7 malformed blend packets")
         }
-        for name in ["blend-bad-table","blend-custom"] {
+        do {
+            let customPaths=[base,fixtures.appendingPathComponent("blend-custom.wad")]
+            let worker=ExtendedWorker();defer{worker.close()}
+            let initial=try worker.start(executable:executable,paths:customPaths,map:1,base:0,profile:0)
+            guard let tables=initial.blendTables,tables.tables.count==4,
+                  initial.presentation.actors.map(\.blendTable)==[3,3,0,3] else {throw PortError("Custom table IDs/precedence/deduplication failed")}
+            for bg in 0..<256 {for fg in 0..<256 {
+                guard tables.tables[2][bg*256+fg]==UInt8((2*bg+fg)/3),tables.tables[3][bg*256+fg]==UInt8(255-fg) else {throw PortError("Custom blend table bytes changed")}
+            }}
+            let switched=try worker.tick(count:2)
+            guard switched.presentation.actors.map(\.blendTable)==[4,3,0,3],switched.blendTables?.tables==tables.tables else {throw PortError("Delayed custom state changed table identity")}
+            let save=try worker.save(),restoredWorker=ExtendedWorker();defer{restoredWorker.close()}
+            _=try restoredWorker.start(executable:executable,paths:customPaths,map:1,base:0,profile:0)
+            let restored=try restoredWorker.restore(save)
+            guard restored.presentation.actors.map(\.blendTable)==[4,3,0,3],restored.blendTables?.tables==tables.tables else {throw PortError("Custom table save/restore failed")}
+            for _ in 0..<8 {
+                let expected=try worker.tick(),actual=try restoredWorker.tick()
+                guard expected.presentation.actors.map(\.blendTable)==actual.presentation.actors.map(\.blendTable),expected.presentation.actors.map(\.state)==actual.presentation.actors.map(\.state) else {throw PortError("Custom table continuation failed")}
+            }
+            let restarted=try worker.advance(restart:true)
+            guard restarted.presentation.actors.map(\.blendTable)==[3,3,0,3],restarted.blendTables?.tables==tables.tables else {throw PortError("Custom table restart failed")}
+            // A structurally valid sprite ID must also exist in this session bank.
+            let raw=try Data(contentsOf:executable.deletingLastPathComponent().appendingPathComponent("initial-presentation.msp"))
+            for flags:UInt32 in [8|(1<<8),8|(2<<8),8|(65<<8),3<<8,24|(3<<8),1<<16] {
+                var data=raw;for i in 0..<4 {data[60+i]=UInt8(truncatingIfNeeded:flags>>(i*8))}
+                var rejected=false;do {_=try ExtendedPresentation(data:data)}catch{rejected=true}
+                guard rejected else {throw PortError("Invalid custom sprite flags accepted")}
+            }
+            var absent=raw;let flags:UInt32=8|(5<<8)
+            for i in 0..<4 {absent[60+i]=UInt8(truncatingIfNeeded:flags>>(i*8))}
+            var rejected=false;do {try tables.validate(ExtendedPresentation(data:absent))}catch{rejected=true}
+            guard rejected else {throw PortError("Absent custom table reference accepted")}
+            print("PASS custom table bytes, shared stable IDs, state/fullbright/opaque/fuzz precedence, delayed state, fresh restore/continuation, restart and invalid IDs")
+        }
+        do {
+            let worker=ExtendedWorker();defer{worker.close()}
+            let state=try worker.start(executable:executable,paths:[base,fixtures.appendingPathComponent("blend-custom-max.wad")],map:1,base:0,profile:0)
+            guard state.blendTables?.tables.count==64,state.presentation.actors.map(\.blendTable)==[64] else {throw PortError("Maximum valid blend bank failed")}
+            print("PASS maximum 64-table bank and highest actor table ID")
+        }
+        for name in ["blend-bad-table","blend-custom-short","blend-custom-long","blend-custom-limit"] {
             let worker=ExtendedWorker();defer{worker.close()}
             var rejected=false
             do {_=try worker.start(executable:executable,paths:[base,fixtures.appendingPathComponent(name+".wad")],map:1,base:0,profile:0)}catch {rejected=true}
@@ -154,7 +194,7 @@ import Foundation
                 return data
             }
             let invalid=[Data(original.prefix(31)),Data(original.dropLast()),original+Data([0]),
-                mutate(4,4),mutate(12,UInt32.max),mutate(16,3),mutate(28,2),mutate(32,0),mutate(32+28,16),mutate(32+28,32)]
+                mutate(4,5),mutate(12,UInt32.max),mutate(16,3),mutate(28,2),mutate(32,0),mutate(32+28,16),mutate(32+28,32)]
             for data in invalid {
                 var rejected=false
                 do { _=try ExtendedPresentation(data:data) } catch { rejected=true }

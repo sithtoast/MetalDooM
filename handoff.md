@@ -5,10 +5,10 @@
 Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, branch
 **codex/legacy-of-rust**, based on fetched origin/main merge **afd7357**. Preserve
 `/Users/wmh/Dev/MetalDooM` and its release artifacts. Current feature version is
-**0.10.0**, final successful build **149**. This remains the same unreleased Rust
+**0.10.0**, final successful build **150**. This remains the same unreleased Rust
 feature; do not bump the minor version for each refinement.
 
-The explicit Rust preview now has **normal/additive actor translucency**, **camera/weapon interpolation during Run**, **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
+The explicit Rust preview now has **normal/additive/per-state actor translucency**, **camera/weapon interpolation during Run**, **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
 plus death/restart and native completion/Continue,
 plus level MIDI, a minimal HUD, cached geometry, selective Metal updates, Run/Pause and keyboard/mouse controls,
 with one-tic world/actor/weapon/material/audio/UI presentation. Manual buttons show every
@@ -21,7 +21,7 @@ Read [translucency](docs/EXTENDED_TRANSLUCENCY.md), [interpolation](docs/EXTENDE
 [worker](docs/EXTENDED_ENGINE.md), [validation](docs/VALIDATION.md) and
 [roadmap](docs/LEGACY_OF_RUST.md).
 
-Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/translucency-preview" bash scripts/build.sh`.
+Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/custom-blend-preview" bash scripts/build.sh`.
 Launch with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
 Only the explicit option packages/signs the helper/dylib and notices. Standard
 builds remain classic. Ordered resources are id24res → Doom II → id1, base index 1;
@@ -48,6 +48,25 @@ diagnostics only. Finite steps allow natural sample tails; explicit pause stops
 voices/mixer. Closing/error cancels future work; termination reaps the child and
 removes scratch. Sound mute stops/skips voices; unmute only plays future starts.
 
+**Build 150 adds per-state custom actor blend tables.** MBL2/op8 supplies a
+bounded bank of 2–64 tables (normal/additive plus up to 62 custom WAD lumps).
+Engine initialization validates every patched state's table allocation/length,
+deduplicates shared pointers and assigns stable IDs before any level spawns.
+MSP4 keeps all strides; bits8–15 hold custom ID3–64, requiring translucent8 and
+forbidding additive16. IDs must exist in the session bank. State tables override
+opaque/fullbright/default flags; fuzz wins. Per-object custom tables still reject
+because the keyframe path does not serialize that pointer. No Vendor changes.
+
+Current candidate: `build/custom-blend-preview/MetalDooM.app`, 0.10.0/build150;
+`build/build150.log`. Tests: `build/custom-blend-worker-validation.log`,
+`build/custom-blend-metal-validation.log`, `build/custom-blend-save-validation.log`.
+Host deep/strict signatures and 0.10.0/build150 running title pass. Actual MAP01
+Run/Up/Right/Pause left at tic164/health100/ammo50/283actors, Music/Sound on; world,
+pistol and HUD screenshot checked. See docs/VALIDATION.md. Preserve build149 and
+its paused MAP01 session, plus all older bundles/private saves. Remaining work:
+translucent walls, per-object/weapon blending, palette effects, fake-floor/control-
+sector/sky effects, actor/moving-surface interpolation and campaign playtesting.
+
 **Build 149 adds normal/additive actor translucency.** `ME_CopyBlendTables`
 brings ABI2 to 18 exports; MBL1/op8 supplies immutable PLAYPAL/normal/additive
 lookup tables once at startup. MSP3/version3 retains record sizes and adds actor
@@ -58,7 +77,7 @@ and cutouts. RGB world/shaded sprite colors are quantized to PLAYPAL before tabl
 lookup; this does not claim software-renderer lighting/pixel parity. Classic
 actors retain their opaque/fuzz behavior. Preserve earlier apps for their saves.
 
-Current candidate: `build/translucency-preview/MetalDooM.app`, 0.10.0/build149;
+Previous candidate: `build/translucency-preview/MetalDooM.app`, 0.10.0/build149;
 `build/build149.log`. Host deep/strict signatures and running title verified.
 Actual MAP01 Run/Up/Right/Pause left at tic48/health100/ammo50/283actors, Music/Sound
 on; world/pistol/HUD screenshot checked. Validation details: docs/VALIDATION.md.
@@ -336,7 +355,7 @@ pitch, Euclidean attenuation and safe unlink positions. Capture consumes no RNG.
 Missing/invalid samples, ambient/random/loop definitions and overflow fail.
 Ambient playback remains absent; sound_events is requests, not audibility.
 
-Next complete actor/moving-surface interpolation, palette powerups/custom/wall translucency,
+Next complete actor/moving-surface interpolation, palette powerups/per-object/wall translucency,
 control-sector/fake-floor/sky effects, targeted monster/map-special parity, actual
 boss exits and remaining world presentation. Full campaign play remains unaccepted; use the
 explicit preview with bounded Restart/Continue mechanics for now.
@@ -348,7 +367,7 @@ Preserve all older candidates: `build/mesh-final` (139), `build/mesh-preview` (1
 `build/extended-milestone` (127), `build/MetalDooM.app` (126).
 The 0.9.0 build 124 release was separately notarized in a prior task (Apple request
 121f1db9-34a4-4f5f-aeb3-599a59de0727); release ZIP remains in primary checkout
-`build/releases/MetalDooM-0.9.0-build124/`. Builds 126–149 are ad-hoc signed,
+`build/releases/MetalDooM-0.9.0-build124/`. Builds 126–150 are ad-hoc signed,
 unnotarized and unpackaged. No push/publish/upload/Apple submission performed.
 
 The remaining sections are historical.

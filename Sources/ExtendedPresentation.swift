@@ -3,6 +3,7 @@ import Foundation
 struct ExtendedSprite {
     let name:String, x:Float, y:Float, z:Float, floorZ:Float, light:Float
     let flags:Int, editor:Int, state:Int
+    var blendTable:Int {flags>>8 != 0 ? flags>>8:flags&16 != 0 ? 2:flags&8 != 0 ? 1:0}
 }
 struct ExtendedPresentation {
     let tic:Int, readyWeapon:Int, ammo:Int
@@ -10,7 +11,7 @@ struct ExtendedPresentation {
     let actors:[ExtendedSprite], weapons:[ExtendedSprite]
     init(data:Data) throws {
         let b=Bytes(data:data);try b.check(0,32)
-        guard data.prefix(4)==Data("MSP3".utf8),try b.i32(4)==3,(0...1).contains(try b.i32(28)) else { throw PortError("Invalid sprite snapshot header.") }
+        guard data.prefix(4)==Data("MSP4".utf8),try b.i32(4)==4,(0...1).contains(try b.i32(28)) else { throw PortError("Invalid sprite snapshot header.") }
         snapCamera=try b.i32(28)==1
         tic=try b.i32(8);let count=try b.i32(12),weaponCount=try b.i32(16)
         readyWeapon=try b.i32(20);ammo=try b.i32(24)
@@ -20,7 +21,8 @@ struct ExtendedPresentation {
             let raw=data[offset..<offset+8],text=raw.prefix{$0 != 0}
             guard !text.isEmpty,text.allSatisfy({(33...126).contains($0)}),raw.dropFirst(text.count).allSatisfy({$0==0}) else { throw PortError("Invalid sprite resource name.") }
             let light=try b.i32(offset+(weapon ? 16:24)),flags=try b.i32(offset+(weapon ? 20:28))
-            guard (0...255).contains(light),flags>=0,flags & ~(weapon ? 7:31)==0,flags & 16==0 || flags & 8 != 0 else { throw PortError("Invalid sprite presentation flags/light (\(flags)/\(light)).") }
+            guard (0...255).contains(light),flags>=0,flags & ~(weapon ? 7:0xff1f)==0,flags & 16==0 || flags & 8 != 0,
+                  flags>>8==0 || (3...64).contains(flags>>8) && flags & 24==8 else { throw PortError("Invalid sprite presentation flags/light (\(flags)/\(light)).") }
             func fixed(_ p:Int) throws -> Float { Float(try b.i32(p))/65536 }
             return try ExtendedSprite(name:String(decoding:text,as:UTF8.self),x:fixed(offset+8),y:fixed(offset+12),
                 z:weapon ? 0:fixed(offset+16),floorZ:weapon ? 0:fixed(offset+20),light:Float(light)/255,
@@ -77,17 +79,24 @@ struct ExtendedInterpolation {
 
 /// Immutable palette-index tables copied once per worker, indexed background * 256 + foreground.
 struct ExtendedBlendTables {
-    static let byteCount=16+768+2*65536
-    let palette:[UInt8], normal:[UInt8], additive:[UInt8]
+    static let maxByteCount=16+768+64*65536
+    let palette:[UInt8], tables:[[UInt8]]
+    var normal:[UInt8] {tables[0]}
+    var additive:[UInt8] {tables[1]}
     init(data:Data) throws {
         let b=Bytes(data:data);try b.check(0,16)
-        guard data.count==Self.byteCount,data.prefix(4)==Data("MBL1".utf8),
-              try b.i32(4)==1,try b.i32(8)==768,try b.i32(12)==2 else {throw PortError("Invalid blend table snapshot.")}
-        palette=Array(data[16..<784]);normal=Array(data[784..<66320]);additive=Array(data[66320..<Self.byteCount])
+        let count=try b.i32(12)
+        guard (2...64).contains(count),data.count==16+768+count*65536,data.prefix(4)==Data("MBL2".utf8),
+              try b.i32(4)==2,try b.i32(8)==768 else {throw PortError("Invalid blend table snapshot.")}
+        palette=Array(data[16..<784])
+        tables=(0..<count).map {Array(data[(784+$0*65536)..<(784+($0+1)*65536)])}
     }
-    func rgba(add:Bool)->[UInt8] {
-        (add ? additive:normal).flatMap { index in
-            let p=Int(index)*3;return [palette[p],palette[p+1],palette[p+2],255]
+    func validate(_ presentation:ExtendedPresentation) throws {
+        guard presentation.actors.allSatisfy({$0.blendTable<=tables.count}) else {throw PortError("Actor references an absent blend table.")}
+    }
+    func rgba(index:Int)->[UInt8] {
+        tables[index].flatMap { entry in
+            let p=Int(entry)*3;return [palette[p],palette[p+1],palette[p+2],255]
         }
     }
 }

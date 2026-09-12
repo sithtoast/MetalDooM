@@ -122,7 +122,7 @@ int ME_Init(const ME_Config *config)
     ME_ApplySessionOptions();
     int tranmap=W_CheckNumForName("TRANMAP");
     if(tranmap>=0 && W_LumpLength(tranmap)!=65536)I_Error("TRANMAP must contain exactly 65536 entries");
-    R_InitData(); P_Init();
+    R_InitData(); ME_InitBlendTables(); P_Init();
     playeringame[0] = true; precache = false;
     G_InitNew((skill_t)(config->skill - 1), 1, config->map, false);
     ready = 1;

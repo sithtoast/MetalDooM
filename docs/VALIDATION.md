@@ -1,5 +1,41 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 150: custom per-state actor tables
+
+Candidate: `build/custom-blend-preview/MetalDooM.app`; `build/build150.log`.
+Same unreleased 0.10.0 feature version, ad-hoc signed and not notarized/packaged.
+Host deep/strict verification passes for app/helper/dylib; source and bundle
+version, BUILD_NUMBER and running title agree. Exactly 18 private exports remain.
+
+- `build/custom-blend-worker-validation.log`: copied-buffer canaries for a custom
+  bank; exact custom table bytes and shared IDs; custom state precedence over
+  opaque/default-additive flags, with fuzz taking precedence; a second table
+  first used after two tics; fresh restore plus eight subsequent state/ID checks;
+  restart; maximum 64-table bank/ID; invalid IDs, absent references, short/long
+  tables and excessive count rejection. All sixteen actual Rust maps and existing
+  gun-frame, rotation, material, audio and framed-worker regressions pass.
+- `build/custom-blend-metal-validation.log`: Metal API validation, exact
+  normal/additive/custom pixel oracles with 25,724 overlapping pixels and both
+  actor enumeration orders, shaded foregrounds, cutouts, 104,636 opaque occluder
+  pixels, walls and fuzz precedence. Also 21 exact real-map reference images,
+  HUD hide/restore, four scrolling/save-phase comparisons and camera/weapon
+  interpolation endpoint checks. No Metal validation errors.
+- `build/custom-blend-save-validation.log`: full private-save regression, including
+  all sixteen maps and 140 future tics each, campaign/death/malformed keyframes,
+  copied-state/RNG/audio checks, fingerprint/envelope checks and atomic writes.
+
+Final bundle launched with the explicit Rust command on actual MAP01. Native
+Run, Up/Right input and Pause were exercised; left paused at tic164, health100,
+ammo50, 283 actors, Music/Sound enabled. The running title shows 0.10.0/build150;
+world geometry, pistol and HUD were inspected in the screenshot. Earlier bundles
+and sessions remain preserved. Custom table pixel evidence is from controlled
+fixtures, not a claim that a full live Rust campaign has been accepted.
+
+MBL2 now contains 2–64 tables, bounded to 4,195,088 bytes. MSP4 retains strides,
+using actor flag bits 8–15 for custom IDs. Per-object tables and weapon/wall
+blending remain unadapted, as do palette/fixed-colormap effects and other world
+presentation gaps. See EXTENDED_TRANSLUCENCY.md for exact scope and contract.
+
 ## 2026-09-12 — 0.10.0 build 149: Rust translucent actors
 
 Candidate: `build/translucency-preview/MetalDooM.app`; `build/build149.log`.

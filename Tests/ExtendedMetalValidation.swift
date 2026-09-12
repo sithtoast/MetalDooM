@@ -47,7 +47,8 @@ func runMeshMetalValidation() throws {
         let palette=(0..<256).flatMap{[UInt8($0),UInt8($0),UInt8($0)]}
         let normal=(0..<256).flatMap{bg in (0..<256).map{fg in UInt8((bg+2*fg)/3)}}
         let additive=(0..<256).flatMap{bg in (0..<256).map{fg in UInt8(min(255,bg+fg))}}
-        let tables=try ExtendedBlendTables(data:Data("MBL1".utf8)+words([1,768,2])+Data(palette+normal+additive))
+        let custom=(0..<256).flatMap{bg in (0..<256).map{fg in UInt8((2*bg+fg)/3)}}
+        let tables=try ExtendedBlendTables(data:Data("MBL2".utf8)+words([2,768,3])+Data(palette+normal+additive+custom))
         var images:[Int:PatchImage]=[:]
         // Distinct RGB control colors avoid invisible mask pixels where opaque
         // art equals the background; fullbright blending must use source indices.
@@ -78,13 +79,13 @@ func runMeshMetalValidation() throws {
                 let p=i*4
                 var color=(Int(background[p])+Int(background[p+1])+Int(background[p+2])+1)/3
                 for (visible,fg) in [(farMask[i],200),(nearMask[i],100)] where visible {
-                    color=mode==1 ? (color+2*fg)/3:min(255,color+fg)
+                    color=mode==1 ? (color+2*fg)/3:mode==2 ? min(255,color+fg):(2*color+fg)/3
                 }
                 output[p]=UInt8(color);output[p+1]=UInt8(color);output[p+2]=UInt8(color);output[p+3]=255
             }
             return output
         }
-        for mode in [1,2] {
+        for mode in [1,2,3] {
             let actual=try draw([near,far],[mode,mode]),reverse=try draw([far,near],[mode,mode])
             guard actual==reverse else {throw PortError("Translucency depends on actor enumeration order")}
             let oracle=expected(mode)
@@ -114,7 +115,7 @@ func runMeshMetalValidation() throws {
         guard try draw([outside],[1])==background else {throw PortError("Translucency draws through room walls")}
         var shadow=near;shadow.shadow=1
         guard try draw([shadow],[2])==draw([shadow],[0]) else {throw PortError("Fuzz did not take precedence over translucency")}
-        print("PASS native fullbright/shaded normal/additive lookup pixels, \(overlap) overlapping pixels sorted both orders, cutouts, \(occluded) opaque actor pixels, wall occlusion and fuzz precedence")
+        print("PASS native fullbright/shaded normal/additive/custom lookup pixels, \(overlap) overlapping pixels sorted both orders, cutouts, \(occluded) opaque actor pixels, wall occlusion and fuzz precedence")
     }
     for number in [1,13,16] {
         let worker=ExtendedWorker();defer{worker.close()}

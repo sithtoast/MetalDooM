@@ -68,20 +68,20 @@ final class SpriteRenderer {
         previewWeapons=weapons
     }
     func setPreview(things:[MD_Thing],weapons:[MD_WeaponSprite],images:[Int:PatchImage],blend:[Int]=[],tables:ExtendedBlendTables?=nil) throws {
-        guard blend.isEmpty || blend.count==things.count && blend.allSatisfy({(0...2).contains($0)}) else {throw PortError("Invalid sprite blend modes.")}
+        guard blend.isEmpty || blend.count==things.count && blend.allSatisfy({(0...64).contains($0)}) else {throw PortError("Invalid sprite blend modes.")}
         if blendTextures.isEmpty,let tables {
             guard let palette=device.makeBuffer(bytes:tables.palette,length:768,options:.storageModeShared) else {throw PortError("Cannot allocate blend palette.")}
             var textures:[MTLTexture]=[]
-            for add in [false,true] {
+            for index in tables.tables.indices {
                 let d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.rgba8Unorm,width:256,height:256,mipmapped:false)
                 d.storageMode = .shared;d.usage = .shaderRead
                 guard let texture=device.makeTexture(descriptor:d) else {throw PortError("Cannot allocate blend table.")}
-                tables.rgba(add:add).withUnsafeBytes {texture.replace(region:MTLRegionMake2D(0,0,256,256),mipmapLevel:0,withBytes:$0.baseAddress!,bytesPerRow:1024)}
+                tables.rgba(index:index).withUnsafeBytes {texture.replace(region:MTLRegionMake2D(0,0,256,256),mipmapLevel:0,withBytes:$0.baseAddress!,bytesPerRow:1024)}
                 textures.append(texture)
             }
             blendPalette=palette;blendTextures=textures
         }
-        guard !blend.contains(where:{$0>0}) || blendTextures.count==2 else {throw PortError("Missing actor blend tables.")}
+        guard blend.allSatisfy({$0<=blendTextures.count}) else {throw PortError("Missing actor blend tables.")}
         previewBlend=blend
         for (index,image) in images where patches[index] == nil { patches[index]=try upload(image) }
         self.things=things;previewWeapons=weapons

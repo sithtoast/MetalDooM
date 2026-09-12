@@ -1,6 +1,6 @@
-# Copied Rust actor and weapon frames — MSP3, build 149
+# Copied Rust actor and weapon frames — MSP4, build 150
 
-`ME_CopyPresentation` returns an MSP3 snapshot on the session thread between
+`ME_CopyPresentation` returns an MSP4 snapshot on the session thread between
 ticks. NULL queries required bytes; insufficient capacity returns that size and
 leaves the buffer untouched. Zero means no ready session/error. It is an additive
 ABI 2 export, with no change to existing structures or MGE2 geometry. No pointers
@@ -13,14 +13,14 @@ also stays invisible: upstream normally supplies that blank in its own resource
 WAD. An explicit TNT1 replacement remains drawable. Other missing frames fail.
 No game artwork is bundled.
 
-## MSP3 layout
+## MSP4 layout
 
 All integers are little-endian. Fixed coordinates use signed 16.16 units.
 
 | Header offset | Value |
 | --- | --- |
-| 0 | `MSP3` magic, four bytes |
-| 4 | Version u32, 3 |
+| 0 | `MSP4` magic, four bytes |
+| 4 | Version u32, 4 |
 | 8 | Simulation tic u32 |
 | 12 | Actor count u32, at most 1,000,000 |
 | 16 | Weapon layer count u32, at most 2 |
@@ -38,7 +38,7 @@ ordered WAD stack. Sprite replacements use the last matching name.
 | 0 | Sprite resource name |
 | 8, 12, 16, 20 | x, y, z, floor z (fixed) |
 | 24 | Sector light i32, clamped 0–255 |
-| 28 | Flags u32: mirrored 1, fullbright 2, shadow 4, translucent 8, additive 16 (requires 8) |
+| 28 | Flags u32: mirrored 1, fullbright 2, shadow 4, translucent 8, additive 16 (requires 8); bits 8–15 custom table ID 3–64 or zero |
 | 32, 36 | Editor number, state index (i32) |
 
 | Weapon offset | Value |
@@ -50,7 +50,8 @@ ordered WAD stack. Sprite replacements use the last matching name.
 
 Weapon and flash layers preserve psprite order. Swift rejects incorrect lengths,
 versions, counts, names, light ranges and unknown flags; the enclosing view tic
-must agree. `ExtendedScene` decodes each selected sprite name once per update.
+must agree. Custom IDs require flag 8, forbid 16 and must exist in the
+session bank; see the translucency contract. `ExtendedScene` decodes each selected sprite name once per update.
 `SpriteRenderer` caches its uploaded patch across updates and reuses the native
 world billboard, weapon overlay and fuzz paths. Classic engine calls are gated
 off when external weapon records are supplied, including an empty array.
@@ -59,8 +60,8 @@ off when external weapon records are supplied, including an empty array.
 
 Simulation psprite offsets already include movement bob. Build 148 interpolates
 camera and compatible weapon positions during Run; see EXTENDED_INTERPOLATION.md.
-Normal/additive actor translucency now uses copied engine tables; see
-[translucency](EXTENDED_TRANSLUCENCY.md). Per-state TRANMAPs, fixed-colormap palette effects, corpse mirroring enhancements,
+Normal/additive/per-state custom actor translucency now uses copied engine tables; see
+[translucency](EXTENDED_TRANSLUCENCY.md). Per-object custom tables, fixed-colormap palette effects, corpse mirroring enhancements,
 control-sector lighting and fake-floor clipping are not yet adapted. The preview
 has a minimal gameplay HUD; build 135 added [sound effects](EXTENDED_AUDIO.md). Build 139 [updates affected geometry and materials](EXTENDED_MESH.md) while
 retaining unchanged Metal buffers. Build 137 adds a continuous clock and per-tic audio;

@@ -38,8 +38,8 @@ size_t ME_WritePresentation(void *out,size_t capacity) {
     if(actors>1000000 || weapons>2)I_Error("Excessive presentation count");
     size_t size=32+(size_t)actors*40+(size_t)weapons*24;
     if(!out || capacity<size)return size;
-    unsigned char *p=out;memcpy(p,"MSP3",4);p+=4;
-    word(&p,3);word(&p,leveltime);word(&p,actors);word(&p,weapons);
+    unsigned char *p=out;memcpy(p,"MSP4",4);p+=4;
+    word(&p,4);word(&p,leveltime);word(&p,actors);word(&p,weapons);
     word(&p,players[0].readyweapon);
     int ammo=weaponinfo[players[0].readyweapon].ammo;
     word(&p,ammo==am_noammo ? -1:players[0].ammo[ammo]);word(&p,players[0].mo->interp > 0 ? 0:1);
@@ -56,14 +56,21 @@ size_t ME_WritePresentation(void *out,size_t capacity) {
         word(&p,m->x);word(&p,m->y);word(&p,m->z);word(&p,m->floorz);
         int light=m->subsector->sector->lightlevel;
         word(&p,light>255?255:light<0?0:light);
-        // Match R_ProjectSprite precedence. Custom tables need a future bank;
-        // never silently render those actors with the wrong blend operation.
-        const unsigned char *table=m->state->tranmap ? m->state->tranmap:m->tranmap;
-        if(table && table!=main_tranmap && table!=main_addimap && !(m->flags & MF_SHADOW))
-            I_Error("Custom actor translucency tables are not supported by the native preview");
-        unsigned blend=table==main_addimap && table ? 24:table ? 8:
-            (m->flags & MF_TRANSLUCENT) ? ((m->state->frame & FF_FULLBRIGHT) ? 24:8):
-            (m->intflags & MIF_GHOST) ? 8:0;
+        // Per-state tables precede object/default translucency, even when the
+        // state is fullbright or the actor lacks MF_TRANSLUCENT. Fuzz wins.
+        unsigned index=0;
+        if(!(m->flags & MF_SHADOW)) {
+            if(m->state->tranmap)index=ME_BlendTableIndex(m->state->tranmap);
+            else if(m->tranmap) {
+                // Object tables are not serialized by the private keyframe path.
+                if(m->tranmap!=main_tranmap && m->tranmap!=main_addimap)
+                    I_Error("Custom per-object actor blend tables are not supported");
+                index=ME_BlendTableIndex(m->tranmap);
+            }
+            else if(m->flags & MF_TRANSLUCENT)index=(m->state->frame & FF_FULLBRIGHT) ? 2:1;
+            else if(m->intflags & MIF_GHOST)index=1;
+        }
+        unsigned blend=index>2 ? 8|(index<<8):index==2 ? 24:index==1 ? 8:0;
         word(&p,(f->flip[rot]?1:0)|((m->frame & FF_FULLBRIGHT)?2:0)|((m->flags & MF_SHADOW)?4:0)|blend);
         word(&p,m->info->doomednum);word(&p,m->state-states);
     }

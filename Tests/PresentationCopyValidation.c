@@ -4,9 +4,9 @@
 #include <string.h>
 #include <stdio.h>
 int main(int argc,char **argv) {
-    assert(argc==3 && ME_CopyPresentation(NULL,0)==0 && ME_CopyMaterials(NULL,0)==0 && ME_CopyBlendTables(NULL,0)==0);
-    const char *paths[]={argv[2]};
-    ME_Config c={.abi_version=ME_ABI_VERSION,.wad_paths=paths,.wad_count=1,.cache_directory=argv[1],.skill=3,.map=1,.random_seed=1993};
+    assert((argc==3 || argc==4) && ME_CopyPresentation(NULL,0)==0 && ME_CopyMaterials(NULL,0)==0 && ME_CopyBlendTables(NULL,0)==0);
+    const char *paths[]={argv[2],argc==4 ? argv[3]:NULL};
+    ME_Config c={.abi_version=ME_ABI_VERSION,.wad_paths=paths,.wad_count=argc-2,.cache_directory=argv[1],.skill=3,.map=1,.random_seed=1993};
     assert(ME_Init(&c));
     size_t (*copies[])(void*,size_t)={ME_CopyPresentation,ME_CopyMaterials,ME_CopyBlendTables};
     for(int kind=0;kind<3;kind++) {

@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory() as cache:
             assert initial[:2] == (0, 0) and initial[2][:4] == b'MVW5'
             geometry, presentation, materials, audio, ui = struct.unpack_from('<IIIII', initial[2], 36)
             sprite_data = initial[2][56+geometry:56+geometry+presentation]
-            assert len(sprite_data) == presentation and sprite_data[:4] == b'MSP3'
+            assert len(sprite_data) == presentation and sprite_data[:4] == b'MSP4'
             (pathlib.Path(executable).parent / 'initial-presentation.msp').write_bytes(sprite_data)
             (pathlib.Path(executable).parent / 'initial-view.mvw').write_bytes(initial[2])
             assert len(initial[2]) == 56+geometry+presentation+materials+audio+ui and initial[2][56+geometry+presentation:][:4] == b'MMT1'

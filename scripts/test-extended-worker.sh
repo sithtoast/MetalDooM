@@ -11,6 +11,7 @@ xcrun clang -std=c11 -Wall -Wextra -Werror -arch arm64 -mmacosx-version-min=14.0
 "$OUT/validate-presentation-copy" "$OUT/cache" "$1"
 python3 "$PROJECT_DIR/Tests/make_id24_fixture.py" "$OUT/fixtures"
 python3 "$PROJECT_DIR/Tests/make_translucency_fixture.py" "$OUT/fixtures"
+"$OUT/validate-presentation-copy" "$OUT/cache" "$1" "$OUT/fixtures/blend-custom.wad"
 xcrun clang -std=c11 -Wall -Wextra -Werror -arch arm64 -mmacosx-version-min=14.0 \
  -I"$PROJECT_DIR/Engine/Extended" "$PROJECT_DIR/Tests/AudioCopyValidation.c" \
  -L"$OUT" -lMetalDooMExtended -Wl,-rpath,@executable_path -o "$OUT/validate-audio-copy"

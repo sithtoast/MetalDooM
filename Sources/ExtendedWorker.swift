@@ -71,7 +71,8 @@ final class ExtendedWorker {
             var view=try receive(deadline:deadline())
             guard let geometry=view.geometry, geometry.map.name == String(format:"MAP%02d",map) else { throw PortError("Worker returned the wrong map.") }
             identity=geometry.contentSHA256
-            blendTables=try ExtendedBlendTables(data:exchange(operation:8,body:Data(),limit:ExtendedBlendTables.byteCount))
+            blendTables=try ExtendedBlendTables(data:exchange(operation:8,body:Data(),limit:ExtendedBlendTables.maxByteCount))
+            try blendTables?.validate(view.presentation)
             view.blendTables=blendTables
             return view
         } catch { cancel(); throw error }
@@ -180,6 +181,7 @@ final class ExtendedWorker {
     }
     private func decodeView(_ body:Data) throws -> ExtendedView {
         var result=try ExtendedView(data:body,previousGeometry:previousGeometry)
+        try blendTables?.validate(result.presentation)
         result.blendTables=blendTables
         if let geometry=result.geometry { previousGeometry=geometry }
         lastUI=result.ui
