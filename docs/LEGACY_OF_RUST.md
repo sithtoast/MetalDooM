@@ -1,6 +1,6 @@
 # Legacy of Rust development and ID24 evidence
 
-Status: **0.10.0 resource-table foundation; Legacy of Rust is not playable yet.**
+Status: **0.10.0 build 127 extended-worker foundation; Legacy of Rust is not playable yet.**
 First campaign acceptance remains fully playable bundled single-player Rust.
 Multiplayer and the online add-on catalog are outside scope. General ID24
 conformance is a separate target and must never be inferred from this campaign.
@@ -128,8 +128,10 @@ before resource/game initialization, not guessed separately by Swift and C.
    SIGIL II now uses its actual ANIMATED lump instead of a hardcoded flame entry.
    Existing add-on guards remain intact. Limits: 65,536 records per table;
    positive rates below 65,536; no SMMU swirl or single-frame extension.
-2. **Extended engine seam and data:** compile an isolated extended simulation
-   behind the native ABI; ordered session/resource/deh plan, extensible validated
+2. **Extended engine seam and data (started in build 127):** a separate native
+   MBF21 worker now runs copied-snapshot, patched combat and Boom conveyor tests
+   ([boundary and limitations](EXTENDED_ENGINE.md)). Still required: ordered
+   session/resource/deh planning and extensible validated
    actor/state/action/sound/sprite tables. Compare classic deterministic movement,
    combat, RNG, saves and all KEX profiles before switching any default backend.
 3. **Rust simulation:** complete Boom/MBF21/required ID24 actions and physics;

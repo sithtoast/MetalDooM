@@ -3,7 +3,7 @@
 Requires an Apple Silicon Mac and macOS 14 or later.
 
 Extract the release ZIP, drag MetalDooM.app to Applications, then open it.
-The current 0.10.0 build 126 is a local, ad-hoc-signed development preview and has
+The current 0.10.0 build 127 is a local, ad-hoc-signed development preview and has
 not been notarized. No new distribution ZIP was produced for this milestone.
 The previous 0.9.0 build 124 distribution was separately Developer ID signed,
 accepted by Apple and stapled; its notarization does not apply to newer builds.
@@ -18,8 +18,9 @@ included. The validated rerelease nerve.wad and masterlevels.wad use Doom II;
 sigil2.wad uses Ultimate Doom. Load one campaign add-on at a time. Use Open WAD
 to change games. See docs/KEX_SUPPORT.md for exact edition boundaries.
 
-Legacy of Rust remains unsupported. Version 0.10.0 begins its resource-table
-foundation; see docs/LEGACY_OF_RUST.md for the remaining engine work.
+Legacy of Rust remains unsupported. Version 0.10.0 includes resource tables and
+a separately built experimental simulation worker; see docs/LEGACY_OF_RUST.md
+for the remaining engine work.
 
 See PLAYER_GUIDE.md for controls and BUG_REPORT.md for reports. When reporting a bug,
 include Diagnostics → Copy Diagnostic Report; never attach commercial WADs.

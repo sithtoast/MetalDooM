@@ -1,16 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD_DIR="$PROJECT_DIR/build"
+BUILD_DIR="${METALDOOM_BUILD_DIR:-$PROJECT_DIR/build}"
+# A single lock protects BUILD_NUMBER even when preserving a preview in another output.
+BUILD_LOCK="$PROJECT_DIR/build/.build-lock"
+mkdir -p "$PROJECT_DIR/build"
 mkdir -p "$BUILD_DIR/module-cache"
-if ! mkdir "$BUILD_DIR/.build-lock" 2>/dev/null; then
-  echo "Another build is running (lock: $BUILD_DIR/.build-lock)." >&2
+if ! mkdir "$BUILD_LOCK" 2>/dev/null; then
+  echo "Another build is running (lock: $BUILD_LOCK)." >&2
   exit 1
 fi
 TEMP_BUILD=""
 cleanup() {
   if [[ -n "$TEMP_BUILD" ]]; then rm -rf "$TEMP_BUILD"; fi
-  rmdir "$BUILD_DIR/.build-lock"
+  rmdir "$BUILD_LOCK"
 }
 trap cleanup EXIT
 CURRENT_BUILD="$(cat "$PROJECT_DIR/BUILD_NUMBER")"

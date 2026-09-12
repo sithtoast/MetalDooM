@@ -1,0 +1,427 @@
+//
+// Copyright(C) 2024 Roman Fomin
+// Copyright(C) 2026 Fabian Greffrath
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+#include "m_json.h"
+
+#include <string.h>
+#include "doomdata.h"
+#include "doomtype.h"
+#include "i_printf.h"
+#include "m_array.h"
+#include "m_misc.h"
+#include "w_wad.h"
+#include "z_zone.h"
+
+#include "yyjson.h"
+
+boolean JS_GetVersion(json_t *json, version_t *version)
+{
+    json_t *js_version = JS_GetObject(json, "version");
+    if (!JS_IsString(js_version))
+    {
+        return false;
+    }
+
+    const char *string = JS_GetString(js_version);
+    if (M_ParseVersion(string, version))
+    {
+        return true;
+    }
+
+    return false;
+}
+
+typedef struct
+{
+    yyjson_doc *json_doc;
+    int lumpnum;
+} doc_t;
+
+static doc_t *docs;
+
+json_t *JS_OpenString(char *string, size_t length)
+{
+    yyjson_read_err err;
+    yyjson_doc *json_doc = yyjson_read_opts(string, length, YYJSON_READ_NOFLAG, NULL, &err);
+
+    if (!json_doc)
+    {
+        size_t line, col, chr;
+        yyjson_locate_pos(string, length, err.pos, &line, &col, &chr);
+        I_Printf(VB_ERROR, "%s(%d:%d): read error: %s\n", __func__, (int)line,
+                 (int)col, err.msg);
+        return NULL;
+    }
+
+    array_push(docs, ((doc_t){json_doc, NO_INDEX}));
+
+    json_t *json = yyjson_doc_get_root(json_doc);
+
+    return json;
+}
+
+json_t *JS_OpenOptions(int lumpnum, boolean comments)
+{
+    char *string = W_CacheLumpNum(lumpnum, PU_CACHE);
+    int length = W_LumpLength(lumpnum);
+
+    yyjson_read_flag flag = comments ? YYJSON_READ_ALLOW_COMMENTS : 0;
+
+    yyjson_read_err err;
+    yyjson_doc *json_doc = yyjson_read_opts(string, length, flag, NULL, &err);
+
+    if (!json_doc)
+    {
+        size_t line, col, chr;
+        yyjson_locate_pos(string, length, err.pos, &line, &col, &chr);
+        char name[9] = {0};
+        M_CopyLumpName(name, lumpinfo[lumpnum].name);
+        I_Printf(VB_ERROR, "%s(%d:%d): read error: %s\n", name, (int)line,
+                 (int)col, err.msg);
+        return NULL;
+    }
+
+    array_push(docs, ((doc_t){json_doc, lumpnum}));
+
+    json_t *json = yyjson_doc_get_root(json_doc);
+
+    return json;
+}
+
+json_t *JS_Open(const char *lump, const char *type, version_t maxversion)
+{
+    int lumpnum = W_CheckNumForName(lump);
+    if (lumpnum < 0)
+    {
+        return NULL;
+    }
+
+    json_t *json = JS_OpenOptions(lumpnum, false);
+    if (!json)
+    {
+        return NULL;
+    }
+
+    json_t *js_type = JS_GetObject(json, "type");
+    if (!JS_IsString(js_type))
+    {
+        I_Printf(VB_ERROR, "%s: no type string", lump);
+        JS_CloseOptions(lumpnum);
+        return NULL;
+    }
+
+    const char *s = JS_GetString(js_type);
+    if (strcmp(s, type))
+    {
+        I_Printf(VB_ERROR, "%s: wrong type %s", lump, s);
+        JS_CloseOptions(lumpnum);
+        return NULL;
+    }
+
+    version_t v = {0};
+    if (!JS_GetVersion(json, &v))
+    {
+        I_Printf(VB_ERROR, "%s: no version string", lump);
+        JS_CloseOptions(lumpnum);
+        return NULL;
+    }
+
+    if (M_CompareVersions(&v, &maxversion) > 0)
+    {
+        I_Printf(VB_ERROR, "%s: max supported version %d.%d.%d", lump,
+                 maxversion.major, maxversion.minor, maxversion.revision);
+        JS_CloseOptions(lumpnum);
+        return NULL;
+    }
+
+    return json;
+}
+
+void JS_CloseOptions(int lumpnum)
+{
+    for (int i = 0; i < array_size(docs); ++i)
+    {
+        if (docs[i].lumpnum == lumpnum)
+        {
+            yyjson_doc_free(docs[i].json_doc);
+            array_delete(docs, i);
+            break;
+        }
+    }
+}
+
+void JS_Close(const char *lump)
+{
+    int lumpnum = W_CheckNumForName(lump);
+    if (lumpnum < 0)
+    {
+        return;
+    }
+
+    JS_CloseOptions(lumpnum);
+}
+
+boolean JS_IsObject(json_t *json)
+{
+    return yyjson_is_obj(json);
+}
+
+boolean JS_IsNull(json_t *json)
+{
+    return yyjson_is_null(json);
+}
+
+boolean JS_IsBoolean(json_t *json)
+{
+    return yyjson_is_bool(json);
+}
+
+boolean JS_IsNumber(json_t *json)
+{
+    return yyjson_is_num(json);
+}
+
+boolean JS_IsString(json_t *json)
+{
+    return yyjson_is_str(json);
+}
+
+boolean JS_IsArray(json_t *json)
+{
+    return yyjson_is_arr(json);
+}
+
+json_t *JS_GetObject(json_t *json, const char *string)
+{
+    return yyjson_obj_get(json, string);
+}
+
+int JS_GetObjectSize(json_t *json)
+{
+    return yyjson_obj_size(json);
+}
+
+int JS_GetArraySize(json_t *json)
+{
+    return yyjson_arr_size(json);
+}
+
+json_t *JS_GetArrayItem(json_t *json, int index)
+{
+    return yyjson_arr_get(json, index);
+}
+
+json_arr_iter_t *JS_ArrayIterator(json_t *json)
+{
+    json_arr_iter_t *iter = malloc(sizeof(*iter));
+    yyjson_arr_iter_init(json, iter);
+    return iter;
+}
+
+json_t *JS_ArrayNext(json_arr_iter_t *iter)
+{
+    json_t *value = yyjson_arr_iter_next(iter);
+    if (!value)
+    {
+        free(iter);
+    }
+    return value;
+}
+
+void JS_ArrayIteratorFree(json_arr_iter_t *iter)
+{
+    free(iter);
+}
+
+boolean JS_GetBoolean(json_t *json)
+{
+    return yyjson_get_bool(json);
+}
+
+boolean JS_GetBooleanValue(json_t *json, const char *string)
+{
+    json_t *obj = JS_GetObject(json, string);
+    if (JS_IsBoolean(obj))
+    {
+        return JS_GetBoolean(obj);
+    }
+    return false;
+}
+
+double JS_GetNumber(json_t *json)
+{
+    return yyjson_get_num(json);
+}
+
+double JS_GetNumberValue(json_t *json, const char *string)
+{
+    json_t *obj = JS_GetObject(json, string);
+    if (JS_IsNumber(obj))
+    {
+        return JS_GetNumber(obj);
+    }
+    return 0;
+}
+
+int JS_GetInteger(json_t *json)
+{
+    return yyjson_get_int(json);
+}
+
+int JS_GetIntegerValue(json_t *json, const char *string)
+{
+    json_t *obj = JS_GetObject(json, string);
+    if (JS_IsNumber(obj))
+    {
+        return JS_GetInteger(obj);
+    }
+    return 0;
+}
+
+uint64_t JS_GetUInteger(json_t *json)
+{
+    return yyjson_get_uint(json);
+}
+
+uint64_t JS_GetUIntegerValue(json_t *json, const char *string)
+{
+    json_t *obj = JS_GetObject(json, string);
+    if (JS_IsNumber(obj))
+    {
+        return JS_GetUInteger(obj);
+    }
+    return 0;
+}
+
+const char *JS_GetString(json_t *json)
+{
+    return yyjson_get_str(json);
+}
+
+const char *JS_GetStringValue(json_t *json, const char *string)
+{
+    json_t *obj = JS_GetObject(json, string);
+    if (JS_IsString(obj))
+    {
+        return JS_GetString(obj);
+    }
+    return NULL;
+}
+
+json_obj_iter_t *JS_ObjectIterator(json_t *json)
+{
+    yyjson_obj_iter *iter = malloc(sizeof(*iter));
+    if (yyjson_obj_iter_init(json, iter))
+    {
+        return iter;
+    }
+    free(iter);
+    return NULL;
+}
+
+boolean JS_ObjectNext(json_obj_iter_t *iter, json_t **key, json_t **value)
+{
+    *key = yyjson_obj_iter_next(iter);
+    if (*key == NULL)
+    {
+        free(iter);
+        return false;
+    }
+    *value = yyjson_obj_iter_get_val(*key);
+    return true;
+}
+
+// Write API
+
+json_mut_doc_t *JS_NewDoc(void)
+{
+    return yyjson_mut_doc_new(NULL);
+}
+
+void JS_FreeDoc(json_mut_doc_t *doc)
+{
+    yyjson_mut_doc_free(doc);
+}
+
+json_mut_t *JS_NewObject(json_mut_doc_t *doc)
+{
+    return yyjson_mut_obj(doc);
+}
+
+json_mut_t *JS_NewArray(json_mut_doc_t *doc)
+{
+    return yyjson_mut_arr(doc);
+}
+
+void JS_SetRoot(json_mut_doc_t *doc, json_mut_t *root)
+{
+    yyjson_mut_doc_set_root(doc, root);
+}
+
+void JS_SetInt(json_mut_doc_t *doc, json_mut_t *obj,
+               const char *key, int val)
+{
+    yyjson_mut_obj_add_int(doc, obj, key, val);
+}
+
+void JS_SetUInt(json_mut_doc_t *doc, json_mut_t *obj,
+               const char *key, uint64_t val)
+{
+    yyjson_mut_obj_add_uint(doc, obj, key, val);
+}
+
+void JS_SetObject(json_mut_doc_t *doc, json_mut_t *parent,
+                  const char *key, json_mut_t *child)
+{
+    yyjson_mut_obj_add_val(doc, parent, key, child);
+}
+
+void JS_SetString(json_mut_doc_t *doc, json_mut_t *parent,
+                  const char *key, const char *str)
+{
+    yyjson_mut_obj_add_str(doc, parent, key, str);
+}
+
+void JS_SetArray(json_mut_doc_t *doc, json_mut_t *parent,
+                 const char *key, json_mut_t *arr)
+{
+    yyjson_mut_obj_add_val(doc, parent, key, arr);
+}
+
+void JS_ArrayAddInt(json_mut_doc_t *doc, json_mut_t *arr, int val)
+{
+    yyjson_mut_arr_add_int(doc, arr, val);
+}
+
+void JS_ArrayAddObject(json_mut_doc_t *doc, json_mut_t *arr, json_mut_t *obj)
+{
+    (void)doc;
+    yyjson_mut_arr_add_val(arr, obj);
+}
+
+void JS_ArrayAddString(json_mut_doc_t *doc, json_mut_t *arr, const char *str)
+{
+    yyjson_mut_arr_add_str(doc, arr, str);
+}
+
+#ifndef SAVEGAME_NO_COMPRESS
+#define YYJSON_WRITE_FLAG YYJSON_WRITE_NOFLAG
+#else
+#define YYJSON_WRITE_FLAG YYJSON_WRITE_PRETTY
+#endif
+
+char *JS_DocWriteString(json_mut_doc_t *doc, size_t *len)
+{
+    return yyjson_mut_write(doc, YYJSON_WRITE_FLAG, len);
+}

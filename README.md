@@ -5,8 +5,9 @@ by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
 **Version 0.10.0 · experimental source preview · local builds are not notarized.**
 
-Build 126 starts the Legacy of Rust development series with data-driven animation
-and switch tables. Rust itself remains unsupported; see the
+Build 127 continues Legacy of Rust development with a separate experimental
+[native extended simulation worker](docs/EXTENDED_ENGINE.md), following build 126’s
+animation and switch tables. Rust itself remains unsupported; see the
 [audit and implementation milestones](docs/LEGACY_OF_RUST.md).
 The previous 0.9.0 build 124 was separately notarized; that release is preserved.
 

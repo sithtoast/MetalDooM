@@ -1,0 +1,1430 @@
+//
+//  Copyright (C) 1999 by
+//  id Software, Chi Hoang, Lee Killough, Jim Flynn, Rand Phares, Ty Halderman
+//
+//  This program is free software; you can redistribute it and/or
+//  modify it under the terms of the GNU General Public License
+//  as published by the Free Software Foundation; either version 2
+//  of the License, or (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+// DESCRIPTION:
+//  Do all the WAD I/O, get map description,
+//  set up initial state and misc. LUTs.
+//
+//-----------------------------------------------------------------------------
+
+#include <limits.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "d_think.h"
+#include "doomdata.h"
+#include "doomdef.h"
+#include "doomstat.h"
+#include "doomtype.h"
+#include "g_game.h"
+#include "g_compatibility.h"
+#include "i_printf.h"
+#include "i_system.h"
+#include "info.h"
+#include "m_arena.h"
+#include "m_argv.h"
+#include "m_bbox.h"
+#include "m_fixed.h"
+#include "m_misc.h"
+#include "m_swap.h"
+#include "nano_bsp.h"
+#include "p_enemy.h"
+#include "p_bsp.h"
+#include "p_map.h"
+#include "p_maputl.h"
+#include "p_mobj.h"
+#include "p_setup.h"
+#include "p_spec.h"
+#include "p_tick.h"
+#include "p_udmf.h"
+#include "r_data.h"
+#include "r_defs.h"
+#include "r_sky.h"
+#include "r_main.h"
+#include "r_state.h"
+#include "r_things.h"
+#include "r_tranmap.h"
+#include "s_musinfo.h" // [crispy] S_ParseMusInfo()
+#include "s_sound.h"
+#include "tables.h"
+#include "w_wad.h"
+#include "z_zone.h"
+
+statenum_t *seenstate_tab = NULL;
+
+// Detect map Format currently being set up.
+// Different map formats
+static const char *const map_format_names[] = {
+    [MAP_NONE] = "Invalid",
+    [MAP_DOOM] = "Doom",
+    [MAP_HEXEN] = "Hexen",
+    [MAP_UDMF] = "UDMF",
+};
+
+static const char *const bsp_format_names[] = {
+    [BSP_DOOMBSP] = "DoomBSP", [BSP_DEEPBSPV4] = "DeepBSPV4",
+    [BSP_XNOD] = "XNOD",       [BSP_ZNOD] = "ZNOD",
+    [BSP_XGLN] = "XGLN",       [BSP_ZGLN] = "ZGLN",
+    [BSP_XGL2] = "XGL2",       [BSP_ZGL2] = "ZGL2",
+    [BSP_XGL3] = "XGL3",       [BSP_ZGL3] = "ZGL3",
+    [BSP_NANO] = "NanoBSP"};
+
+// Appended to node_format_names, hence the plus sign
+static const char *const bmap_format_names[] = {
+    [BMAP_DoomBlockmap] = "",
+    [BMAP_XBM1] = "+XBM1",
+    [BMAP_BoomBuilder] = "+BoomBlockmap",
+};
+
+map_t map = {0};
+
+//
+// MAP related Lookup tables.
+// Store VERTEXES, LINEDEFS, SIDEDEFS, etc.
+//
+
+int      numvertexes;
+vertex_t *vertexes;
+
+int      numsegs;
+seg_t    *segs;
+
+int      numsectors;
+sector_t *sectors;
+
+int      numsubsectors;
+subsector_t *subsectors;
+
+int      numnodes;
+node_t   *nodes;
+
+int      numlines;
+line_t   *lines;
+
+int      numsides;
+side_t   *sides;
+
+int      *sslines_indexes;
+ssline_t *sslines;
+
+arena_t *world_arena;
+
+// BLOCKMAP
+// Created from axis aligned bounding box
+// of the map, a rectangular array of
+// blocks of size ...
+// Used to speed up collision detection
+// by spatial subdivision in 2D.
+//
+// Blockmap size.
+
+int       bmapwidth, bmapheight;  // size in mapblocks
+
+// killough 3/1/98: remove blockmap limit internally:
+int32_t      *blockmap;           // was short -- killough
+
+// offsets in blockmap are from here
+int32_t      *blockmaplump;       // was short -- killough
+
+fixed_t   bmaporgx, bmaporgy;     // origin of block map
+
+mobj_t    **blocklinks;           // for thing chains
+int       blocklinks_size;
+
+boolean   skipblstart;  // MaxW: Skip initial blocklist short
+
+//
+// REJECT
+// For fast sight rejection.
+// Speeds up enemy AI by skipping detailed
+//  LineOf Sight calculation.
+// Without the special effect, this could
+// be used as a PVS lookup as well.
+//
+
+byte *rejectmatrix;
+
+// Maintain single and multi player starting spots.
+
+// 1/11/98 killough: Remove limit on deathmatch starts
+mapthing_t *deathmatchstarts;      // killough
+size_t     num_deathmatchstarts;   // killough
+
+mapthing_t *deathmatch_p;
+mapthing_t playerstarts[MAXPLAYERS];
+
+//
+// P_LoadVertexes
+//
+// killough 5/3/98: reformatted, cleaned up
+
+void P_LoadVertexes (int lump)
+{
+  byte *data;
+  int i;
+
+  // Determine number of lumps:
+  //  total lump length / vertex record length.
+  numvertexes = W_LumpLength(lump) / sizeof(mapvertex_t);
+
+  // Allocate zone memory for buffer.
+  vertexes = arena_alloc_num(world_arena, vertex_t, numvertexes);
+
+  // Load data into cache.
+  data = W_CacheLumpNum(lump, PU_STATIC);
+
+  // Copy and convert vertex coordinates,
+  // internal representation as fixed.
+  for (i=0; i<numvertexes; i++)
+    {
+      vertexes[i].x = IntToFixed(SHORT(((mapvertex_t *) data)[i].x));
+      vertexes[i].y = IntToFixed(SHORT(((mapvertex_t *) data)[i].y));
+
+      // [FG] vertex coordinates used for rendering
+      vertexes[i].r_x = vertexes[i].x;
+      vertexes[i].r_y = vertexes[i].y;
+    }
+
+  // Free buffer memory.
+  Z_Free (data);
+}
+
+// GetSectorAtNullAddress
+
+sector_t* GetSectorAtNullAddress(void)
+{
+  static boolean null_sector_is_initialized = false;
+  static sector_t null_sector;
+
+  if (demo_compatibility && overflow[emu_missedbackside].enabled)
+  {
+    overflow[emu_missedbackside].triggered = true;
+
+    if (!null_sector_is_initialized)
+    {
+      memset(&null_sector, 0, sizeof(null_sector));
+      I_GetMemoryValue(0, &null_sector.floorheight, 4);
+      I_GetMemoryValue(4, &null_sector.ceilingheight, 4);
+      null_sector_is_initialized = true;
+    }
+
+    return &null_sector;
+  }
+
+  return 0;
+}
+
+//
+// P_LoadSectors
+//
+// killough 5/3/98: reformatted, cleaned up
+
+void P_LoadSectors (int lump)
+{
+  byte *data;
+  int  i;
+
+  numsectors = W_LumpLength (lump) / sizeof(mapsector_t);
+  sectors = arena_alloc_num(world_arena, sector_t, numsectors);
+  data = W_CacheLumpNum (lump,PU_STATIC);
+
+  for (i=0; i<numsectors; i++)
+    {
+      sector_t *ss = sectors + i;
+      const mapsector_t *ms = (mapsector_t *) data + i;
+
+      ss->floorheight = IntToFixed(SHORT(ms->floorheight));
+      ss->ceilingheight = IntToFixed(SHORT(ms->ceilingheight));
+      ss->floorpic = R_FlatNumForName(ms->floorpic);
+      ss->ceilingpic = R_FlatNumForName(ms->ceilingpic);
+      ss->lightlevel = SHORT(ms->lightlevel);
+      ss->special = SHORT(ms->special);
+      ss->oldspecial = SHORT(ms->special);
+      ss->tag = SHORT(ms->tag);
+      P_SectorInit(ss);
+    }
+
+  Z_Free (data);
+}
+
+//
+// factored out, removed properties that are zero by default
+//
+void P_SectorInit(sector_t * const sector)
+{
+  sector->nextsec = -1; // jff 2/26/98 add fields to support locking out
+  sector->prevsec = -1; // stair retriggering until build completes
+
+  sector->heightsec = -1;       // sector used to get floor and ceiling height
+  sector->floorlightsec = -1;   // sector used to get floor lighting
+  sector->ceilinglightsec = -1; // sector used to get ceiling lighting:
+
+  sector->tint = sector->tintfloor = sector->tintceiling = -1;
+
+  // killough 8/28/98: initialize all sectors to normal friction first
+  sector->friction = ORIG_FRICTION;
+  sector->movefactor = ORIG_FRICTION_FACTOR;
+
+  // killough 3/7/98:
+  // floor and ceiling flats offsets
+  sector->old_floor_xoffs = sector->interp_floor_xoffs = sector->floor_xoffs;
+  sector->old_floor_yoffs = sector->interp_floor_yoffs = sector->floor_yoffs;
+  sector->old_ceiling_xoffs = sector->interp_ceiling_xoffs = sector->ceiling_xoffs;
+  sector->old_ceiling_yoffs = sector->interp_ceiling_yoffs = sector->ceiling_yoffs;
+
+  // [AM] Sector interpolation.  Even if we're
+  //      not running uncapped, the renderer still
+  //      uses this data.
+  sector->oldfloorheight = sector->interpfloorheight = sector->floorheight;
+  sector->oldceilingheight = sector->interpceilingheight = sector->ceilingheight;
+
+  // [FG] inhibit sector interpolation during the 0th gametic
+  sector->oldceilgametic = sector->oldfloorgametic = -1;
+  sector->old_ceil_offs_gametic = sector->old_floor_offs_gametic = -1;
+}
+
+
+//
+// P_LoadThings
+//
+// killough 5/3/98: reformatted, cleaned up
+
+void P_LoadThings (int lump)
+{
+  int  i, numthings = W_LumpLength (lump) / sizeof(mapthing_doom_t);
+  byte *data = W_CacheLumpNum (lump,PU_STATIC);
+
+  for (i=0; i<numthings; i++)
+    {
+      mapthing_t mt = {0};
+      mapthing_doom_t *mtd = (mapthing_doom_t *) data + i;
+
+      // Do not spawn cool, new monsters if !commercial
+      if (gamemode != commercial)
+        switch(mtd->type)
+          {
+          case 68:  // Arachnotron
+          case 64:  // Archvile
+          case 88:  // Boss Brain
+          case 89:  // Boss Shooter
+          case 69:  // Hell Knight
+          case 67:  // Mancubus
+          case 71:  // Pain Elemental
+          case 65:  // Former Human Commando
+          case 66:  // Revenant
+          case 84:  // Wolf SS
+            continue;
+          }
+
+      // Do spawn all other stuff.
+      mt.x = IntToFixed((int32_t)SHORT(mtd->x));
+      mt.y = IntToFixed((int32_t)SHORT(mtd->y));
+      mt.angle = SHORT(mtd->angle);
+      mt.type = SHORT(mtd->type);
+      mt.options = SHORT(mtd->options);
+
+      mt.health = FRACUNIT;
+      mt.tint = NO_INDEX;
+
+      if (mt.options & MTF_EASY)
+      {
+        mt.options |= MTF_SKILL1 | MTF_SKILL2;
+      }
+
+      if (mt.options & MTF_NORMAL)
+      {
+        mt.options |= MTF_SKILL3;
+      }
+
+      if (mt.options & MTF_HARD)
+      {
+        mt.options |= MTF_SKILL4 | MTF_SKILL5;
+      }
+
+      P_SpawnMapThing(&mt);
+    }
+
+  Z_Free (data);
+}
+
+//
+// P_LoadLineDefs
+// Also counts secret lines for intermissions.
+//        ^^^
+// ??? killough ???
+// Does this mean secrets used to be linedef-based, rather than sector-based?
+//
+// killough 4/4/98: split into two functions, to allow sidedef overloading
+//
+// killough 5/3/98: reformatted, cleaned up
+
+void P_LoadLineDefs (int lump)
+{
+  byte *data;
+  int  i;
+
+  numlines = W_LumpLength (lump) / sizeof(maplinedef_t);
+  lines = arena_alloc_num(world_arena, line_t, numlines);
+  data = W_CacheLumpNum (lump,PU_STATIC);
+
+  for (i=0; i<numlines; i++)
+    {
+      maplinedef_t *mld = (maplinedef_t *) data + i;
+      line_t *ld = lines+i;
+
+      // [FG] extended nodes
+      ld->flags = (unsigned short)SHORT(mld->flags);
+      ld->special = SHORT(mld->special);
+      ld->id = SHORT(mld->tag);
+      ld->args[0] = ld->id; // UDMF spec
+      ld->v1 = &vertexes[(unsigned short)SHORT(mld->v1)];
+      ld->v2 = &vertexes[(unsigned short)SHORT(mld->v2)];
+
+      P_LinedefInit(ld);
+
+      ld->sidenum[0] = (unsigned short)SHORT(mld->sidenum[0]);
+      ld->sidenum[1] = (unsigned short)SHORT(mld->sidenum[1]);
+
+      FIX_NO_INDEX(ld->sidenum[0]);
+      FIX_NO_INDEX(ld->sidenum[1]);
+
+      // killough 4/4/98: support special sidedef interpretation below
+      if (ld->sidenum[0] != NO_INDEX && ld->special)
+        sides[*ld->sidenum].special = ld->special;
+    }
+  Z_Free (data);
+}
+
+void P_LinedefInit(line_t * const linedef)
+{
+  const vertex_t v1 = *linedef->v1;
+  const vertex_t v2 = *linedef->v2;
+  const fixed_t dx = linedef->dx = v2.x - v1.x;
+  const fixed_t dy = linedef->dy = v2.y - v1.y;
+
+  // killough 4/11/98: no translucency by default
+  linedef->tranmap = NULL;
+
+  linedef->angle = R_PointToAngle2(v1.x, v1.y, v2.x, v2.y);
+
+  linedef->slopetype = !dx                  ? ST_VERTICAL
+                     : !dy                  ? ST_HORIZONTAL
+                     : FixedDiv(dy, dx) > 0 ? ST_POSITIVE
+                                            : ST_NEGATIVE;
+
+  if (v1.x < v2.x)
+  {
+    linedef->bbox[BOXLEFT] = v1.x;
+    linedef->bbox[BOXRIGHT] = v2.x;
+  }
+  else
+  {
+    linedef->bbox[BOXLEFT] = v2.x;
+    linedef->bbox[BOXRIGHT] = v1.x;
+  }
+
+  if (v1.y < v2.y)
+  {
+    linedef->bbox[BOXBOTTOM] = v1.y;
+    linedef->bbox[BOXTOP] = v2.y;
+  }
+  else
+  {
+    linedef->bbox[BOXBOTTOM] = v2.y;
+    linedef->bbox[BOXTOP] = v1.y;
+  }
+
+  /* calculate sound origin of line to be its midpoint */
+  // Andrey Budko: fix sound origin for large levels
+  linedef->soundorg.x = linedef->bbox[BOXLEFT] / 2 + linedef->bbox[BOXRIGHT] / 2;
+  linedef->soundorg.y = linedef->bbox[BOXTOP] / 2 + linedef->bbox[BOXBOTTOM] / 2;
+  linedef->soundorg.thinker.function.p1 = P_DegenMobjThinker;
+}
+
+// killough 4/4/98: delay using sidedefs until they are loaded
+// killough 5/3/98: reformatted, cleaned up
+
+void P_LoadLineDefs2(int lump)
+{
+  int i = numlines;
+  register line_t *ld = lines;
+  for (;i--;ld++)
+    {
+      // killough 11/98: fix common wad errors (missing sidedefs):
+
+      if (ld->sidenum[0] == NO_INDEX)
+	ld->sidenum[0] = 0;  // Substitute dummy sidedef for missing right side
+
+      if (ld->sidenum[1] == NO_INDEX)
+      {
+	if (!demo_compatibility || !overflow[emu_missedbackside].enabled)
+	ld->flags &= ~ML_TWOSIDED;  // Clear 2s flag for missing left side
+      }
+
+      // haleyjd 05/02/06: Reserved line flag. If set, we must clear all
+      // BOOM or later extended line flags. This is necessitated by E2M7.
+      if (ld->flags & ML_RESERVED && comp[comp_reservedlineflag])
+        ld->flags &= 0x1FF;
+
+      ld->frontsector = ld->sidenum[0]!=NO_INDEX ? sides[ld->sidenum[0]].sector : 0;
+      ld->backsector  = ld->sidenum[1]!=NO_INDEX ? sides[ld->sidenum[1]].sector : 0;
+      switch (ld->special) // killough 4/11/98: handle special types
+      {
+        case 260: // killough 4/11/98: translucent 2s textures
+        {
+          int32_t lump = sides[*ld->sidenum].midindex; // translucency from sidedef
+          const byte *tranmap =
+              !lump ? main_tranmap : W_CacheLumpNum(lump - 1, PU_STATIC);
+          if (!ld->args[0])
+            // if tag==0, affect this linedef only
+            ld->tranmap = tranmap;
+          else
+            for (int j = 0; j < numlines; j++)
+              if (lines[j].id == ld->args[0])
+                // if tag!=0, affect all matching linedefs
+                lines[j].tranmap = tranmap;
+          break;
+        }
+      }
+    }
+}
+
+//
+// P_LoadSideDefs
+//
+// killough 4/4/98: split into two functions
+
+static int32_t GetColormapOrTexture(int32_t *out, const char *texture_name)
+{
+  int32_t texture_index = R_TextureNumForName(texture_name);
+  int32_t colormap_index = R_ColormapNumForName(texture_name);
+
+  if (colormap_index < 0)
+  {
+    colormap_index = 0;
+  }
+  else
+  {
+    texture_index = 0;
+  }
+
+  *out = colormap_index;
+  return texture_index;
+}
+
+static int32_t GetMusicOrTexture(int32_t *out, const char *texture_name)
+{
+  int32_t texture_index = R_TextureNumForName(texture_name);
+  int32_t music_index = W_CheckNumForName(texture_name);
+
+  if (music_index < 0)
+  {
+    music_index = 0;
+  }
+  else
+  {
+    texture_index = 0;
+  }
+
+  *out = music_index;
+  return texture_index;
+}
+
+static int32_t GetTranmapOrTexture(int32_t *out, const char *texture_name)
+{
+  int32_t tranmap_index = 0;
+  int32_t texture_index = 0;
+
+  if (strncasecmp("TRANMAP", texture_name, 8) != 0)
+  {
+    tranmap_index = W_CheckNumForName(texture_name);
+
+    if (tranmap_index >= 0 && W_LumpLength(tranmap_index) == 65536)
+    {
+      tranmap_index++;
+      texture_index = 0;
+    }
+    else
+    {
+      tranmap_index = 0;
+      texture_index = R_TextureNumForName(texture_name);
+    }
+  }
+
+  *out = tranmap_index;
+  return texture_index;
+}
+
+void P_ProcessSideDefs(side_t *side, int i, char *bottomtexture, char *midtexture, char *toptexture)
+{
+  sector_t *sec = side->sector;
+  switch (side->special)
+  {
+    case 2057: case 2058: case 2059: case 2060: case 2061: case 2062:
+    case 2063: case 2064: case 2065: case 2066: case 2067: case 2068:
+    case 2087: case 2088: case 2089: case 2090: case 2091: case 2092:
+    case 2093: case 2094: case 2095: case 2096: case 2097: case 2098:
+      side->toptexture = GetMusicOrTexture(&side->topindex, toptexture);
+      side->midtexture = R_TextureNumForName(midtexture);
+      side->bottomtexture = GetMusicOrTexture(&side->bottomindex, bottomtexture);
+      break;
+
+    case 2076: case 2077: case 2078: case 2079: case 2080: case 2081:
+      side->toptexture = GetColormapOrTexture(&side->topindex, toptexture);
+      side->midtexture = R_TextureNumForName(midtexture);
+      side->bottomtexture = GetColormapOrTexture(&side->bottomindex, bottomtexture);
+      break;
+
+    case 2075:
+      side->toptexture = GetColormapOrTexture(&side->topindex, toptexture);
+      side->midtexture = R_TextureNumForName(midtexture);
+      side->bottomtexture = R_TextureNumForName(bottomtexture);
+      break;
+
+    // variable colormap via 242 linedef
+    case 242:
+      side->toptexture = GetColormapOrTexture(&sec->topmap, toptexture);
+      side->midtexture = GetColormapOrTexture(&sec->midmap, midtexture);
+      side->bottomtexture = GetColormapOrTexture(&sec->bottommap, bottomtexture);
+      break;
+
+    // killough 4/11/98: apply translucency to 2s normal texture
+    case 260:
+      side->toptexture = R_TextureNumForName(toptexture);
+      side->midtexture = GetTranmapOrTexture(&side->midindex, midtexture);
+      side->bottomtexture = R_TextureNumForName(bottomtexture);
+      break;
+
+    // normal cases
+    default:
+      side->toptexture = R_TextureNumForName(toptexture);
+      side->midtexture = R_TextureNumForName(midtexture);
+      side->bottomtexture = R_TextureNumForName(bottomtexture);
+      break;
+  }
+}
+
+void P_LoadSideDefs (int lump)
+{
+  numsides = W_LumpLength(lump) / sizeof(mapsidedef_t);
+  sides = arena_alloc_num(world_arena, side_t, numsides);
+}
+
+// killough 4/4/98: delay using texture names until
+// after linedefs are loaded, to allow overloading.
+// killough 5/3/98: reformatted, cleaned up
+
+void P_LoadSideDefs2(int lump)
+{
+  byte *data = W_CacheLumpNum(lump,PU_STATIC);
+  int  i;
+
+  for (i=0; i<numsides; i++)
+    {
+      register mapsidedef_t *msd = (mapsidedef_t *) data + i;
+      register side_t *sd = sides + i;
+
+      sd->textureoffset = IntToFixed(SHORT(msd->textureoffset));
+      sd->rowoffset = IntToFixed(SHORT(msd->rowoffset));
+      sd->sector = &sectors[SHORT(msd->sector)];
+      P_SidedefInit(sd);
+
+      // killough 4/4/98: allow sidedef texture names to be overloaded
+      // killough 4/11/98: refined to allow colormaps to work as wall
+      // textures if invalid as colormaps but valid as textures.
+      P_ProcessSideDefs(sd, i, msd->bottomtexture, msd->midtexture, msd->toptexture);
+    }
+  Z_Free (data);
+}
+
+void P_SidedefInit(side_t * const sidedef)
+{
+  sidedef->tint = -1;
+  // [crispy] smooth texture scrolling
+  sidedef->oldtextureoffset = sidedef->interptextureoffset = sidedef->textureoffset;
+  sidedef->oldrowoffset = sidedef->interprowoffset = sidedef->rowoffset;
+  sidedef->oldgametic = -1;
+}
+
+//
+// P_GroupLines
+// Builds sector line lists and subsector sector numbers.
+// Finds block bounding boxes for sectors.
+//
+// killough 5/3/98: reformatted, cleaned up
+// killough 8/24/98: rewrote to use faster algorithm
+
+static void AddLineToSector(sector_t *s, line_t *l)
+{
+  M_AddToBox(s->blockbox, l->v1->x, l->v1->y);
+  M_AddToBox(s->blockbox, l->v2->x, l->v2->y);
+  *s->lines++ = l;
+}
+
+void P_DegenMobjThinker(mobj_t *mobj)
+{
+  (void)mobj;
+  I_Error("This function should never get called.");
+}
+
+int P_GroupLines (void)
+{
+  int i, total;
+  line_t **linebuffer;
+
+  // look up sector number for each subsector
+  for (i=0; i<numsubsectors; i++)
+    subsectors[i].sector = segs[subsectors[i].firstline].sidedef->sector;
+
+  // count number of lines in each sector
+  for (i=0; i<numlines; i++)
+    {
+      lines[i].frontsector->linecount++;
+      if (lines[i].backsector && lines[i].backsector != lines[i].frontsector)
+	lines[i].backsector->linecount++;
+    }
+
+  // compute total number of lines and clear bounding boxes
+  for (total=0, i=0; i<numsectors; i++)
+    {
+      total += sectors[i].linecount;
+      M_ClearBox(sectors[i].blockbox);
+    }
+
+  // build line tables for each sector
+  linebuffer = arena_alloc_num(world_arena, line_t *, total);
+
+  for (i=0; i<numsectors; i++)
+    {
+      sectors[i].lines = linebuffer;
+      linebuffer += sectors[i].linecount;
+    }
+  
+  for (i=0; i<numlines; i++)
+    {
+      AddLineToSector(lines[i].frontsector, &lines[i]);
+      if (lines[i].backsector && lines[i].backsector != lines[i].frontsector)
+	AddLineToSector(lines[i].backsector, &lines[i]);
+    }
+
+  for (i=0; i<numsectors; i++)
+    {
+      sector_t *sector = sectors+i;
+      int block;
+
+      // adjust pointers to point back to the beginning of each list
+      sector->lines -= sector->linecount;
+
+      // set the degenmobj_t to the middle of the bounding box
+      sector->soundorg.x =
+          sector->blockbox[BOXRIGHT] / 2 + sector->blockbox[BOXLEFT] / 2;
+      sector->soundorg.y =
+          sector->blockbox[BOXTOP] / 2 + sector->blockbox[BOXBOTTOM] / 2;
+
+      sector->soundorg.thinker.function.p1 = P_DegenMobjThinker;
+
+      // adjust bounding box to map blocks
+      block = (sector->blockbox[BOXTOP]-bmaporgy+MAXRADIUS)>>MAPBLOCKSHIFT;
+      block = block >= bmapheight ? bmapheight-1 : block;
+      sector->blockbox[BOXTOP]=block;
+
+      block = (sector->blockbox[BOXBOTTOM]-bmaporgy-MAXRADIUS)>>MAPBLOCKSHIFT;
+      block = block < 0 ? 0 : block;
+      sector->blockbox[BOXBOTTOM]=block;
+
+      block = (sector->blockbox[BOXRIGHT]-bmaporgx+MAXRADIUS)>>MAPBLOCKSHIFT;
+      block = block >= bmapwidth ? bmapwidth-1 : block;
+      sector->blockbox[BOXRIGHT]=block;
+
+      block = (sector->blockbox[BOXLEFT]-bmaporgx-MAXRADIUS)>>MAPBLOCKSHIFT;
+      block = block < 0 ? 0 : block;
+      sector->blockbox[BOXLEFT]=block;
+    }
+    return total;
+}
+
+//
+// killough 10/98
+//
+// Remove slime trails.
+//
+// Slime trails are inherent to Doom's coordinate system -- i.e. there is
+// nothing that a node builder can do to prevent slime trails ALL of the time,
+// because it's a product of the integer coordinate system, and just because
+// two lines pass through exact integer coordinates, doesn't necessarily mean
+// that they will intersect at integer coordinates. Thus we must allow for
+// fractional coordinates if we are to be able to split segs with node lines,
+// as a node builder must do when creating a BSP tree.
+//
+// A wad file does not allow fractional coordinates, so node builders are out
+// of luck except that they can try to limit the number of splits (they might
+// also be able to detect the degree of roundoff error and try to avoid splits
+// with a high degree of roundoff error). But we can use fractional coordinates
+// here, inside the engine. It's like the difference between square inches and
+// square miles, in terms of granularity.
+//
+// For each vertex of every seg, check to see whether it's also a vertex of
+// the linedef associated with the seg (i.e, it's an endpoint). If it's not
+// an endpoint, and it wasn't already moved, move the vertex towards the
+// linedef by projecting it using the law of cosines. Formula:
+//
+//      2        2                         2        2
+//    dx  x0 + dy  x1 + dx dy (y0 - y1)  dy  y0 + dx  y1 + dx dy (x0 - x1)
+//   {---------------------------------, ---------------------------------}
+//                  2     2                            2     2
+//                dx  + dy                           dx  + dy
+//
+// (x0,y0) is the vertex being moved, and (x1,y1)-(x1+dx,y1+dy) is the
+// reference linedef.
+//
+// Segs corresponding to orthogonal linedefs (exactly vertical or horizontal
+// linedefs), which comprise at least half of all linedefs in most wads, don't
+// need to be considered, because they almost never contribute to slime trails
+// (because then any roundoff error is parallel to the linedef, which doesn't
+// cause slime). Skipping simple orthogonal lines lets the code finish quicker.
+//
+// Please note: This section of code is not interchangable with TeamTNT's
+// code which attempts to fix the same problem.
+//
+// Firelines (TM) is a Rezistered Trademark of MBF Productions
+//
+
+void P_RemoveSlimeTrails(void)                // killough 10/98
+{
+  byte *hit = Z_Calloc(numvertexes, sizeof(*hit), PU_STATIC, 0); // Hitlist for vertices
+  int i;
+  for (i=0; i<numsegs; i++)                   // Go through each seg
+    {
+      const line_t *l = segs[i].linedef;      // The parent linedef
+
+      if (!segs[i].linedef)
+        break; // Andrey Budko: probably 'continue;'?
+
+      if (l->dx && l->dy)                     // We can ignore orthogonal lines
+	{
+	  vertex_t *v = segs[i].v1;
+	  do
+	    if (!hit[v - vertexes])           // If we haven't processed vertex
+	      {
+		hit[v - vertexes] = 1;        // Mark this vertex as processed
+		if (v != l->v1 && v != l->v2) // Exclude endpoints of linedefs
+		  { // Project the vertex back onto the parent linedef
+		    int64_t dx2 = (l->dx >> FRACBITS) * (l->dx >> FRACBITS);
+		    int64_t dy2 = (l->dy >> FRACBITS) * (l->dy >> FRACBITS);
+		    int64_t dxy = (l->dx >> FRACBITS) * (l->dy >> FRACBITS);
+		    int64_t s = dx2 + dy2;
+		    int x0 = v->x, y0 = v->y, x1 = l->v1->x, y1 = l->v1->y;
+		    // [FG] move vertex coordinates used for rendering
+		    v->r_x = (fixed_t)((dx2 * x0 + dy2 * x1 + dxy * (y0 - y1)) / s);
+		    v->r_y = (fixed_t)((dy2 * y0 + dx2 * y1 + dxy * (x0 - x1)) / s);
+
+		    // [FG] override actual vertex coordinates except in compatibility mode
+		    if (demo_version >= DV_MBF)
+		    {
+		      v->x = v->r_x;
+		      v->y = v->r_y;
+		    }
+
+		    // [FG] wait a minute... moved more than 8 map units?
+		    // maybe that's a Linguortal then, back to the original coordinates
+		    if (abs(v->r_x - x0) > 8*FRACUNIT || abs(v->r_y - y0) > 8*FRACUNIT)
+		    {
+		      v->r_x = x0;
+		      v->r_y = y0;
+		    }
+		  }
+	      }  // Obfuscated C contest entry:   :)
+	  while ((v != segs[i].v2) && (v = segs[i].v2));
+	}
+    }
+  Z_Free(hit);
+}
+
+// [crispy] fix long wall wobble
+
+static angle_t anglediff(angle_t a, angle_t b)
+{
+    if (b > a)
+        return anglediff(b, a);
+
+    if (a - b < ANG180)
+        return a - b;
+    else // [crispy] wrap around
+        return b - a;
+}
+
+void P_SegLengths(void)
+{
+    for (int32_t i = 0; i < numsegs; i++)
+    {
+        seg_t *li = segs+i;
+
+        int64_t dx = li->v2->r_x - li->v1->r_x;
+        int64_t dy = li->v2->r_y - li->v1->r_y;
+        sidedef_flags_t flags = (li->sidedef) // mini segs!!
+                              ? li->sidedef->flags
+                              : SF_NONE;
+
+        li->r_length = (uint32_t)(sqrt((double)dx*dx + (double)dy*dy)/2);
+
+        // [crispy] re-calculate angle used for rendering
+        viewx = li->v1->r_x;
+        viewy = li->v1->r_y;
+        li->r_angle = R_PointToAngleCrispy(li->v2->r_x, li->v2->r_y);
+        // [crispy] more than just a little adjustment?
+        // back to the original angle then
+        if (anglediff(li->r_angle, li->angle) > ANG60/2)
+        {
+            li->r_angle = li->angle;
+        }
+
+        if (flags & SF_NO_FAKE_CONTRAST)
+        {
+            li->fakecontrast = 0;
+        }
+        else
+        {
+            // vanilla
+            if (!dy)
+              li->fakecontrast = -1;
+            else if (!dx)
+              li->fakecontrast = +1;
+        }
+    }
+}
+
+// [FG] pad the REJECT table when the lump is too small
+
+boolean P_LoadReject(int lumpnum, int totallines)
+{
+    int minlength;
+    int lumplen;
+    boolean ret;
+
+    // Calculate the size that the REJECT lump *should* be.
+
+    minlength = (numsectors * numsectors + 7) / 8;
+
+    // If the lump meets the minimum length, it can be loaded directly.
+    // Otherwise, we need to allocate a buffer of the correct size
+    // and pad it with appropriate data.
+
+    lumplen = W_LumpLengthWithName(lumpnum, "REJECT");
+
+    if (lumplen >= minlength)
+    {
+        rejectmatrix = W_CacheLumpNum(lumpnum, PU_LEVEL);
+        ret = false;
+    }
+    else
+    {
+        unsigned int padvalue;
+
+        rejectmatrix = Z_Malloc(minlength, PU_LEVEL, (void **) &rejectmatrix);
+
+        if (W_LumpExists(lumpnum))
+        {
+            W_ReadLumpSize(lumpnum, rejectmatrix, minlength);
+        }
+
+        //!
+        // @category mod
+        //
+        // Pad the remaining REJECT table space with 0xff.
+        //
+
+        if (M_CheckParm("-reject_pad_with_ff"))
+        {
+            padvalue = 0xff;
+        }
+        else
+        {
+            padvalue = 0x00;
+        }
+
+        memset(rejectmatrix + lumplen, padvalue, minlength - lumplen);
+
+        if (demo_compatibility && overflow[emu_reject].enabled)
+        {
+            unsigned int i;
+            unsigned int byte_num;
+            byte *dest;
+
+            unsigned int rejectpad[4] =
+            {
+                0,                               // Size
+                0,                               // Part of z_zone block header
+                50,                              // PU_LEVEL
+                0x1d4a11                         // DOOM_CONST_ZONEID
+            };
+
+            overflow[emu_reject].triggered = true;
+
+            rejectpad[0] = ((totallines * 4 + 3) & ~3) + 24;
+
+            // Copy values from rejectpad into the destination array.
+
+            dest = rejectmatrix + lumplen;
+
+            for (i = 0; i < (minlength - lumplen) && i < sizeof(rejectpad); ++i)
+            {
+                byte_num = i % 4;
+                *dest = (rejectpad[i / 4] >> (byte_num * 8)) & 0xff;
+                ++dest;
+            }
+        }
+
+        ret = true;
+    }
+
+    return ret;
+}
+
+static void LoadMap(map_t *map)
+{
+  // note: most of this ordering is important
+
+  // killough 3/1/98: P_LoadBlockMap call moved down to below
+  // killough 4/4/98: split load of sidedefs into two parts,
+  // to allow texture names to be used in special linedefs
+
+  P_LoadVertexes (map->vertexes);
+  P_LoadSectors  (map->sectors);
+  P_LoadSideDefs (map->sidedefs);                // killough 4/4/98
+  P_LoadLineDefs (map->linedefs);                //       |
+  P_LoadSideDefs2(map->sidedefs);                //       |
+  P_LoadLineDefs2(map->linedefs);                // killough 4/4/98
+  map->bmap_format = P_LoadBlockMap(map->blockmap); // killough 3/1/98
+
+  // [FG] build nodes with NanoBSP
+  if (map->bsp_format == BSP_NANO)
+  {
+    BSP_BuildNodes();
+  }
+  // support all ZDoom extended node formats
+  else if (map->bsp_format >= BSP_XNOD && map->bsp_format <= BSP_ZGL3)
+  {
+    P_LoadBSPTree_ZDBSP(map->znodes, map->bsp_format);
+  }
+  else if (map->bsp_format == BSP_DEEPBSPV4)
+  {
+    P_LoadSubsectors_DeePBSPV4(map->ssectors);
+    P_LoadNodes_DeePBSPV4(map->nodes);
+    P_LoadSegs_DeePBSPV4(map->segs);
+  }
+  else
+  {
+    P_LoadSubsectors(map->ssectors);
+    P_LoadNodes(map->nodes);
+    P_LoadSegs(map->segs);
+  }
+
+  // [FG] pad the REJECT table when the lump is too small
+  map->reject_built = P_LoadReject(map->reject, P_GroupLines());
+}
+
+//
+// P_SetupLevel
+//
+// killough 5/3/98: reformatted, cleaned up
+
+// fast-forward demo to the next map
+boolean playback_nextlevel = false;
+
+// check for different supported and unsupported formats
+static void CheckMapFormat(int lumpnum, map_t *map)
+{
+    map->map_format = MAP_NONE;
+    map->bsp_format = BSP_NANO;
+    map->bmap_format = BMAP_BoomBuilder;
+    map->built = false;
+    map->param = false;
+
+    map->label = lumpnum;
+    map->vertexes = NO_INDEX;
+    map->linedefs = NO_INDEX;
+    map->sidedefs = NO_INDEX;
+    map->sectors = NO_INDEX;
+    map->things = NO_INDEX;
+    map->textmap = NO_INDEX;
+    map->nodes = NO_INDEX;
+    map->ssectors = NO_INDEX;
+    map->segs = NO_INDEX;
+    map->znodes = NO_INDEX;
+    map->blockmap = NO_INDEX;
+    map->reject = NO_INDEX;
+    map->behavior = NO_INDEX;
+    map->dialogue = NO_INDEX;
+    map->lightmap = NO_INDEX;
+
+    // Fully built map
+    if (W_LumpExistsWithName(lumpnum + ML_THINGS, "THINGS")
+        && W_LumpExistsWithName(lumpnum + ML_LINEDEFS, "LINEDEFS")
+        && W_LumpExistsWithName(lumpnum + ML_SIDEDEFS, "SIDEDEFS")
+        && W_LumpExistsWithName(lumpnum + ML_VERTEXES, "VERTEXES")
+        && W_LumpExistsWithName(lumpnum + ML_SEGS, "SEGS")
+        && W_LumpExistsWithName(lumpnum + ML_SSECTORS, "SSECTORS")
+        && W_LumpExistsWithName(lumpnum + ML_NODES, "NODES")
+        && W_LumpExistsWithName(lumpnum + ML_SECTORS, "SECTORS")
+        && W_LumpExistsWithName(lumpnum + ML_REJECT, "REJECT")
+        && W_LumpExistsWithName(lumpnum + ML_BLOCKMAP, "BLOCKMAP"))
+    {
+        map->map_format = MAP_DOOM;
+        map->built = true;
+        map->things = lumpnum + ML_THINGS;
+        map->linedefs = lumpnum + ML_LINEDEFS;
+        map->sidedefs = lumpnum + ML_SIDEDEFS;
+        map->vertexes = lumpnum + ML_VERTEXES;
+        map->segs = lumpnum + ML_SEGS;
+        map->ssectors = lumpnum + ML_SSECTORS;
+        map->nodes = lumpnum + ML_NODES;
+        map->sectors = lumpnum + ML_SECTORS;
+        map->reject = lumpnum + ML_REJECT;
+        map->blockmap = lumpnum + ML_BLOCKMAP;
+
+        // [FG] check nodes format
+        P_CheckBSPFormat_Binary(map);
+
+        if (W_LumpExistsWithName(lumpnum + ML_BEHAVIOR, "BEHAVIOR"))
+        {
+            map->map_format = MAP_HEXEN;
+            map->param = true;
+            map->behavior = lumpnum + ML_BEHAVIOR;
+        }
+    }
+
+    // Non built map
+    if (map->map_format == MAP_NONE
+        && W_LumpExistsWithName(lumpnum + MLX_THINGS, "THINGS")
+        && W_LumpExistsWithName(lumpnum + MLX_LINEDEFS, "LINEDEFS")
+        && W_LumpExistsWithName(lumpnum + MLX_SIDEDEFS, "SIDEDEFS")
+        && W_LumpExistsWithName(lumpnum + MLX_VERTEXES, "VERTEXES")
+        && W_LumpExistsWithName(lumpnum + MLX_SECTORS, "SECTORS"))
+    {
+        map->map_format = MAP_DOOM;
+        map->built = false;
+        map->things = lumpnum + MLX_THINGS;
+        map->linedefs = lumpnum + MLX_LINEDEFS;
+        map->sidedefs = lumpnum + MLX_SIDEDEFS;
+        map->vertexes = lumpnum + MLX_VERTEXES;
+        map->sectors = lumpnum + MLX_SECTORS;
+
+        map->bsp_format = BSP_NANO;
+
+        if (W_LumpExistsWithName(lumpnum + MLX_BEHAVIOR, "BEHAVIOR"))
+        {
+            map->map_format = MAP_HEXEN;
+            map->param = true;
+            map->behavior = lumpnum + MLX_BEHAVIOR;
+        }
+    }
+
+    if (W_LumpExistsWithName(lumpnum + ML_TEXTMAP, "TEXTMAP"))
+    {
+        map->map_format = MAP_UDMF;
+        map->built = true;
+        map->textmap = lumpnum + ML_TEXTMAP;
+
+        // skip label and TEXTMAP, test against all other lumps until ENDMAP
+        for (int i = ML_TEXTMAP + 1; i < ML_MAPLUMPCOUNT; ++i)
+        {
+            int j = lumpnum + i;
+            if (W_LumpExistsWithName(j, "ENDMAP"))
+            {
+                break;
+            }
+            else if (W_LumpExistsWithName(j, "ZNODES"))
+            {
+                map->znodes = j;
+            }
+            else if (W_LumpExistsWithName(j, "REJECT"))
+            {
+                map->reject = j;
+            }
+            else if (W_LumpExistsWithName(j, "BLOCKMAP"))
+            {
+                map->blockmap = j;
+            }
+            else if (W_LumpExistsWithName(j, "BEHAVIOR"))
+            {
+                map->behavior = j;
+            }
+            else if (W_LumpExistsWithName(j, "DIALOGUE"))
+            {
+                map->dialogue = j;
+            }
+            else if (W_LumpExistsWithName(j, "LIGHTMAP"))
+            {
+                map->lightmap = j;
+            }
+        }
+
+        // [FG] check nodes format
+        P_CheckBSPFormat_UDMF(map);
+    }
+}
+
+void P_SetupLevel(int episode, int map_num, skill_t skill, boolean from_savegame)
+{
+  char  lumpname[9];
+  int   lumpnum;
+
+  totalkills = totalitems = totalsecret = wminfo.maxfrags = 0;
+  max_kill_requirement = 0;
+  wminfo.partime = 180;
+  for (int i = 0; i < MAXPLAYERS; i++)
+  {
+    players[i].killcount = players[i].secretcount = players[i].itemcount = 0;
+    players[i].maxkilldiscount = 0;
+  }
+
+  // Initial height of PointOfView will be set by player think.
+  players[consoleplayer].viewz = 1;
+
+  // [FG] fast-forward demo to the desired map
+  if (playback_warp == map_num || playback_nextlevel)
+  {
+    if (!playback_skiptics)
+      G_EnableWarp(false);
+
+    playback_warp = -1;
+    playback_nextlevel = false;
+  }
+
+  // Make sure all sounds are stopped before Z_FreeTags.
+  S_Reset();
+
+  // do not start level music yet
+  if (!from_savegame)
+  {
+    S_Start();
+  }
+
+  Z_FreeTag(PU_LEVEL);
+  M_ArenaClear(world_arena);
+  M_ArenaClear(thinkers_arena);
+  M_ArenaClear(msecnodes_arena);
+
+  Z_FreeTag(PU_CACHE);
+
+  P_InitThinkers();
+  // haleyjd 02/02/04 -- clear the TID hash table
+  P_InitTIDHash();
+
+  // if working with a devlopment map, reload it
+  //    W_Reload ();     killough 1/31/98: W_Reload obsolete
+
+  // find map name
+  M_CopyLumpName(lumpname, MapName(episode, map_num));
+
+  lumpnum = W_GetNumForName(lumpname);
+
+  CheckMapFormat(lumpnum, &map);
+  G_ApplyLevelCompatibility(&map);
+
+  leveltime = 0;
+  oldleveltime = 0;
+
+  switch (map.map_format)
+  {
+    case MAP_DOOM:
+      // the original implementation used only low precision math
+      P_PointOnLineSide = P_PointOnLineSide_Classic;
+      P_PointOnDivlineSide = P_PointOnDivlineSide_Classic;
+      LoadMap(&map);
+      break;
+    case MAP_HEXEN:
+      I_Error("Unsupported Hexen level format in %s", lumpname);
+      break;
+    case MAP_UDMF:
+      // udmf requires higher precision math
+      P_PointOnLineSide = P_PointOnLineSide_Precise;
+      P_PointOnDivlineSide = P_PointOnDivlineSide_Precise;
+      UDMF_LoadMap(&map);
+      break;
+    case MAP_NONE:
+      I_Error("Unknown level format in %s", lumpname);
+      break;
+  }
+
+  // P_CrossSubsector optimization
+  P_InitSubsectorLines();
+
+  // XGL3/ZGL3 provide high-precision partition lines
+  if (map.bsp_format >= BSP_XGL3)
+  {
+    R_PointOnSide = R_PointOnSide_Precise;
+  }
+  else
+  {
+    R_PointOnSide = R_PointOnSide_Classic;
+  }
+
+  if (map.bsp_format != BSP_NANO)
+  {
+    P_RemoveSlimeTrails();    // killough 10/98: remove slime trails from wad
+  }
+
+  // [crispy] fix long wall wobble
+  P_SegLengths();
+
+  // Note: you don't need to clear player queue slots --
+  // a much simpler fix is in g_game.c -- killough 10/98
+
+  bodyqueslot = 0;
+  deathmatch_p = deathmatchstarts;
+  P_MapStart();
+
+  switch (map.map_format)
+  {
+    case MAP_DOOM:
+      P_LoadThings(map.things);
+      break;
+    case MAP_HEXEN:
+      I_Error("Tried to spawn things on invalid map format");
+      break;
+    case MAP_UDMF:
+      P_LoadThings_UDMF();
+      UDMF_ClearMemory(); // done with internal UDMF representation
+      break;
+    case MAP_NONE:
+      I_Error("Tried to spawn things on invalid map format");
+      break;
+  }
+
+  // if deathmatch, randomly spawn the active players
+  if (deathmatch)
+  {
+    for (int i = 0; i < MAXPLAYERS; i++)
+      if (playeringame[i])
+        {
+          players[i].mo = NULL;
+          G_DeathMatchSpawnPlayer(i);
+        }
+  }
+  else // if !deathmatch, check all necessary player starts actually exist
+  {
+    for (int i = 0; i < MAXPLAYERS; i++)
+      if (playeringame[i] && !players[i].mo)
+        I_Error("missing player %d start", i + 1);
+  }
+
+  // killough 3/26/98: Spawn icon landings:
+  if (gamemode==commercial)
+    P_SpawnBrainTargets();
+
+  // [crispy] support MUSINFO lump (dynamic music changing)
+  if (gamemode != shareware)
+  {
+    S_ParseMusInfo(lumpname);
+  }
+
+  // clear special respawning que
+  iquehead = iquetail = 0;
+
+  // SKYDEFS flatmapping needs to be loaded before 271/272 transfers
+  R_InitSkyMap();
+
+  // set up world state
+  P_SpawnSpecials();
+  P_MapEnd();
+
+  // preload graphics
+  if (precache)
+    R_PrecacheLevel();
+
+  // [FG] log level setup
+  I_Printf(VB_DEMO, "P_SetupLevel: %.8s (%s), Skill %d, %s (%s%s%s), %s",
+    lumpname, W_WadNameForLump(lumpnum),
+    gameskill + 1,
+    map_format_names[map.map_format],
+    bsp_format_names[map.bsp_format],
+    bmap_format_names[map.bmap_format],
+    map.reject_built ? "+Reject" : "",
+    G_GetCurrentComplevelName());
+}
+
+//
+// P_Init
+//
+void P_Init (void)
+{
+  P_InitSwitchList();
+  P_InitPicAnims();
+  R_InitSprites(sprnames);
+
+  #define SIZE_MB(x) ((x) * 1024 * 1024)
+  world_arena = M_ArenaInit(SIZE_MB(128), SIZE_MB(4));
+  thinkers_arena = M_ArenaInit(SIZE_MB(128), SIZE_MB(2));
+  msecnodes_arena = M_ArenaInit(SIZE_MB(32), SIZE_MB(1));
+  activeceilings_arena = M_ArenaInit(SIZE_MB(32), SIZE_MB(1));
+  activeplats_arena = M_ArenaInit(SIZE_MB(32), SIZE_MB(1));
+  #undef SIZE_MB
+
+  seenstate_tab = calloc(num_states, sizeof(*seenstate_tab));
+}
+
+//----------------------------------------------------------------------------
+//
+// $Log: p_setup.c,v $
+// Revision 1.16  1998/05/07  00:56:49  killough
+// Ignore translucency lumps that are not exactly 64K long
+//
+// Revision 1.15  1998/05/03  23:04:01  killough
+// beautification
+//
+// Revision 1.14  1998/04/12  02:06:46  killough
+// Improve 242 colomap handling, add translucent walls
+//
+// Revision 1.13  1998/04/06  04:47:05  killough
+// Add support for overloading sidedefs for special uses
+//
+// Revision 1.12  1998/03/31  10:40:42  killough
+// Remove blockmap limit
+//
+// Revision 1.11  1998/03/28  18:02:51  killough
+// Fix boss spawner savegame crash bug
+//
+// Revision 1.10  1998/03/20  00:30:17  phares
+// Changed friction to linedef control
+//
+// Revision 1.9  1998/03/16  12:35:36  killough
+// Default floor light level is sector's
+//
+// Revision 1.8  1998/03/09  07:21:48  killough
+// Remove use of FP for point/line queries and add new sector fields
+//
+// Revision 1.7  1998/03/02  11:46:10  killough
+// Double blockmap limit, prepare for when it's unlimited
+//
+// Revision 1.6  1998/02/27  11:51:05  jim
+// Fixes for stairs
+//
+// Revision 1.5  1998/02/17  22:58:35  jim
+// Fixed bug of vanishinb secret sectors in automap
+//
+// Revision 1.4  1998/02/02  13:38:48  killough
+// Comment out obsolete reload hack
+//
+// Revision 1.3  1998/01/26  19:24:22  phares
+// First rev with no ^Ms
+//
+// Revision 1.2  1998/01/26  05:02:21  killough
+// Generalize and simplify level name generation
+//
+// Revision 1.1.1.1  1998/01/19  14:03:00  rand
+// Lee's Jan 19 sources
+//
+//----------------------------------------------------------------------------

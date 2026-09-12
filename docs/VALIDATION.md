@@ -1,5 +1,28 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 127: extended-worker bootstrap
+
+`scripts/test-extended-engine.sh /path/to/original/doom2.wad` passes on arm64:
+private exports/system-only dependencies, two-worker actor snapshot determinism,
+35-tic movement, extended Thing 500/Frames 1100–1201, flags 518/1, patched pistol
+ammo 50→48 and target health 200→193, Boom conveyor motion without input, both
+wrong-signature callback directions, and targeted malformed/unsupported rejection.
+The installed Rust campaign rejects at GAMECONF/ID24. Logs are
+`build/extended-validation.log` and `build/extended-rust-rejection.log`.
+
+The worker is a separate headless target. This evidence does not establish Rust
+playability, native rendering/audio, extended saves or full Boom/MBF21/ID24
+compatibility. [EXTENDED_ENGINE.md](EXTENDED_ENGINE.md) records the exact boundary.
+
+`scripts/test-presentation.sh` passes with original Ultimate Doom, including wall/
+flat animation phase restoration and face-state behavior. A native host app build
+in `build/extended-milestone/MetalDooM.app` succeeds as 0.10.0/build 127; host
+codesign verification passes. CUA inspected rendered Doom II MAP01 and its open
+menu, with version/build visible in both title and footer. The app remains paused.
+The separate build 126 resource preview process remains running. Build logs:
+`build/build127.log`, `build/classic-presentation127.log`. No packaging or upload.
+
+
 ## 2026-09-12 — 0.10.0 build 126: Rust resource foundation
 
 The isolated `codex/legacy-of-rust` branch starts at main merge afd7357. This is

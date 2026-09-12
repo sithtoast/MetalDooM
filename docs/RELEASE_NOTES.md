@@ -5,7 +5,7 @@ Requires Apple Silicon and macOS 14 or later. This is an early preview.
 
 ## Install
 
-The current local development app is **0.10.0 build 126**, ad-hoc signed and
+The current local development app is **0.10.0 build 127**, ad-hoc signed and
 unnotarized. No new release package was produced. The previous **0.9.0 build 124**
 distribution was separately Developer ID signed, accepted by Apple and stapled.
 GitHub workflow assets remain unnotarized. For unnotarized previews, macOS may
@@ -14,9 +14,12 @@ require System Settings → Privacy & Security → Open Anyway. See INSTALL.md.
 Supply your own Doom/Ultimate Doom, Doom II, TNT or Plutonia IWAD. Standard SIGIL
 Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
-## New in 0.10.0 — resource-table foundation
+## New in 0.10.0 — Rust development foundations
 
-Final successful local build: **126**.
+Final successful local build: **127**.
+
+Build 127 adds a separately built [experimental native simulation worker](EXTENDED_ENGINE.md).
+It is not selected by the app and does not yet make Rust playable.
 
 ANIMATED and SWITCHES now drive engine material animation and native switch
 texture preload, including pairs without SW1/SW2 names. SIGIL II's flame sequence

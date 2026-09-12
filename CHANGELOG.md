@@ -4,6 +4,20 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Extended simulation worker (build 127)
+
+- Add a separate developer target for native MBF21 simulation, copied snapshots,
+  explicit RNG seeds and clear errors for unsupported patches/action signatures.
+  Verify extended actors, patched weapon damage/ammo and Boom conveyor motion.
+- Keep this worker outside the normal app while Rust-specific ID24 behavior,
+  rendering, campaign flow and saves are developed. Legacy of Rust remains
+  unsupported; there is no new playable campaign or backend selection yet.
+- Allow a separate app output directory while keeping a shared build-number lock.
+  Build and inspect native 0.10.0/build 127 on Doom II, preserving the paused build
+  126 preview and the primary checkout's notarized 0.9.0 build 124 release.
+- Pass the native worker/rejection suite and classic presentation/save-phase
+  regression. Build 127 remains local, ad-hoc signed and unnotarized.
+
 ## 0.10.0 — Rust resource-table foundation (build 126)
 
 - Read bounded Boom ANIMATED/SWITCHES tables, with dynamic storage, replacement

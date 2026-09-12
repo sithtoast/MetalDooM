@@ -376,3 +376,13 @@ The bridge enumerates all switch materials, allowing Metal to preload pairs whos
 names do not follow SW1/SW2. Animation timing and button archives use the existing
 engine paths. See [Rust/ID24 evidence and milestones](LEGACY_OF_RUST.md) for the
 extended simulation boundary, XNOD requirement and remaining save/ABI work.
+
+
+## Experimental extended worker (build 127)
+
+`Engine/Extended` and the pinned `Vendor/Woof` subset compile into a separate
+hidden-symbol dylib via `scripts/build-extended-engine.sh`. The normal app neither
+links nor selects it. Its one-session native worker API copies commands/snapshots,
+uses explicit seeds and guards fatal errors inside C. Typed action dispatch
+prevents actor/weapon callback confusion. See [EXTENDED_ENGINE.md](EXTENDED_ENGINE.md)
+for tested MBF21 behavior, process-lifetime restrictions and remaining ID24 work.

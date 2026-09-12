@@ -89,6 +89,6 @@ Apple accepted submission `121f1db9-34a4-4f5f-aeb3-599a59de0727`; stapler,
 codesign and Gatekeeper checks passed in the host context. Its distribution ZIP
 is preserved in the primary checkout's `build/releases/MetalDooM-0.9.0-build124/`.
 That is prior-task evidence, not a new submission or repeat Gatekeeper check.
-The current **0.10.0 build 126** is an ad-hoc-signed development app; no packaging,
+The current **0.10.0 build 127** is an ad-hoc-signed development app; no packaging,
 Apple submission or publishing was performed. GitHub automation still produces
 unnotarized assets. Never overwrite the build-124 release while testing here.
