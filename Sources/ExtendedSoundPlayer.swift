@@ -8,8 +8,11 @@ final class ExtendedSoundPlayer {
     private let resources:WAD
     private var generation=0, lastTic=0
     private var synchronizedTic:Int?
+    private let initialTic:Int
     private var indices:[String:Int]=[:]
-    init(resources:WAD,offline:Bool=false) throws {
+    init(resources:WAD,offline:Bool=false,initialTic:Int=0) throws {
+        guard initialTic>=0 else {throw PortError("Invalid initial audio tic")}
+        self.initialTic=initialTic
         self.resources=resources
         sound=try SoundPlayer(wad:resources,offline:offline,onlyLumps:[],voiceCount:32)
     }
@@ -32,8 +35,8 @@ final class ExtendedSoundPlayer {
     /// Apply the audio belonging to the scene being presented now. Consecutive
     /// one-tic replies are mandatory; no delayed callbacks can drift behind it.
     func present(_ audio:ExtendedAudio,audible:Bool=true) throws {
-        let previous=synchronizedTic ?? 0
-        guard audio.tic == (synchronizedTic == nil ? 0:previous+1),
+        let previous=synchronizedTic ?? initialTic
+        guard audio.tic == (synchronizedTic == nil ? initialTic:previous+1),
               audio.events.allSatisfy({$0.tic>=previous}) else { throw PortError("Nonconsecutive synchronized sound events.") }
         try prepare(audio)
         synchronizedTic=audio.tic

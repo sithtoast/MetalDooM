@@ -74,6 +74,9 @@ controller with injected fixture resources, native controls, pause/resume,
 MIDI/effects, both endings, restarts and close during a pending level replacement.
 
 These route and presentation fixtures are not full campaign or boss playthroughs.
-Save/restore, full death-camera playback, episode selection and full gameplay
+Saving presentation phases, full death-camera playback, episode selection and full gameplay
 acceptance remain ahead; ordinary picker acceptance is still guarded. Demos,
 speedrunning mode and external uploads remain a future aside.
+
+Build 145 permits loading live-level saves from campaign screens; the presentation
+itself is not serialized. See EXTENDED_SAVES.md.

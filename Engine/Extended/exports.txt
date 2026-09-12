@@ -13,3 +13,5 @@ _ME_CopyAudio
 _ME_CopyUI
 _ME_Advance
 _ME_CopyCampaign
+_ME_CopySave
+_ME_RestoreSave

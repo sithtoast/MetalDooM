@@ -32,7 +32,8 @@ profile's range (Rust MAP01–16, baseline MAP01–32). MAP99 is not a route tar
 Both standard end-game flags and Rust's custom endfinale flag terminate progression.
 
 Autosaving defaults on upstream. The native Continue wrapper explicitly disables
-it because no extended save format is accepted. The autosave hook fails if ever
+it because the native preview does not offer automatic saves. Build 145 adds
+explicit Save/Load through EXTENDED_SAVES.md. The autosave hook fails if ever
 called; it does not silently write classic or upstream save files. StatCopy and
 WI_Start are presentation hooks owned by the native summary rather than software
 intermission drawing or optional file statistics. G_Ticker's general demo/save/
@@ -97,4 +98,5 @@ test resources/helper, exercising the panels, map/music changes, repeated
 restart/step and close during replacement. See VALIDATION.md for final evidence.
 
 Next: animated intermission/finale presentation, targeted combat/map-special and
-boss exits, followed by versioned extended saves and full campaign acceptance.
+boss exits and full campaign acceptance. Build 145 adds private extended saves
+through EXTENDED_SAVES.md.

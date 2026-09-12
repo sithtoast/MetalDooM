@@ -1,6 +1,6 @@
 # Experimental extended simulation worker
 
-The **0.10.0 build 144** development milestone includes copied geometry, sprite
+The **0.10.0 build 145** development milestone includes copied geometry, sprite
 frames, material animations, sound events, HUD and level music, explicit session planning, three Rust-required ID24 fields, an explicit
 [native preview](EXTENDED_PREVIEW.md), and headless tests with the actual Rust
 patch/resources. The normal app still uses Chocolate Doom; its Rust rejection
@@ -55,7 +55,7 @@ Profiles are explicit development choices:
   The copied session still reports the declared ID24 requirement. This profile
   does **not** advertise full ID24 conformance or silently relabel it as MBF21.
 
-The dylib exports exactly fifteen `ME_` functions, keeping both engine and helper
+The dylib exports exactly seventeen `ME_` functions, keeping both engine and helper
 symbols private. One `ME_Tick` consumes one 35 Hz command. Movement, attack/use
 and validated weapon-change bits are accepted; special command bits and invalid
 weapon indices fail. Player/actor snapshots copy values, messages and selected
@@ -72,7 +72,7 @@ Use a **dedicated single-thread process, one session per process**. Initializati
 can be attempted once. Fatal engine errors stay inside the guarded C call and
 invalidate the session; terminate the worker after completion/error to reclaim
 its allocations. Level restart/continue now use ME_Advance within that session. There is no
-second initialization, teardown/reinitialization API or extended save format.
+second initialization, teardown/reinitialization API. Private saves restore only into fresh workers; see EXTENDED_SAVES.md.
 The separate [preview worker protocol](EXTENDED_PREVIEW.md) now carries copied
 views/geometry, named actor/weapon frames and material translations/sound events and HUD/music selection. Do not load the dylib into the Swift app process.
 
@@ -168,6 +168,6 @@ Build 143 adds `ME_Advance`, MUI2 lifecycle state, death/restart, engine-owned
 normal/secret routing and a native completion summary. All route probes pass.
 Build 144 adds ME_CopyCampaign and native animated intermissions, stories, credits
 and custom cast. Next: targeted monster/map-special parity and remaining world
-presentation. Actual boss exits, full playthroughs and versioned saves remain
+presentation. Build 145 adds versioned saves (EXTENDED_SAVES.md). Actual boss exits and full playthroughs remain
 acceptance gates. Keep the ordinary GUI Rust guard until native campaign
 play is validated.

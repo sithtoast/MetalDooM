@@ -65,20 +65,21 @@ int main(int argc,char **argv) {
     if(!state(0,1)){char e[2048];ME_CopyError(e,sizeof(e));return fail(0,e[0]?e:"Cannot copy initial presentation");}
     uint32_t expected=1;
     for(;;) {
-        unsigned char header[16],payload[210];
+        unsigned char header[16],small[210],*payload=small;
         size_t got=fread(header,1,16,stdin);
         if(!got && feof(stdin))return 0;
         if(got!=16)return fail(expected,"Truncated request header");
         uint32_t seq=get(header+4),op=get(header+8),length=get(header+12);
-        if(memcmp(header,"MEQ1",4) || seq!=expected || !expected || length>sizeof(payload))
+        if(memcmp(header,"MEQ1",4) || seq!=expected || !expected || length>(op==7 ? 64u*1024*1024:sizeof(small)))
             return fail(expected,"Invalid request header, sequence or length");
+        if(op==7 && length){payload=malloc(length);if(!payload)return fail(seq,"Restore allocation failed");}
         if(fread(payload,1,length,stdin)!=length)return fail(seq,"Truncated request body");
         if(op==3 && !length)return send_frame(seq,0,"",0)?0:1;
-        if(op==5 && !length) {
-            size_t size=ME_CopyCampaign(NULL,0);
-            if(!size || size>1024*1024)return fail(seq,"Campaign metadata requires a completed level");
-            void *body=malloc(size);if(!body)return fail(seq,"Campaign allocation failed");
-            if(ME_CopyCampaign(body,size)!=size){free(body);return fail(seq,"Cannot copy campaign");}
+        if((op==5 || op==6) && !length) {
+            size_t size=op==5 ? ME_CopyCampaign(NULL,0):ME_CopySave(NULL,0);
+            if(!size || size>(op==5 ? 1024*1024:64*1024*1024)){char e[2048];ME_CopyError(e,sizeof(e));return fail(seq,e[0]?e:"Snapshot unavailable at this lifecycle phase");}
+            void *body=malloc(size);if(!body)return fail(seq,"Snapshot allocation failed");
+            if((op==5 ? ME_CopyCampaign(body,size):ME_CopySave(body,size))!=size){free(body);return fail(seq,"Cannot copy snapshot");}
             int sent=send_frame(seq,0,body,size);free(body);if(!sent)return 1;
             expected++;continue;
         }
@@ -91,10 +92,13 @@ int main(int argc,char **argv) {
                 ME_Snapshot snapshot;if(!ME_CopySnapshot(&snapshot))return fail(seq,"Cannot copy lifecycle state");
                 if(snapshot.health<=0 || snapshot.pending_exit)break;
             }
+        } else if(op==7 && length) {
+            if(!ME_RestoreSave(payload,length)){char error[2048];ME_CopyError(error,sizeof(error));return fail(seq,error);}
+            free(payload);
         } else if(op==4 && length==4) {
             if(!ME_Advance(get(payload))){char error[2048];ME_CopyError(error,sizeof(error));return fail(seq,error);}
         } else if(op!=2 || length) return fail(seq,"Invalid request operation/body");
-        if(!state(seq,op==2 || op==4)){char e[2048];ME_CopyError(e,sizeof(e));return fail(seq,e[0]?e:"Cannot copy presentation");}
+        if(!state(seq,op==2 || op==4 || op==7)){char e[2048];ME_CopyError(e,sizeof(e));return fail(seq,e[0]?e:"Cannot copy presentation");}
         expected++;
     }
 }

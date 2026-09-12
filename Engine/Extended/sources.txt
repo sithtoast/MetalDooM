@@ -97,3 +97,4 @@ m_cheat.c
 i_region.c
 i_glob.c
 r_draw.c
+kf_file.c

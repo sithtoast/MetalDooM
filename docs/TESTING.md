@@ -162,3 +162,12 @@ For native GPU validation, first run
 then `AO_RESOURCES=1 bash scripts/test-ambient-occlusion.sh build/resource-native-fixtures/preview.wad`.
 It checks nonstandard switch preload, animated pixels, pause and save restoration.
 Native GPU access requires permitted host execution.
+
+## Private Rust preview saves
+
+Build the extended worker and generate the existing Rust/lifecycle fixtures, then
+run `scripts/test-extended-save.sh /path/to/rerelease` for engine continuation and
+file-envelope checks. `scripts/test-extended-save-app.sh /path/to/rerelease` needs
+a logged-in native Metal/audio session and tests worker replacement in the app.
+Use Save…/Load… in the packaged preview to verify actual dialog behavior. Saves
+require matching engine and WAD fingerprints; see [the contract](EXTENDED_SAVES.md).

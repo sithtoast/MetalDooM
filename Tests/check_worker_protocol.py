@@ -15,7 +15,7 @@ def read(p):
     return seq, status, body
 with tempfile.TemporaryDirectory() as cache:
     command = [executable, cache, '1', '0', '0', '3', base]
-    for mode in ['sequence', 'length', 'operation', 'truncated', 'reserved', 'quit', 'eof', 'action', 'action-length', 'campaign-playing', 'campaign-length']:
+    for mode in ['sequence', 'length', 'operation', 'truncated', 'reserved', 'quit', 'eof', 'action', 'action-length', 'campaign-playing', 'campaign-length', 'save-length', 'restore-empty', 'restore-oversize', 'restore-truncated']:
         p = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
             initial = read(p)
@@ -39,6 +39,10 @@ with tempfile.TemporaryDirectory() as cache:
             if mode == 'quit': op = 3
             if mode == 'campaign-playing': op = 5
             if mode == 'campaign-length': op,body,length=5,b'\0',1
+            if mode == 'save-length': op,body,length=6,b'\0',1
+            if mode == 'restore-empty': op=7
+            if mode == 'restore-oversize': op,length=7,64*1024*1024+1
+            if mode == 'restore-truncated': op,body,length=7,b'{',2
             if mode == 'action': op,body,length=4,struct.pack('<I',2),4
             if mode == 'action-length': op,body,length=4,b'\0',1
             p.stdin.write(struct.pack('<4sIII', b'MEQ1', seq, op, length)+body)

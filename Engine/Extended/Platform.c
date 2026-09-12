@@ -95,3 +95,9 @@ void MN_AddEpisode(const char *map, const char *gfx, const char *txt, char key) 
 void WI_Start(wbstartstruct_t *info) {}
 void StatCopy(const struct wbstartstruct_s *info) {}
 void M_SaveAutoSave(void) { I_Error("Extended autosaves are not implemented"); }
+
+#include "am_map.h"
+boolean automap_grid;
+int markpointnum,markpointnum_max;
+mpoint_t *markpoints;
+void AM_Start(void) {I_Error("Extended automap restore is unsupported");}

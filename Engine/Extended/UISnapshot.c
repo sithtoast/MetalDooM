@@ -11,6 +11,7 @@
 #include "deh_strings.h"
 #include "w_wad.h"
 #include "i_system.h"
+#include "yyjson.h"
 #include <stdio.h>
 #include <string.h>
 static char track[8];
@@ -61,4 +62,17 @@ size_t ME_WriteUI(void *out,size_t capacity) {
     word(&p,player->secretcount);word(&p,totalsecret);word(&p,leveltime);
     word(&p,phase>=2 && secretexit);word(&p,0);word(&p,0);
     return size;
+}
+
+void ME_ArchiveNativeUI(json_mut_doc_t *doc,json_mut_t *root) {
+    char name[9]={0};memcpy(name,track,8);
+    yyjson_mut_obj_add_strcpy(doc,root,"native_music",name);
+    JS_SetInt(doc,root,"native_music_loop",looped);
+    JS_SetInt(doc,root,"native_music_generation",generation);
+}
+void ME_UnArchiveNativeUI(json_t *root) {
+    const char *name=JS_GetStringValue(root,"native_music");
+    int gen=JS_GetIntegerValue(root,"native_music_generation"),loop=JS_GetIntegerValue(root,"native_music_loop");
+    if(!name || !*name || strlen(name)>8 || W_CheckNumForName(name)<0 || gen<=0 || (loop!=0 && loop!=1))I_Error("Invalid restored music");
+    memset(track,0,8);memcpy(track,name,strlen(name));generation=gen;looped=loop;
 }

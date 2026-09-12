@@ -1,5 +1,54 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 145: Native Rust save/restore
+
+Final candidate: `build/save-preview/MetalDooM.app`; `build/build145.log`.
+The bundle passes host `codesign --verify --deep --strict`; plist and running title
+report **0.10.0/build 145**. It is ad-hoc signed, unnotarized, with no distribution
+package. Previous 144 and older bundles remain intact.
+
+Actual MAP01 file-dialog validation: Fire 1 second reached tic 35/ammo 48. Save…
+wrote `build/save-test/build145-MAP01.mdrust` (1,098,261 bytes); independent parsing
+confirmed MRS1, tic/map/ammo, payload checksum and the packaged engine fingerprint.
+Another Fire 1 second reached tic 70/ammo 46. Load… restored tic 35 paused; the
+raised native-window screenshot showed the matching world, firing pistol frame,
+health 100 and 48 bullets. Sound/Music remained enabled. The app is left at that
+restored state. The save stays private/ignored under build/.
+
+Automated evidence:
+
+- `build/save-validation.log`: all sixteen maps, Incinerator and Calamity Blade
+  fixtures, and a MAP16 Use sequence. Each compares complete geometry, materials,
+  actor/weapon/UI state immediately after load and after another 140 tics.
+- Five post-transition saves cover actual pickups, normal routes, both secret
+  entries and secret returns. Inventory/history and different global/level clocks
+  survive a new worker. Future-state comparisons pass. These are exit-room probes.
+- Thirteen malformed raw JSON cases bypass the parent checksum to test worker
+  validation. Late/repeated restore rejects. C size/short-buffer/full-copy canaries
+  and repeated saves prove no snapshot/RNG mutation or drained audio. Swift tests
+  cover eight envelope failures, resource/engine fingerprints, checksum, bounded
+  file reading, round trip and atomic replacement.
+- `build/save-native.log`: actual app code with fixture resources passes repeated
+  independent worker loads, subsequent audio/stepping, paused controls/music,
+  corrupt-save and write-failure preservation, and closing during pending restore.
+- `build/save-core.log`: 17 private exports, native dependency isolation, original
+  core movement/combat/conveyor and patch rejection regressions.
+- `build/save-worker-regression.log`: existing copied audio/render/UI, all-map
+  worker checks and malformed packet/cancellation regressions, plus invalid save
+  body and empty/oversized/truncated restore protocol requests.
+
+The first-frame test caught missing upstream material-translation arrays; native
+save fields now preserve them. The Calamity Blade case caught valid removed arena
+objects outside the active thinker list; only deletion types may be unlinked.
+Brain-target and MUSINFO references are repaired after thinker arena replacement.
+The upstream JSON file was imported from the existing pinned Woof commit.
+
+These tests do not establish full campaign/boss playthrough acceptance, arbitrary
+save fuzzing coverage, cross-build compatibility or physical speaker audibility.
+Saves are live-level only; loading clears old sample tails/input and restarts the
+selected music track. Autosaves, demo/upload work and ordinary picker acceptance
+remain outside this milestone. See EXTENDED_SAVES.md for the full contract.
+
 ## 2026-09-12 — 0.10.0 build 144: Native Rust intermissions and finales
 
 Final candidate: `build/campaign-preview/MetalDooM.app`; `build/build144.log`.

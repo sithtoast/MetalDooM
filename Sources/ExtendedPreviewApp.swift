@@ -1,5 +1,6 @@
 import AppKit
 import MetalKit
+import UniformTypeIdentifiers
 
 /// Explicit command-line development preview; it never changes the WAD picker
 /// acceptance rules or launches the classic simulation.
@@ -7,7 +8,9 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     private var window:NSWindow!, view:GameView!, renderer:Renderer!
     private let status=NSTextField(labelWithString:"Loading worker…")
     private let queue=DispatchQueue(label:"MetalDooM.extended-preview")
-    private let worker=ExtendedWorker()
+    private var worker=ExtendedWorker(),pendingWorker:ExtendedWorker?
+    private var workerExecutable:URL?
+    private var saveButton:NSButton!,loadButton:NSButton!
     private var audioPlayer:ExtendedSoundPlayer?
     private var soundToggle:NSButton!, musicToggle:NSButton!, runButton:NSButton!, restartButton:NSButton!, continueButton:NSButton!
     private var levelUI:ExtendedUI?, changingLevel=false
@@ -71,7 +74,10 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             restartButton=NSButton(title:"Restart level",target:self,action:#selector(restartLevel))
             continueButton=NSButton(title:"Continue",target:self,action:#selector(continueLevel))
             restartButton.isEnabled=false;continueButton.isHidden=true
-            let transport=NSStackView(views:[runButton,restartButton,continueButton,mode]);transport.spacing=12
+            saveButton=NSButton(title:"Save…",target:self,action:#selector(saveGame))
+            loadButton=NSButton(title:"Load…",target:self,action:#selector(loadGame))
+            saveButton.isEnabled=false;loadButton.isEnabled=false
+            let transport=NSStackView(views:[runButton,restartButton,saveButton,loadButton,continueButton,mode]);transport.spacing=12
             completion.isHidden=true;completion.font=NSFont.systemFont(ofSize:16,weight:.semibold)
             let caption=NSTextField(labelWithString:"WASD move · Arrows turn/move · Shift run · E use · F fire · 1–7 weapon · Click to aim · Esc pause")
             caption.textColor = .secondaryLabelColor
@@ -85,6 +91,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             window.center();window.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true)
             let paths=["id24res.wad","doom2.wad","id1.wad"].map{root.appendingPathComponent($0)}
             let executable=Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MetalDooMWorker")
+            workerExecutable=executable
             queue.async { [self] in
                 do {
                     let state=try worker.start(executable:executable,paths:paths,map:map,base:1)
@@ -131,6 +138,8 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         runButton?.title=(clock.running || campaignRunning) ? "Pause":"Run"
         runButton?.isEnabled=available && (playing || campaign != nil) && (clock.running || !clock.inFlight)
         restartButton?.isEnabled=available && !clock.inFlight
+        saveButton?.isEnabled=available && playing && !clock.inFlight
+        loadButton?.isEnabled=available && !clock.inFlight
         continueButton?.isHidden=campaign == nil || campaign?.stage == .art
         if let campaign {
             switch campaign.stage {
@@ -313,6 +322,84 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             } catch {DispatchQueue.main.async { [weak self] in self?.failed(error) }}
         }
     }
+    @objc private func saveGame() {
+        guard ready,!stopped,!closed,!changingLevel,!clock.inFlight,levelUI?.playing==true else {return}
+        pause();changingLevel=true;updateControls()
+        let panel=NSSavePanel();panel.title="Save Rust game";panel.nameFieldStringValue=String(format:"Rust-MAP%02d.mdrust",levelUI!.map)
+        panel.allowedContentTypes=[UTType(exportedAs:"dev.metaldoom.rust-save",conformingTo:.data)]
+        panel.beginSheetModal(for:window) { [weak self] response in
+            guard let self,!self.closed else {return}
+            self.changingLevel=false
+            if response == .OK,let url=panel.url {self.save(to:url)} else {self.updateControls()}
+        }
+    }
+    @objc private func loadGame() {
+        guard ready,!stopped,!closed,!changingLevel,!clock.inFlight else {return}
+        pause();changingLevel=true;updateControls()
+        let panel=NSOpenPanel();panel.title="Load Rust game";panel.allowsMultipleSelection=false;panel.canChooseDirectories=false
+        panel.allowedContentTypes=[UTType(exportedAs:"dev.metaldoom.rust-save",conformingTo:.data)]
+        panel.beginSheetModal(for:window) { [weak self] response in
+            guard let self,!self.closed else {return}
+            self.changingLevel=false
+            if response == .OK,let url=panel.url {self.restore(from:url)} else {self.updateControls()}
+        }
+    }
+    private func save(to url:URL) {
+        guard ready,!stopped,!closed,!changingLevel,!clock.inFlight,levelUI?.playing==true,let executable=workerExecutable else {return}
+        pause();changingLevel=true;updateControls()
+        queue.async { [self] in
+            let payload:Data
+            do {payload=try worker.save()}
+            catch {DispatchQueue.main.async { [weak self] in self?.failed(error)};return}
+            do {
+                let snapshot=try ExtendedSave(payload:payload,engine:ExtendedSave.engineIdentity(executable:executable))
+                try snapshot.write(to:url)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self,!self.closed else {return}
+                    self.changingLevel=false;self.status.stringValue="Saved \(url.lastPathComponent) · MAP\(snapshot.map) · tic \(snapshot.tic)";self.updateControls()
+                }
+            } catch {DispatchQueue.main.async { [weak self] in self?.saveFailed(error)}}
+        }
+    }
+    private func restore(from url:URL) {
+        guard ready,!stopped,!closed,!changingLevel,!clock.inFlight,let executable=workerExecutable,let resources=sceneBuilder?.resources else {return}
+        pause();changingLevel=true;updateControls()
+        let candidate=ExtendedWorker();pendingWorker=candidate
+        queue.async { [self] in
+            do {
+                guard let identity=worker.identity else {throw PortError("Missing resource identity")}
+                let saved=try ExtendedSave.read(url,engine:ExtendedSave.engineIdentity(executable:executable),identity:identity)
+                _=try candidate.start(executable:executable,paths:resources.sourceURLs,map:saved.map,base:1,profile:1,skill:saved.skill)
+                let state=try candidate.restore(saved.payload)
+                guard state.ui.playing,state.tic==saved.tic,state.ui.map==saved.map,state.geometry != nil else {throw PortError("Restored state does not match save")}
+                let builder=try ExtendedSceneBuilder(resources:resources),scene=try builder.prepare(state)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self,!self.closed else {candidate.cancel();self?.queue.async{candidate.close()};return}
+                    do {
+                        // Prepare every fallible native resource before retiring the
+                        // current worker. Bad saves leave that paused game intact.
+                        let renderer=try Renderer(view:self.view);try renderer.loadExtendedPreview(scene)
+                        let audio=try ExtendedSoundPlayer(resources:resources,initialTic:state.tic);try audio.prepare(state.audio)
+                        let music=try MusicPlayer(wad:resources,map:scene.copiedGeometry.map.name,track:state.ui.music,backend:"apple")
+                        music.looping=state.ui.looping;music.enabled=self.musicToggle.state == .on;music.update(active:false)
+                        renderer.onError={ [weak self] in self?.failed($0) }
+                        let previous=self.worker;self.worker=candidate;self.pendingWorker=nil;self.sceneBuilder=builder
+                        self.campaignView?.removeFromSuperview();self.campaignView=nil;self.campaign=nil;self.campaignSound=nil;self.campaignTrack=""
+                        self.renderer=renderer;self.view.delegate=renderer;self.view.isPaused=false
+                        self.audioPlayer=audio;self.musicPlayer=music;self.musicGeneration=state.ui.musicGeneration
+                        self.clock=ExtendedPlaybackClock();self.manualTag=nil;self.changingLevel=false
+                        self.presentInitial(scene)
+                        self.status.stringValue="Loaded \(url.lastPathComponent) · MAP\(saved.map) · tic \(saved.tic) · Paused"
+                        previous.cancel();self.queue.async{previous.close()}
+                    } catch {candidate.cancel();self.queue.async{candidate.close()};self.saveFailed(error)}
+                }
+            } catch {candidate.close();DispatchQueue.main.async { [weak self] in self?.saveFailed(error)}}
+        }
+    }
+    private func saveFailed(_ error:Error) {
+        guard !closed else {return}
+        pendingWorker=nil;changingLevel=false;status.stringValue="Save/load failed: \(error)";updateControls()
+    }
     func applicationDidResignActive(_ notification:Notification) { pause() }
     func windowDidResignKey(_ notification:Notification) { pause() }
     @objc private func toggleMusic() { musicPlayer?.enabled=musicToggle.state == .on;musicPlayer?.update(active:clock.busy || campaignRunning) }
@@ -330,12 +417,12 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     private func shutdown() {
         guard !closed else { return };closed=true;pause()
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor);self.keyMonitor=nil }
-        worker.cancel();musicPlayer=nil;view?.isPaused=true;view?.delegate=nil
+        worker.cancel();pendingWorker?.cancel();musicPlayer=nil;view?.isPaused=true;view?.delegate=nil
     }
     func applicationShouldTerminate(_ sender:NSApplication)->NSApplication.TerminateReply {
         shutdown()
         queue.async { [self] in
-            worker.close()
+            worker.close();pendingWorker?.close()
             DispatchQueue.main.async { sender.reply(toApplicationShouldTerminate:true) }
         }
         return .terminateLater

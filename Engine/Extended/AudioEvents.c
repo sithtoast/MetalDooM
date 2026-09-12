@@ -90,3 +90,5 @@ size_t ME_WriteAudio(void *out,size_t capacity) {
     for(size_t i=0;i<count;i++){event_t *e=&events[i];word(&p,e->tic);word(&p,e->channel);word(&p,e->operation);memcpy(p,e->name,8);p+=8;word(&p,e->volume);word(&p,e->pan);}
     count=0;return size;
 }
+
+void ME_ResetRestoredAudio(void) {count=0;memset(channels,0,sizeof(channels));}

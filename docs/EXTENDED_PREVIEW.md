@@ -1,4 +1,4 @@
-# Rust native preview — 0.10.0 build 144
+# Rust native preview — 0.10.0 build 145
 
 An explicit development preview now starts the extended simulation in a separate
 child process and draws its copied geometry with the existing native Metal world
@@ -8,7 +8,7 @@ checks their session fingerprint and reads the UMAPINFO sky selection.
 
 This is a **continuous development preview**, not full Rust campaign support.
 Native HUD, MIDI, intermissions, episode stories/credits and custom cast are
-connected; full Boom/ID24 world presentation, saves and gameplay acceptance remain
+connected; full Boom/ID24 world presentation and gameplay acceptance remain
 ahead. Death, Restart and Continue are connected; see
 [lifecycle behavior](EXTENDED_LIFECYCLE.md) and [campaign presentation](EXTENDED_CAMPAIGN.md).
 The ordinary WAD picker still rejects Rust gameplay. Run and manual controls advance real
@@ -136,7 +136,8 @@ is 160 MiB + 56 bytes; errors are at most 2048 bytes. Startup/requests have a
 30-second deadline and run on one serial background queue; cancellation terminates
 the owned child and interrupts reads. EOF/truncation and protocol errors stop the
 session. Level restart/continue use the existing process and resource session;
-there is no reinitialization or save contract.
+there is no in-process reinitialization. Build 145 adds a fresh-worker
+[private save contract](EXTENDED_SAVES.md).
 
 ## Validation
 
@@ -175,3 +176,6 @@ updates. All 21 reference GPU comparisons pass; all-map/worker regressions pass.
 The build-139 candidate remains at `build/mesh-final/MetalDooM.app`. See
 EXTENDED_MESH.md. Build 140 is `build/ui-preview/MetalDooM.app`; its native HUD,
 Music control and pause/fire/weapon behavior are recorded in VALIDATION.md.
+
+Build 145 adds Save…/Load… controls; see [save/restore](EXTENDED_SAVES.md) for
+state coverage, engine/resource compatibility and validation.

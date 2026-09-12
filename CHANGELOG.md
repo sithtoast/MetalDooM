@@ -4,6 +4,23 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — Rust save and restore (build 145)
+
+- Add Save…/Load… to the Rust preview, preserving inventory, actors, weapon state,
+  moving sectors, animation, RNG, music selection and campaign history.
+- Write private `.mdrust` files atomically with engine/resource fingerprints and
+  corruption checks. Restore into a fresh worker and return paused at the saved
+  tic; failed loads or file writes leave the current game available.
+- Reset input and sound tails on load; restart selected music while retaining
+  Music/Sound choices. Load is available from death and campaign screens; saving
+  those presentation phases and automatic saves remain unsupported.
+- Validate exact restored scenes and 140 future tics across all maps, both Rust
+  weapon fixtures, Use and five post-transition cases, plus malformed files,
+  copy/protocol boundaries, repeated native loads and failure/close cleanup.
+- Keep this refinement on 0.10.0. Build 145 is local, ad-hoc signed and unnotarized.
+  Full campaign/boss playthroughs and ordinary picker acceptance remain pending.
+  No demo/upload work, distribution package or WAD data is added.
+
 ## 0.10.0 refinement — Rust intermissions and finales (build 144)
 
 - Show original Rust episode maps, counting statistics, visited markers and

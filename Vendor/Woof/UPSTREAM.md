@@ -6,7 +6,8 @@ Pinned commit: `acd1c7f84fdd0fae92d1c58643c14364a131c75a` (imported 2026-09-12).
 This is a source subset, not a Woof application distribution. `src` contains
 upstream headers and only the C translation units listed in
 `Engine/Extended/sources.txt`. The native target dead-strips unused presentation,
-startup, demo and save entry points. No upstream base WAD, game assets, SDL
+startup and demo entry points. The native save adapter uses the pinned JSON
+keyframe serializer; general upstream save-file I/O is excluded. No upstream base WAD, game assets, SDL
 implementation, audio mixer or launcher is imported. The normal MetalDooM app
 continues to use its Chocolate Doom core.
 
@@ -53,6 +54,13 @@ Local changes from the pin:
 - `dsdh_sounds.c`, `dsdh_main.h`: add a read-only external sound-ID lookup for
   copied campaign metadata. Unlike DSDH_SoundTranslate it never allocates an ID
   or changes the sound table. See docs/EXTENDED_CAMPAIGN.md.
+
+- `kf_file.c`: import the pinned JSON keyframe serializer; add strict native
+  scalar/index accessors and thinker topology validation, preserve MUSINFO actor
+  references and rebuild brain-target pointers after replacing the thinker arena.
+  Engine/Extended/SaveSnapshot.c wraps it with native clocks/counters, material
+  translations, resource identity and a single-use restore boundary. See
+  docs/EXTENDED_SAVES.md for the private envelope and validation limits.
 
 Native integration, limitations and reproduction: `docs/EXTENDED_ENGINE.md`.
 Future upstream updates must reapply/review this list and rerun the worker suite.

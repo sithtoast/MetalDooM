@@ -281,3 +281,14 @@ size_t ME_CopyCampaign(void *out,size_t capacity) {
     entered=1;if(setjmp(error_boundary)){entered=0;return 0;}
     size_t result=ME_WriteCampaign(out,capacity);entered=0;return result;
 }
+
+size_t ME_CopySave(void *out,size_t capacity) {
+    if(!ready || failed)return 0;
+    entered=1;if(setjmp(error_boundary)){entered=0;return 0;}
+    size_t result=ME_WriteSave(out,capacity);entered=0;return result;
+}
+int ME_RestoreSave(const void *data,size_t size) {
+    if(!ready || failed)return 0;
+    entered=1;if(setjmp(error_boundary)){entered=0;return 0;}
+    int result=ME_ReadSave(data,size);entered=0;return result;
+}

@@ -95,6 +95,15 @@ final class ExtendedWorker {
             return view
         } catch {cancel();throw error}
     }
+    func save() throws -> Data {
+        guard lastUI?.playing==true else {throw PortError("Save requires a live level")}
+        return try exchange(operation:6,body:Data(),limit:64*1024*1024)
+    }
+    func restore(_ data:Data) throws -> ExtendedView {
+        guard lastUI?.tic==0,data.count>0,data.count<=64*1024*1024 else {throw PortError("Restore requires a fresh worker and bounded save")}
+        previousGeometry=nil
+        return try request(operation:7,body:data)
+    }
     func campaign() throws -> Data {
         guard let ui=lastUI,ui.phase>=2 else {throw PortError("Campaign metadata requires a completed level")}
         return try exchange(operation:5,body:Data(),limit:1024*1024)
