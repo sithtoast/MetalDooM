@@ -57,3 +57,34 @@ struct BundledPreviewPlan {
         return (plan,map)
     }
 }
+
+extension BundledPreviewPlan {
+    static func picker(base:URL,addOns:[URL],content:Content?=nil,extras:Bool=false)throws->Self? {
+        let names=addOns.map{$0.lastPathComponent.lowercased()}
+        let known=["id1.wad","id1-res.wad","id1-weap.wad","id1-tex.wad","id1-mus.wad","id24res.wad","extras.wad"]
+        guard content != nil || names.contains(where:known.contains) else {return nil}
+        guard base.lastPathComponent.lowercased()=="doom2.wad" else {throw PortError("Choose rerelease Doom II for bundled content.")}
+        guard names.allSatisfy(known.contains),Set(names).count==names.count else {throw PortError("Use one bundled content plan without unrelated or duplicate add-ons.")}
+        let selected:Content
+        if let content {selected=content}
+        else if names.contains("id1.wad") {selected = .rust}
+        else if names.contains("id1-weap.wad") {selected = .weapons}
+        else if names.contains("id1-res.wad") {selected = .resources}
+        else if names.contains("id1-tex.wad") {selected = .textures}
+        else if names.contains("id1-mus.wad") {selected = .music}
+        else {selected = .doom2}
+        let plan=try Self(root:base.deletingLastPathComponent(),content:selected,extras:extras || names.contains("extras.wad"))
+        let canonical={ (url:URL) in url.standardizedFileURL.resolvingSymlinksInPath() }
+        guard canonical(plan.paths[plan.base])==canonical(base),addOns.allSatisfy({url in plan.paths.contains{canonical($0)==canonical(url)}}) else {
+            throw PortError("Choose one bundled pack from the same rerelease folder. Packs with different roles cannot be combined here.")
+        }
+        for file in plan.paths where !FileManager.default.isReadableFile(atPath:file.path) {throw PortError("Missing required resource: \(file.lastPathComponent)")}
+        return plan
+    }
+    var launchArguments:[String] {
+        var args=["--bundled-preview",paths[base].deletingLastPathComponent().path,"--content",content.rawValue]
+        if paths.first?.lastPathComponent=="extras.wad" {args.append("--extras")}
+        if let track {args += ["--track",track]}
+        return args
+    }
+}

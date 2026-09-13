@@ -257,7 +257,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             if let index = arguments.firstIndex(of:"-warp"), index+1 < arguments.count {
                 maps.selectItem(withTitle:arguments[index+1].uppercased()); changeMap()
             }
-            if wad == nil { openGameMenu() }
+            if wad == nil {if arguments.contains("--choose-wads") {openWAD()} else {openGameMenu()}}
         } catch { show(error) }
     }
     @objc func toggleStatusBar() {
@@ -320,6 +320,10 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             if self.wad == nil { self.load(url,addOns:extras) }
             else { self.switchWAD(url,addOns:extras) }
         }
+        stack.onPlayBundled={ [weak self] plan in
+            guard let self else {return};self.stackPanel=nil
+            self.switchApplication(arguments:plan.launchArguments)
+        }
         stack.onCancel={ [weak self] in self?.stackPanel=nil }
         window.beginSheet(stack)
     }
@@ -328,6 +332,13 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func switchWAD(_ url: URL, addOns: [URL]) {
         do {
             _ = try WAD(url:url,addOns:addOns)
+            var args=["-iwad",url.path]
+            if !addOns.isEmpty {args += ["-file"]+addOns.map(\.path)}
+            switchApplication(arguments:args)
+        } catch {show(error)}
+    }
+    func switchApplication(arguments:[String]) {
+        do {
             let directory=FileManager.default.temporaryDirectory.appendingPathComponent("MetalDooM-switch-" + UUID().uuidString)
             try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:false)
             let ready=directory.appendingPathComponent("ready")
@@ -335,8 +346,7 @@ final class App: NSObject, NSApplicationDelegate, NSWindowDelegate {
             switchingWAD=true; renderer.paused=true
             let configuration=NSWorkspace.OpenConfiguration()
             configuration.createsNewApplicationInstance=true
-            configuration.arguments=["-iwad",url.path,"-switch-ready",ready.path]
-            if !addOns.isEmpty { configuration.arguments += ["-file"] + addOns.map(\.path) }
+            configuration.arguments=arguments+["-switch-ready",ready.path]
             NSWorkspace.shared.openApplication(at:Bundle.main.bundleURL,configuration:configuration) { [weak self] application,error in
                 DispatchQueue.main.async {
                     guard let self else { try? FileManager.default.removeItem(at:directory); return }

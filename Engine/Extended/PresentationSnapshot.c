@@ -68,7 +68,7 @@ size_t ME_WritePresentation(void *out,size_t capacity) {
         word(&p,m->x);word(&p,m->y);word(&p,m->z);word(&p,m->floorz);
         sector_t rendered;int fl,cl;
         ME_RenderSector(m->subsector->sector,0,&rendered,&fl,&cl);
-        int light=(fl+cl)/2;
+        int light=(fl+cl)/2+players[0].extralight*16;
         word(&p,light>255?255:light<0?0:light);
         unsigned blend=blend_flags(m, m->state, (m->flags & MF_SHADOW)!=0, 1);
         word(&p,(f->flip[rot]?1:0)|((m->frame & FF_FULLBRIGHT)?2:0)|((m->flags & MF_SHADOW)?4:0)|blend|(m->interp==1 && m->native_previous_tic==leveltime?32:0));
@@ -82,7 +82,9 @@ size_t ME_WritePresentation(void *out,size_t capacity) {
         // Simulation offsets already include vanilla movement bob. The parent
         // interpolates presentation only; flash shares the weapon coordinates.
         word(&p,psp->sx);word(&p,psp->sy);
-        int light=players[0].mo->subsector->sector->lightlevel+players[0].extralight*32;
+        sector_t rendered;int fl,cl;
+        ME_RenderSector(players[0].mo->subsector->sector,0,&rendered,&fl,&cl);
+        int light=(fl+cl)/2+players[0].extralight*16;
         word(&p,light>255?255:light<0?0:light);
         int fuzz=players[0].powers[pw_invisibility]>128 || (players[0].powers[pw_invisibility]&8);
         word(&p,(f->flip[0]?1:0)|((psp->state->frame & FF_FULLBRIGHT)?2:0)|

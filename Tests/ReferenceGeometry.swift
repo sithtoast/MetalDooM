@@ -11,6 +11,7 @@ struct ReferenceGeometry {
         func vertex(_ p: SIMD2<Float>, _ height: Float, _ u: Float, _ v: Float, _ light: Float) -> WorldVertex {
             WorldVertex(position: SIMD4(p.x, height, -p.y, 1), uvLight: SIMD4(u,v,light,0))
         }
+        var wallLight:Float=0
         func wall(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ bottom: Float, _ top: Float,
                   _ side: Side, _ texture: String, _ light: Float, _ anchor: Float,blend:Int=0,sky:Int=0) {
             guard top > bottom, texture != "-", !texture.isEmpty else { return }
@@ -21,7 +22,7 @@ struct ReferenceGeometry {
             let four = vertex(a,top,u,anchor-top+side.y,light)
             // w marks directional walls; the fragment shader rejects the far side.
             var vertices = [one,two,three,one,three,four]
-            for i in vertices.indices { vertices[i].uvLight.w = 1 }
+            for i in vertices.indices { vertices[i].uvLight.w = 1;vertices[i].lighting=SIMD4(wallLight,2,0,0) }
             groups[MaterialKey(name:texture,flat:texture == "F_SKY1",blend:blend,sky:sky), default:[]] += vertices
         }
         for line in map.lines {
@@ -33,6 +34,7 @@ struct ReferenceGeometry {
                 let otherIndex = isBack ? line.front : line.back
                 let shade: Float = abs(a.y-b.y) < 0.01 ? 0.88 : 1
                 let light = max(0.12,sector.light*shade)
+                wallLight=floor((sector.light*255).rounded()/16)+(a.y==b.y ? -1:a.x==b.x ? 1:0)
                 let bottomPegged = line.flags & 16 != 0, topPegged = line.flags & 8 != 0
                 func height(_ name: String) -> Float { textureHeights[name] ?? 128 }
                 if otherIndex == -1 {
@@ -166,12 +168,12 @@ struct ReferenceGeometry {
                     let to=SIMD2(Double(b.position.x),Double(-b.position.z))
                     for (t,point) in edgePoints(from,to) {
                         boundary.append(WorldVertex(position:SIMD4(Float(point.x),a.position.y,Float(-point.y),1),
-                                                    uvLight:a.uvLight+(b.uvLight-a.uvLight)*Float(t)))
+                                                    uvLight:a.uvLight+(b.uvLight-a.uvLight)*Float(t),lighting:a.lighting))
                     }
                 }
                 if boundary.count==3 { stitched += triangle;continue }
                 let center=WorldVertex(position:triangle.reduce(SIMD4<Float>.zero) { $0+$1.position }/3,
-                                       uvLight:triangle.reduce(SIMD4<Float>.zero) { $0+$1.uvLight }/3)
+                                       uvLight:triangle.reduce(SIMD4<Float>.zero) { $0+$1.uvLight }/3,lighting:triangle[0].lighting)
                 for j in boundary.indices { stitched += [center,boundary[j],boundary[(j+1)%boundary.count]] }
             }
             groups[key]=stitched
@@ -203,7 +205,9 @@ struct ReferenceGeometry {
                 let skyID=name=="F_SKY1" ? (ceiling ? sector.ceilingSky:sector.floorSky)?.id ?? 0:0
                 for points in triangles {
                     let triangle = points.map { p in
-                        vertex(SIMD2<Float>(p),height,Float(p.x*cos(angle)-p.y*sin(angle))+(ceiling ? sector.ceilingOffset.x:sector.floorOffset.x).truncatingRemainder(dividingBy:64),Float(-p.x*sin(angle)-p.y*cos(angle))+(ceiling ? sector.ceilingOffset.y:sector.floorOffset.y).truncatingRemainder(dividingBy:64),max(0.12,(ceiling ? sector.ceilingLight:sector.floorLight) ?? sector.light))
+                        var result=vertex(SIMD2<Float>(p),height,Float(p.x*cos(angle)-p.y*sin(angle))+(ceiling ? sector.ceilingOffset.x:sector.floorOffset.x).truncatingRemainder(dividingBy:64),Float(-p.x*sin(angle)-p.y*cos(angle))+(ceiling ? sector.ceilingOffset.y:sector.floorOffset.y).truncatingRemainder(dividingBy:64),max(0.12,(ceiling ? sector.ceilingLight:sector.floorLight) ?? sector.light))
+                        result.lighting=SIMD4(floor((((ceiling ? sector.ceilingLight:sector.floorLight) ?? sector.light)*255).rounded()/16),1,0,0)
+                        return result
                     }
                     groups[MaterialKey(name:name,flat:true,sky:skyID),default:[]] += triangle
                 }

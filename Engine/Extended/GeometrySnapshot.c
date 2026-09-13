@@ -85,11 +85,12 @@ size_t ME_WriteGeometry(void *out, size_t capacity)
         ME_RenderSector(&sectors[i],0,&front,&fl,&cl);
         ME_RenderSector(&sectors[i],1,&back,&unused1,&unused2);
         const sector_t *s=&front;
-        Word(&p,s->floorheight); Word(&p,s->ceilingheight); Word(&p,s->lightlevel);
+        const int extra=players[0].extralight*16;
+        Word(&p,s->floorheight); Word(&p,s->ceilingheight); Word(&p,MAX(0,MIN(511,s->lightlevel+extra)));
         PlaneFlat(&p,s->floorpic,s->floorsky); PlaneFlat(&p,s->ceilingpic,s->ceilingsky);
         Word(&p,s->floor_xoffs); Word(&p,s->floor_yoffs);
         Word(&p,s->ceiling_xoffs); Word(&p,s->ceiling_yoffs);
-        Word(&p,MAX(0,MIN(255,fl))); Word(&p,MAX(0,MIN(255,cl)));
+        Word(&p,MAX(0,MIN(255,fl+extra))); Word(&p,MAX(0,MIN(255,cl+extra)));
         Word(&p,back.floorheight); Word(&p,back.ceilingheight); PlaneFlat(&p,back.ceilingpic,back.ceilingsky);
         fixed_t bottom,top;ME_SectorClip(&sectors[i],&bottom,&top);Word(&p,bottom);Word(&p,top);
         Word(&p,s->floor_rotation);Word(&p,s->ceiling_rotation);

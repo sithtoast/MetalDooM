@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Read-only canonical 320-wide plane-lighting comparison, not frame parity.
+"""Historical build159 RGB baseline against canonical 320-wide plane lighting.
 
 Pinned Woof acd1c7f: r_main.c R_InitLightTables, r_plane.c R_MapPlane;
 LIGHTLEVELS=16, LIGHTSEGSHIFT=4, LIGHTZSHIFT=20, LIGHTSCALESHIFT=12.
-Native: Geometry.swift light floor and Renderer.swift worldFragment RGB shade.
+Legacy native: build159 Geometry.swift/Renderer.swift RGB shade.
+Current indexed shading is tested with test-indexed-lighting.sh GPU readback.
 Only JSON statistics leave the caller's WAD; no artwork or palettes are exported.
 """
 import hashlib,json,pathlib,struct,sys
@@ -31,5 +32,5 @@ for light in [0,32,64,96,128,160,192,224,255]:
    errors.append(sum(abs(a-b) for a,b in zip(native,software)))
   rows.append(dict(light=light,distance=distance,colormap=level,different=sum(e>0 for e in errors),mean_rgb_error=round(sum(errors)/768,3)))
 print(json.dumps(dict(reference='Woof acd1c7f84fdd0fae92d1c58643c14364a131c75a, 320-wide plane table',
- scope='Unfiltered opaque plane samples, no powers, fixed maps, translations, extra light or brightmaps; native RGB rounding modeled, not GPU readback or whole-frame acceptance.',
+ scope='Historical build159 RGB baseline. Unfiltered opaque plane samples, no powers, fixed maps, translations, extra light or brightmaps; native RGB rounding modeled, not GPU readback or whole-frame acceptance.',
  wad_sha256=hashlib.sha256(data).hexdigest(),samples=len(rows)*256,different=sum(r['different'] for r in rows),rows=rows),indent=2))

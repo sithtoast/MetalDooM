@@ -73,6 +73,9 @@ private final class WADDropArea: NSView {
 final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
     var onCancel: (()->Void)?
     var onPlay: ((URL,[URL])->Void)?
+    var onPlayBundled: ((BundledPreviewPlan)->Void)?
+    private let contentMenu=NSPopUpButton(),bundledExtras=NSButton(checkboxWithTitle:"Include extras resources",target:nil,action:nil)
+    private let bundledAvailable:Bool
     private var names:[URL:String]=[:]
     private func name(_ url:URL)->String {
         if let cached=names[url] { return cached }
@@ -91,9 +94,10 @@ final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
     private var playButton:NSButton!
     private var removeButton:NSButton!, upButton:NSButton!, downButton:NSButton!
 
-    init(base:URL? = nil, addOns:[URL] = [], replacingGame:Bool = false) {
+    init(base:URL? = nil, addOns:[URL] = [], replacingGame:Bool = false,bundledAvailable:Bool = FileManager.default.isExecutableFile(atPath:Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MetalDooMWorker").path)) {
+        self.bundledAvailable=bundledAvailable
         self.base=base?.standardizedFileURL.resolvingSymlinksInPath();self.addOns=addOns.map { $0.standardizedFileURL.resolvingSymlinksInPath() }
-        super.init(contentRect:NSRect(x:0,y:0,width:840,height:540),styleMask:[.titled],backing:.buffered,defer:false)
+        super.init(contentRect:NSRect(x:0,y:0,width:840,height:610),styleMask:[.titled],backing:.buffered,defer:false)
         title="Choose WADs";isReleasedWhenClosed=false
         let root=contentView!
         func label(_ text:String,_ rect:NSRect, bold:Bool=false) {
@@ -104,6 +108,15 @@ final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
         func button(_ title:String,_ rect:NSRect,_ action:Selector)->NSButton {
             let b=NSButton(title:title,target:self,action:action);b.bezelStyle = .rounded;b.frame=rect;root.addSubview(b);return b
         }
+        label("Play",NSRect(x:20,y:567,width:65,height:24),bold:true)
+        contentMenu.frame=NSRect(x:85,y:560,width:445,height:32)
+        contentMenu.addItems(withTitles:["Classic game and add-ons","Legacy of Rust · Preview","Doom II · Bundled preview","Doom II + Rust resources · Preview","Doom II + Rust weapons · Preview","Doom II + Rust textures · Preview","Doom II + Rust music · Preview"])
+        contentMenu.target=self;contentMenu.action=#selector(contentChanged);contentMenu.setAccessibilityLabel("Content to play")
+        contentMenu.autoenablesItems=false
+        for item in contentMenu.itemArray.dropFirst() {item.isEnabled=bundledAvailable}
+        root.addSubview(contentMenu)
+        bundledExtras.frame=NSRect(x:555,y:562,width:265,height:28);bundledExtras.isEnabled=false;root.addSubview(bundledExtras)
+        label(bundledAvailable ? "Bundled previews use rerelease Doom II and its accompanying files. Campaign playtesting is ongoing." : "Bundled campaigns are not included in this build.",NSRect(x:20,y:532,width:800,height:22))
         label("Main game",NSRect(x:20,y:500,width:390,height:24),bold:true)
         label("Extra WADs",NSRect(x:430,y:500,width:390,height:24),bold:true)
         label("Choose one IWAD from your folder.",NSRect(x:20,y:475,width:390,height:20))
@@ -241,5 +254,19 @@ final class WADStackPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate {
     @objc private func moveEarlier() { move(-1) }
     @objc private func moveLater() { move(1) }
     @objc private func cancel() { sheetParent?.endSheet(self);orderOut(nil);onCancel?() }
-    @objc private func play() { guard let base else { return };sheetParent?.endSheet(self);orderOut(nil);onPlay?(base,addOns) }
+    @objc private func contentChanged() {
+        bundledExtras.isEnabled=contentMenu.indexOfSelectedItem>0
+        if !bundledExtras.isEnabled {bundledExtras.state = .off}
+        notice.stringValue=contentMenu.indexOfSelectedItem>0 ? "The selected plan assembles its required files. Extra WADs must belong to that plan.":""
+    }
+    @objc private func play() {
+        guard let base else {return}
+        do {
+            let content:BundledPreviewPlan.Content?=contentMenu.indexOfSelectedItem==0 ? nil:BundledPreviewPlan.Content.allCases[contentMenu.indexOfSelectedItem-1]
+            if let plan=try BundledPreviewPlan.picker(base:base,addOns:addOns,content:content,extras:bundledExtras.state == .on) {
+                guard bundledAvailable,let onPlayBundled else {throw PortError("Bundled campaigns are not included in this build.")}
+                sheetParent?.endSheet(self);orderOut(nil);onPlayBundled(plan)
+            } else {sheetParent?.endSheet(self);orderOut(nil);onPlay?(base,addOns)}
+        } catch {notice.stringValue=String(describing:error)}
+    }
 }

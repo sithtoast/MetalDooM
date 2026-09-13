@@ -1,4 +1,4 @@
-# Rust native preview — 0.10.0 build 159
+# Rust native preview — 0.10.0 build 160
 
 An explicit development preview now starts the extended simulation in a separate
 child process and draws its copied geometry with the existing native Metal world
@@ -97,8 +97,8 @@ clock supports counting stats, entering markers, stories, credits and the custom
 cast without ticking the simulation. Pause/Restart also work during presentation.
 
 Build 159 adds optional bundled Doom II content profiles, extras resource loading
-and named SKYDEFS flat support; see EXTENDED_BUNDLED.md. Native lighting remains
-approximate; the initial indexed-lighting audit is in EXTENDED_LIGHTING.md.
+and named SKYDEFS flat support; see EXTENDED_BUNDLED.md. Build 160 adds indexed native lighting and picker integration; see
+EXTENDED_LIGHTING.md and BRANCH_ACCEPTANCE.md for remaining acceptance limits.
 
 ## Process and protocol
 

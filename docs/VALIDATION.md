@@ -1,5 +1,57 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 160: indexed lighting and bundled picker
+
+Candidate: `build/indexed-picker-preview/MetalDooM.app`; `build/build160.log`.
+Bundle and running title report0.10.0/build160; deep/strict codesign verification
+passes for app/helper/dylib. The private ABI2 export count stays18. Same feature
+version; earlier bundles and private saves remain untouched.
+
+- `build/indexed-lighting-validation.log`: 387,072 actual GPU samples versus an
+  independent integer palette/light-table oracle, including plane/wall/actor/
+  weapon depths, fixed maps, fullbright and custom blend-table precedence.
+- `build/indexed-metal-validation.log`: first/last maps of all six bundled plans
+  with extras use indexed lighting and match independent full geometry. Existing
+  sky/rotation, control-sector, blend/fuzz, weapon and moving-surface regression
+  oracles retain legacy RGB mode and pass. Separate indexed tests establish color
+  correctness; neither suite is whole-frame software-renderer acceptance.
+- `build/indexed-classic-metal-validation.log`: classic restoration, AO/light,
+  shadows, HDR/EDR, bloom/volumetric effects, HUD isolation, presets, save/load,
+  map changes and shutdown pass after the shared vertex/shader changes.
+- `build/indexed-bundled-validation.log`:352 map starts/tic35 preparations across
+  all content/extras plans, distinct identities, save/future state, merged texture
+  and MIDI decoding, plus both component weapons' pickup/firing checks pass.
+- `build/indexed-boss-validation.log`: native deaths of eight MAP13 Cyberdemons,
+  one MAP14 tag666 boss and24 MAP14 tag667 bosses. Floors stay unchanged while
+  a boss remains alive, then1/1,1/1 and2/2 tagged sectors lower. Test links native
+  worker objects directly; production exports and gameplay remain unchanged.
+- `build/indexed-control-validation.log`:374,400 frozen fake-flat/reference cases,
+  actual transferred-light fixtures, copy/restore and malformed geometry checks.
+- `build/indexed-save-validation.log`: native keyframes, continued simulation,
+  malformed saves, copy canaries and envelope regressions pass.
+- `build/indexed-save-app-validation.log`: Rust fixture plus actual MAP32 Doom II,
+  weapons and music with extras. Repeated restore, music/HUD, corrupt-save/write
+  recovery, Run/Pause, explicit focus-loss pause and close-during-restore pass.
+  Earlier runs stopped at partial finite-step tics when desktop focus changed.
+  This harness now suppresses unsolicited external focus events and deliberately
+  invokes the production callback to test focus loss; production behavior stays.
+- `build/indexed-picker-validation.log`: all six real picker callbacks, extras/
+  base ordering, recognized Rust add-on routing, conflicting stacks and missing
+  dependencies; existing folder/drop/reorder/classic callbacks also pass.
+
+Native signed-app acceptance: build160 classic Doom II process91842 survived a
+malformed `id1.wad` fixture launch; the visible alert confirmed the current game
+remained available and the failed candidate exited. Selecting the real Rust plan
+then launched process3898/helper3919 in id24res/Doom II/id1 order and retired91842.
+Run/Pause reached MAP01tic149, health100/ammo50,283actors,25,344triangles, Sound/
+Music enabled. Screenshot confirms indexed world rendering, actors, weapon and
+HUD. Preview Cmd-O started a separate `--choose-wads` process6716 while Rust3898
+remained paused. The UI automation binding remained attached to Rust, so the
+new picker process is verified by command line rather than an additional UI grab.
+
+Remaining full-playthrough and rendering/presentation limits are explicit in
+BRANCH_ACCEPTANCE.md. No push, merge, notarization or distribution package claimed.
+
 ## 2026-09-12 — 0.10.0 build 159: bundled single-player profiles
 
 Candidate: `build/bundled-preview-final/MetalDooM.app`; build log `build/build159.log`.

@@ -11,7 +11,7 @@ func runMeshMetalValidation() throws {
         let view=GameView(frame:NSRect(x:0,y:0,width:640,height:400),device:MTLCreateSystemDefaultDevice())
         view.colorPixelFormat = .bgra8Unorm;view.depthStencilPixelFormat = .depth32Float
         view.isPaused=true;view.framebufferOnly=false;view.inputBlocked=true
-        let renderer=try Renderer(view:view);view.delegate=renderer
+        let renderer=try Renderer(view:view);renderer.extendedIndexedLighting=false;view.delegate=renderer
         renderer.onError={error in fputs("FAIL renderer: \(error)\n",stderr);exit(1)}
         window.contentView=view;window.orderFront(nil)
         view.layoutSubtreeIfNeeded();view.updateResolution()
@@ -290,6 +290,7 @@ func runMeshMetalValidation() throws {
             let scene=try builder.prepare(worker.tick(count:35))
             let (window,view,renderer)=try surface(0),(otherWindow,otherView,other)=try surface(650)
             defer{view.delegate=nil;otherView.delegate=nil;window.close();otherWindow.close()}
+            renderer.extendedIndexedLighting=true;other.extendedIndexedLighting=true
             renderer.extendedRustWeaponNames=plan.rustWeapons;other.extendedRustWeaponNames=plan.rustWeapons
             try renderer.loadExtendedPreview(first);try renderer.loadExtendedPreview(scene)
             try other.loadExtendedPreview(scene.validationReference())

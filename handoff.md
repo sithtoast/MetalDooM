@@ -5,14 +5,16 @@
 Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, branch
 **codex/legacy-of-rust**, based on fetched origin/main merge **afd7357**. Preserve
 `/Users/wmh/Dev/MetalDooM` and its release artifacts. Current feature version is
-**0.10.0**, final successful build **159**. This remains the same unreleased Rust
+**0.10.0**, final successful build **160**. This remains the same unreleased Rust
 feature; do not bump the minor version for each refinement.
 
 The explicit Rust preview now has **object/weapon blending, unified fuzz/translucent ordering and actor/moving-surface interpolation**, **sky transfers and flat rotation**, **fake floors and transferred lighting**, **translucent walls and palette effects**, **normal/additive/per-state actor translucency**, **camera/weapon interpolation during Run**, **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
 plus death/restart and native completion/Continue,
 plus level MIDI, a minimal HUD, cached geometry, selective Metal updates, Run/Pause and keyboard/mouse controls,
 with one-tic world/actor/weapon/material/audio/UI presentation. Manual buttons show every
-tic too. Keep the ordinary Rust picker guard until full campaign acceptance.
+tic too. The classic loader keeps its unsupported-content guard; the picker now
+routes explicit bundled choices to a separate extended-preview instance. Keep
+preview labelling until full campaign acceptance.
 No speedrun/demo/upload work was requested; that idea remains a future aside.
 
 Read [bundled content](docs/EXTENDED_BUNDLED.md) and [lighting baseline](docs/EXTENDED_LIGHTING.md), then [skies/rotation](docs/EXTENDED_SKIES_ROTATION.md), [control sectors](docs/EXTENDED_CONTROL_SECTORS.md), [palette effects](docs/EXTENDED_PALETTES.md), [translucency](docs/EXTENDED_TRANSLUCENCY.md), [interpolation](docs/EXTENDED_INTERPOLATION.md), [scrolling flats](docs/EXTENDED_SCROLLING.md), [save/restore](docs/EXTENDED_SAVES.md), [preview/process contract](docs/EXTENDED_PREVIEW.md),
@@ -21,7 +23,7 @@ Read [bundled content](docs/EXTENDED_BUNDLED.md) and [lighting baseline](docs/EX
 [worker](docs/EXTENDED_ENGINE.md), [validation](docs/VALIDATION.md) and
 [roadmap](docs/LEGACY_OF_RUST.md).
 
-Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/bundled-preview-final" bash scripts/build.sh`.
+Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/indexed-picker-preview" bash scripts/build.sh`.
 Launch with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
 Only the explicit option packages/signs the helper/dylib and notices. Standard
 builds remain classic. Ordered resources are id24res → Doom II → id1, base index 1;
@@ -47,6 +49,40 @@ presentation, not sample-accurate hardware timing. Old timed `play` remains for
 diagnostics only. Finite steps allow natural sample tails; explicit pause stops
 voices/mixer. Closing/error cancels future work; termination reaps the child and
 removes scratch. Sound mute stops/skips voices; unmute only plays future starts.
+
+**Build160 adds indexed lighting and the bundled picker.** Read
+[branch acceptance](docs/BRANCH_ACCEPTANCE.md) first. WorldVertex is now48bytes
+(threefloat4s); lighting metadata survives stitching/interpolation/BSP splits.
+Opaque surfaces, actors, weapons and translucent foregrounds use original palette
+indices and canonical Woof plane/scale tables. Fixed maps beat fullbright; HUD
+stays unshaded. Classic/AO/HDR retains its previous RGB path and passes regressions.
+MGE5 layout stays; wall light accepts0–511 to preserve extra-light headroom before
+fake contrast. Plane/actor light remains0–255. Worker fingerprint changes protect
+save compatibility. See EXTENDED_LIGHTING.md for exact scope and tests.
+
+The picker offers six content roles and optional extras. Recognized bundled files
+on the add-on side route automatically; unsupported mixed roles and missing files
+stay in the picker. A ready-file handshake preserves the classic game on failed
+worker/resource/audio startup and retires it only on success. Preview Cmd-O opens
+a separate picker and leaves the paused/unsaved preview available. Standard builds
+without the worker keep bundled modes disabled. No general mod acceptance implied.
+
+Final candidate: `build/indexed-picker-preview/MetalDooM.app`, **0.10.0/build160**;
+`build/build160.log`. Native classic process91842 survived an intentionally malformed
+Rust WAD launch with a visible failure message, then exited after real Rust loaded.
+The new Rust process3898/helper3919 is paused MAP01tic149, health100/ammo50,
+283actors/25,344triangles, Sound/Music on. Running title/screenshot and strict
+bundle/helper signing/18exports verified. Preview Cmd-O spawned picker6716 while
+Rust3898 stayed paused. Preserve these and earlier bundles/private saves.
+
+387,072 native indexed/blend samples, all352 bundled map checks, classic effects,
+transferred control sectors, and actual MAP13/MAP14 boss-death actions pass. Native
+save tests explicitly control focus loss so unrelated desktop activation cannot
+cancel finite steps; the actual production focus-loss callback is tested separately.
+See VALIDATION.md for results. Full normal playthroughs remain the main acceptance
+step; layered/fire skies, brightmaps/custom tints, software raster/fuzz/sky stretch,
+and extras carousel/SBARDEF/H_ music selection remain known limits. Multiplayer
+and speedrun/demo uploads remain deferred. Earlier remaining lists are historical.
 
 **Build 155 adds sector-local sky transfers and flat rotation.** MGE5/version5
 keeps header120 and non-sector strides; sector stride140 appends floor/ceiling
@@ -89,7 +125,7 @@ full campaign/boss playtesting and sustained performance open. Multiplayer and
 speedrun/demo uploads are deferred. Earlier milestone remaining lists below
 are historical and do not replace these boundaries.
 
-Current candidate: `build/bundled-preview-final/MetalDooM.app`, **0.10.0/build159**;
+Previous candidate: `build/bundled-preview-final/MetalDooM.app`, **0.10.0/build159**;
 `build/build159.log`. The weapons + extras MAP01 session is paused at tic124,
 health100/ammo50, 43 actors/2,384 triangles, Sound/Music enabled, process87178/tool
 session18975. Running title, screenshot, strict signing and 18 exports verified;

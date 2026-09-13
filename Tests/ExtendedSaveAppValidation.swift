@@ -42,6 +42,12 @@ func saveAppValidation() throws {
     RunLoop.current.run(until:Date().addingTimeInterval(0.1))
     guard subject.validationUI!.tic==paused else {throw PortError("Pause continued simulation")}
     print("PASS native continuous Run/Pause after save restoration")
+    subject.validationRun();try wait("run before focus loss"){subject.validationUI!.tic>paused+2}
+    subject.validationLoseFocus();try wait("focus loss pauses"){subject.validationPaused}
+    let unfocused=subject.validationUI!.tic
+    RunLoop.current.run(until:Date().addingTimeInterval(0.1))
+    guard subject.validationUI!.tic==unfocused else {throw PortError("Focus loss continued simulation")}
+    print("PASS explicit native focus-loss event pauses playback and stops simulation")
     subject.validationLoad(file);subject.validationClose()
     RunLoop.current.run(until:Date().addingTimeInterval(0.1))
     print("PASS close during pending restore cancels candidate and preserves teardown ordering")

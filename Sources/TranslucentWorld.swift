@@ -50,7 +50,7 @@ final class TranslucentWorld {
             if da<=0 {back.append(a)}
             if (da<0 && db>0) || (da>0 && db<0) {
                 let t=Float(da/(da-db))
-                let cut=WorldVertex(position:a.position+(b.position-a.position)*t,uvLight:a.uvLight+(b.uvLight-a.uvLight)*t)
+                let cut=WorldVertex(position:a.position+(b.position-a.position)*t,uvLight:a.uvLight+(b.uvLight-a.uvLight)*t,lighting:a.lighting)
                 front.append(cut);back.append(cut)
             }
         }

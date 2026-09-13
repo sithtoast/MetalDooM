@@ -4,6 +4,25 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — indexed lighting and bundled WAD picker (build 160)
+
+- Add Rust and bundled content choices to the WAD picker, assembling resource
+  dependencies automatically and rejecting missing or conflicting selections.
+  Recognized bundled add-ons route to the extended worker. Failed startup keeps
+  the current classic game; Choose WADs in the preview preserves its paused game.
+- Shade preview worlds, actors and weapons through original palette indices and
+  discrete light tables, including directional contrast, transferred/extra light,
+  fixed/fullbright precedence and lighting before custom blend-table lookup.
+- Preserve light metadata through mesh updates, interpolation and transparent
+  splits; retain classic rendering, AO and HDR behavior.
+- Validate 387,072 native lighting samples, 352 bundled map checks, actual Rust
+  boss death actions, native picker handoff/failure recovery and save/focus-loss
+  behavior. Update branch acceptance notes with the remaining playthrough and
+  rendering/presentation limits.
+- Deliver signed local 0.10.0/build160 as the same unreleased feature version.
+  Full campaign playthroughs, remaining sky/brightmap/tint parity and extras menu/
+  SBARDEF/alternate-music presentation remain open. Multiplayer stays deferred.
+
 ## 0.10.0 refinement — bundled single-player content (build 159)
 
 - Add explicit Doom II resource, weapon, texture and music preview plans, with

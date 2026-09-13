@@ -1,46 +1,63 @@
-# Native lighting compatibility baseline — build 159
+# Indexed preview lighting — 0.10.0 build 160
 
-Ordinary native world lighting currently multiplies decoded RGB by a continuous
-sector light and distance factor. Woof selects discrete COLORMAP rows and maps
-original palette indices through those rows. Existing fixed-colormap/palette
-flash and blend-table work does not make ordinary sector lighting equivalent.
-No lighting shader change or software-renderer parity is claimed in build 159.
+The extended preview now shades opaque world surfaces, actors, weapons and
+translucent foregrounds through the original palette indices and COLORMAP rows.
+The classic renderer and its optional native effects retain their prior RGB path.
+This replaces the preview's continuous RGB darkening for ordinary lighting.
 
-The read-only `scripts/audit-native-lighting.py /path/to/doom2.wad` produces JSON
-statistics from the caller's private PLAYPAL/COLORMAP without exporting artwork.
-It models canonical 320-wide opaque plane lighting from the pinned Woof
-`acd1c7f84fdd0fae92d1c58643c14364a131c75a` sources:
+The implementation follows pinned Woof
+`acd1c7f84fdd0fae92d1c58643c14364a131c75a`: `r_main.c` light tables,
+`r_plane.c` plane distance buckets, `r_segs.c` directional/scale lighting and
+`r_things.c` actor/weapon and fixed/fullbright precedence. It uses canonical
+320-wide depth/scale normalization while retaining Metal's camera projection.
 
-- `src/r_main.c`, `R_InitLightTables`: 16 light levels, 128 distance buckets,
-  `LIGHTSEGSHIFT=4`, `LIGHTZSHIFT=20`, `LIGHTSCALESHIFT=12`, row clamping 0–31.
-- `src/r_plane.c`, `R_MapPlane`: distance bucket and sector light table selection.
-- Native `Geometry.swift` / `Renderer.swift`: minimum light 0.12 and distance
-  attenuation `max(0.3, 1-distance/3200)`.
+## Data and ordering
 
-For rerelease Doom II, 13,659 of 13,824 modeled palette/light/distance samples
-have at least one different RGB channel. This is a deliberately broad set of
-nine light levels and six distances, not a distribution of real scene pixels.
-Native rounding is modeled; this is not GPU readback, a screenshot comparison,
-a perceptual error score or whole-frame acceptance. The local JSON includes the
-input WAD digest, each selected row and mean absolute RGB error.
+WorldVertex now has a third float4 (48-byte stride): discrete light level and
+primitive kind (plane, wall, actor or weapon). Geometry and independent reference
+meshes preserve metadata through stitched triangles; the translucent BSP preserves
+it through splits. Draws using inline Metal buffers stay below the 4 KiB limit.
+Classic shaders ignore the metadata. CPU topology caches, moving-surface meshes
+and GPU upload sizes use the shared stride.
 
-## Implementation order
+Planes use their transferred light and one of 128 distance buckets. Walls add
+horizontal -1 / vertical +1 fake contrast before final clamping; walls and actors
+use one of 48 scale buckets. Weapons use the final scale bucket. The worker copies
+player extra light in 16-unit increments, and weapon light uses the resolved
+floor/ceiling average. Wall light retains headroom to 511 so extra light is not
+clamped before directional contrast. MGE5 layout is unchanged; copied wall-light
+validation accepts 0–511, plane/actor light remains 0–255. Engine/resource save
+fingerprints still require a matching build.
 
-1. Carry original palette indices through opaque world and actor textures, with
-   transparent coverage kept separate. Avoid reconstructing source indices from
-   already shaded RGB when exact indexed shading is required.
-2. Match plane depth tables and wall/sprite scale tables, directional fake
-   contrast, sector transfers and player extra light. Use the pinned source's
-   fixed-point selection, with explicit resolution/FOV assumptions.
-3. Apply fullbright/brightmap, fixed-colormap, sector/thing tint and blend
-   precedence against independent indexed pixel oracles. Preserve the existing
-   classic renderer and optional native effects behavior.
-4. Compare matched cameras/light levels on actual bundled maps, including
-   power-ups and moving transferred-light sectors. Keep rasterization, sky,
-   filtering, fuzz and interpolation differences separately identified.
+The GPU reads source indices from textures separately from transparent coverage.
+Fixed maps override fullbright; otherwise fullbright uses row zero. Custom blend
+tables receive the already mapped foreground index and the background palette
+index. Animation selects matching color and index textures. HUD rendering is
+unshaded; palette flashes still apply after the HUD. Fuzz remains its separate
+background effect.
 
-Source details to carry into that work: `r_segs.c` combines sector light,
-`extralight` and `fakecontrast` before `R_GetLightIndex`; `r_things.c` gives fuzz,
-fixed maps, fullbright and sprite lighting distinct branches; `p_setup.c` sets
-horizontal/vertical fake contrast. A single RGB gamma adjustment cannot replace
-these rules. Multiplayer and demo recording are separate future work.
+## Evidence
+
+`scripts/test-indexed-lighting.sh /path/to/doom2.wad` renders 387,072 native GPU
+samples against an independent integer table oracle: four primitive kinds, six
+light levels, seven distances, fixed rows 0/1/32, fullbright variants and opaque/
+custom-blended output. It uses the production shader pipelines with Metal API
+validation. Original source indices are checked across all 256 palette entries.
+
+The bundled native-map suite compares all six plans' first/last maps with extras
+against independent full geometry under indexed lighting. Existing RGB-based
+projection/blending regression oracles explicitly retain the legacy shading mode;
+indexed color correctness has its separate independent GPU oracle. Classic
+AO/lighting/HDR tests verify the shared vertex/binding changes do not alter Classic
+restoration or optional effects behavior. See VALIDATION.md for results.
+
+`scripts/audit-native-lighting.py` retains the **build159 RGB baseline**: 13,659 of
+13,824 modeled samples differed from Woof. It is historical, not a measurement of
+the current shader. Current acceptance uses actual GPU readback above.
+
+## Remaining parity work
+
+Per-color brightmaps, custom sector/thing colormap tints, software rasterization,
+projection edge cases, sky stretching and fuzz pattern matching remain separate.
+The table-sample evidence does not establish whole-frame software-renderer parity.
+Full campaign and sustained performance acceptance are in BRANCH_ACCEPTANCE.md.

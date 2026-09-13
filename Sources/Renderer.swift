@@ -8,11 +8,19 @@ private struct Uniforms { var matrix: simd_float4x4 }
 final class Renderer: NSObject, MTKViewDelegate {
     let device: MTLDevice, queue: MTLCommandQueue, depth: MTLDepthStencilState, fuzzDepth: MTLDepthStencilState, visibleDepth: MTLDepthStencilState, paletteDepth: MTLDepthStencilState
     private var transparentWorld:TranslucentWorld?
+    private var indexFallback:MTLTexture?
+    var extendedIndexedLighting=true
     private var previewIndices:[MaterialKey:MTLTexture]=[:]
     private var extendedPalette:MTLBuffer?,extendedColormaps:MTLBuffer?,colorFallback:MTLBuffer?
     private var previewPaletteIndex:UInt32=0
     private func bindColors(_ encoder:MTLRenderCommandEncoder) {
         if colorFallback==nil {colorFallback=device.makeBuffer(length:768,options:.storageModeShared)}
+        if indexFallback==nil {
+            let d=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.r8Uint,width:1,height:1,mipmapped:false)
+            d.storageMode = .shared;d.usage = .shaderRead;indexFallback=device.makeTexture(descriptor:d)
+            var zero:UInt8=0;indexFallback?.replace(region:MTLRegionMake2D(0,0,1,1),mipmapLevel:0,withBytes:&zero,bytesPerRow:1)
+        }
+        encoder.setFragmentTexture(indexFallback,index:3)
         encoder.setFragmentBuffer(extendedPalette ?? colorFallback,offset:0,index:3)
         encoder.setFragmentBuffer(extendedColormaps ?? colorFallback,offset:0,index:4)
     }
@@ -338,12 +346,12 @@ final class Renderer: NSObject, MTKViewDelegate {
         #include <metal_stdlib>
         using namespace metal;
         \(WorldSampling.shader)
-        struct Vertex { float4 position; float4 uvLight; };
-        struct Out { float4 position [[position]]; float2 uv; float light; float distance; float fullbright; float3 world; };
+        struct Vertex { float4 position; float4 uvLight; float4 lighting; };
+        struct Out { float4 position [[position]]; float2 uv; float light; float distance; float fullbright; float3 world; float2 lighting [[flat]]; };
         vertex Out worldVertex(uint id [[vertex_id]], const device Vertex *v [[buffer(0)]],
                                constant float4x4 &matrix [[buffer(1)]]) {
             Out o; o.position = matrix * v[id].position; o.uv = v[id].uvLight.xy;
-            o.world = v[id].position.xyz; o.light = v[id].uvLight.z; o.distance = o.position.w; o.fullbright = v[id].uvLight.w; return o;
+            o.lighting=v[id].lighting.xy; o.world = v[id].position.xyz; o.light = v[id].uvLight.z; o.distance = o.position.w; o.fullbright = v[id].uvLight.w; return o;
         }
         uint paletteIndex(float3 color, constant uchar *palette) {
             int3 rgb=int3(round(clamp(color,0.0,1.0)*255.0));
@@ -354,6 +362,25 @@ final class Renderer: NSObject, MTKViewDelegate {
                 if(d<distance) {best=i;distance=d;}
             }
             return best;
+        }
+        // Canonical Woof 320-wide light tables, evaluated at native view depth.
+        uint lightRow(float2 lighting,float distance,bool fullbright,float4 power) {
+            if(power.x<0) return uint(-power.x);
+            if(fullbright) return 0;
+            int start=(15-clamp(int(lighting.x),0,15))*4;
+            int scale;
+            if(lighting.y==1) {
+                uint z=min(127u,uint(max(0.0,floor(distance/16.0))));
+                scale=int((655360u/(z+1))>>12);
+            } else if(lighting.y==4) scale=47;
+            else scale=clamp(int(floor(2560.0/max(distance,0.001))),0,47);
+            return uint(clamp(start-scale/2,0,31));
+        }
+        uint indexedEntry(uint source,float2 lighting,float distance,bool fullbright,float4 power,constant uchar *maps) {
+            return maps[lightRow(lighting,distance,fullbright,power)*256+source];
+        }
+        float3 paletteColor(uint entry,constant uchar *palette) {
+            return float3(palette[entry*3],palette[entry*3+1],palette[entry*3+2])/255.0;
         }
         float3 powerColor(float3 rgb, float4 power, constant uchar *palette, constant uchar *maps) {
             if(power.x<0) {
@@ -382,18 +409,27 @@ final class Renderer: NSObject, MTKViewDelegate {
             constexpr sampler s(coord::normalized,address::repeat,filter::nearest);
             if (tex.sample(s,in.uv/float2(tex.get_width(),tex.get_height())).a<0.5) discard_fragment();
         }
-        fragment float4 worldFragment(Out in [[stage_in]], bool front [[front_facing]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]], constant float4 &emission [[buffer(11)]], constant uchar *palette [[buffer(3)]], constant uchar *maps [[buffer(4)]]) {
+        fragment float4 worldFragment(Out in [[stage_in]], bool front [[front_facing]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]], constant float4 &emission [[buffer(11)]], constant uchar *palette [[buffer(3)]], constant uchar *maps [[buffer(4)]],texture2d<uint,access::read> indices [[texture(3)]]) {
             if (in.fullbright > 0.5 && !front) discard_fragment();
             constexpr sampler s(coord::normalized, address::repeat, filter::nearest);
             float4 c = sampleWorld(tex,in.uv,power);
             if (c.a < 0.5) discard_fragment();
+            if(power.w<0 && in.lighting.y>0) {
+                float2 size=float2(tex.get_width(),tex.get_height());
+                uint2 pixel=uint2(floor(in.uv-floor(in.uv/size)*size));
+                return float4(paletteColor(indexedEntry(indices.read(pixel).r,in.lighting,in.distance,false,power,maps),palette),1);
+            }
             float shade = (power.x>0 || power.y>0) ? 1.0 : in.light * clamp(1.0 - in.distance / 3200.0, 0.3, 1.0);
             return float4(powerColor(emissiveColor(c.rgb,c.rgb*shade,emission,power),power,palette,maps), 1.0);
         }
-        fragment float4 spriteFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]], constant uchar *palette [[buffer(3)]], constant uchar *maps [[buffer(4)]]) {
+        fragment float4 spriteFragment(Out in [[stage_in]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]], constant uchar *palette [[buffer(3)]], constant uchar *maps [[buffer(4)]],texture2d<uint,access::read> indices [[texture(3)]]) {
             constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::nearest);
             float4 c = tex.sample(s,in.uv / float2(tex.get_width(),tex.get_height()));
             if (c.a < 0.5) discard_fragment();
+            if(power.w<0 && in.lighting.y>0) {
+                uint2 pixel=uint2(clamp(floor(in.uv),float2(0),float2(tex.get_width()-1,tex.get_height()-1)));
+                return float4(paletteColor(indexedEntry(indices.read(pixel).r,in.lighting,in.distance,in.fullbright>0.5,power,maps),palette),1);
+            }
             float shade = (power.x>0 || power.y>0) ? 1.0 : in.fullbright>0.5 ? max(1.0,in.fullbright) : in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
             return float4(powerColor(c.rgb*shade,power,palette,maps),1.0);
         }
@@ -410,8 +446,12 @@ final class Renderer: NSObject, MTKViewDelegate {
             float4 c=tex.read(pixel);
             if(c.a<0.5) discard_fragment();
             float shade=power.y>0 || (!wall && in.fullbright>0.5) ? 1.0:in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
-            uint foreground=shade==1.0 ? indices.read(pixel).r:paletteIndex(c.rgb*shade,palette);
-            if(power.x<0) foreground=maps[uint(-power.x)*256+foreground];
+            uint foreground;
+            if(power.w<0 && in.lighting.y>0) foreground=indexedEntry(indices.read(pixel).r,in.lighting,in.distance,!wall && in.fullbright>0.5,power,maps);
+            else {
+                foreground=shade==1.0 ? indices.read(pixel).r:paletteIndex(c.rgb*shade,palette);
+                if(power.x<0) foreground=maps[uint(-power.x)*256+foreground];
+            }
             return table.read(uint2(foreground,paletteIndex(background.rgb,palette)));
         }
         fragment float4 paletteFragment(float4 background [[color(0)]], constant uchar *palette [[buffer(3)]],constant uint &selected [[buffer(4)]]) {
@@ -870,7 +910,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         // encoder fails, so the next frame never consumes an unbuilt structure.
         guard var encoder = command.makeRenderCommandEncoder(descriptor:pass) else { command.commit(); return }
         var power=SIMD4<Float>(hud.fixedColorMap==32 ? 1:0,hud.fixedColorMap==1 ? 1:0,Float(hud.tick),sceneEffects.contains(.textureFiltering) ? 1:0)
-        if extendedPreview {power.x = -Float(hud.fixedColorMap);power.y = hud.fixedColorMap>0 ? 1:0}
+        if extendedPreview {power.x = -Float(hud.fixedColorMap);power.y = hud.fixedColorMap>0 ? 1:0;power.w=extendedIndexedLighting ? -1:0}
         bindColors(encoder)
         var noPower=SIMD4<Float>.zero
         encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
@@ -951,6 +991,10 @@ final class Renderer: NSObject, MTKViewDelegate {
                 var emission=sceneEffects.contains(.emissive) ? emissionSettings(batch.material):.zero
                 encoder.setFragmentBytes(&emission,length:MemoryLayout<SIMD4<Float>>.stride,index:11)
                 encoder.setVertexBuffer(batch.vertices,offset:0,index:0); encoder.setFragmentTexture(animatedTexture(batch),index:0)
+                if extendedPreview {
+                    let base=batch.material.unblended
+                    encoder.setFragmentTexture(previewIndices[previewTranslations[base] ?? base] ?? indexFallback,index:3)
+                }
                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:batch.count)
             }
             encoder.setDepthStencilState(depth)
@@ -1000,8 +1044,8 @@ final class Renderer: NSObject, MTKViewDelegate {
                             encoder.setDepthStencilState(fuzzDepth);encoder.setFragmentTexture(texture,index:0)
                             let v=polygon.vertices
                             let triangles=(1..<v.count-1).flatMap{[v[0],v[$0],v[$0+1]]}
-                            for start in stride(from:0,to:triangles.count,by:120) {
-                                let part=Array(triangles[start..<min(start+120,triangles.count)])
+                            for start in stride(from:0,to:triangles.count,by:84) {
+                                let part=Array(triangles[start..<min(start+84,triangles.count)])
                                 encoder.setVertexBytes(part,length:part.count*MemoryLayout<WorldVertex>.stride,index:0)
                                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:part.count)
                             }
@@ -1098,7 +1142,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                 }
                 bindColors(encoder)
                 // Weapons and HUD stay at standard white in HDR.
-                power.w=0;encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
+                power.w=extendedPreview && extendedIndexedLighting ? -1:0;encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
                 if (hud.invisibility>128 || (hud.invisibility&8) != 0), let snapshot=scaledWorld ? weaponSnapshot:sceneSnapshot {
                     encoder.setFragmentTexture(snapshot,index:1);encoder.setRenderPipelineState(fuzzPipeline)
                     sprites.drawWeapon(encoder:encoder,width:width,height:worldHeight,fuzz:true,overlay:hudStyle == .minimal)

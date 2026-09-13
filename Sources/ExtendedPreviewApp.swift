@@ -11,6 +11,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     private var worker=ExtendedWorker(),pendingWorker:ExtendedWorker?
     private var workerExecutable:URL?
     private var plan:BundledPreviewPlan!
+    private var launchReported=false,openingPicker=false
     private var saveButton:NSButton!,loadButton:NSButton!
     private var audioPlayer:ExtendedSoundPlayer?
     private var soundToggle:NSButton!, musicToggle:NSButton!, runButton:NSButton!, restartButton:NSButton!, continueButton:NSButton!
@@ -81,6 +82,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             let content=NSView();window.contentView=content;content.addSubview(stack)
             NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo:content.leadingAnchor,constant:12),stack.trailingAnchor.constraint(equalTo:content.trailingAnchor,constant:-12),stack.topAnchor.constraint(equalTo:content.topAnchor,constant:12),stack.bottomAnchor.constraint(equalTo:content.bottomAnchor,constant:-12),view.widthAnchor.constraint(equalTo:stack.widthAnchor),view.heightAnchor.constraint(greaterThanOrEqualToConstant:300)])
             let menu=NSMenu(),item=NSMenuItem(),submenu=NSMenu()
+            submenu.addItem(withTitle:"Choose WADs…",action:#selector(chooseWADs),keyEquivalent:"o").target=self
             submenu.addItem(withTitle:"Quit preview",action:#selector(NSApplication.terminate(_:)),keyEquivalent:"q")
             item.submenu=submenu;menu.addItem(item);NSApp.mainMenu=menu
             window.center();window.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true)
@@ -203,7 +205,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     }
     private func presentInitial(_ scene:ExtendedScene) {
         guard !closed,!stopped else { return }
-        do { try display(scene,audible:false);ready=true;updateControls() }
+        do { try display(scene,audible:false);ready=true;updateControls();try reportLaunch("ready") }
         catch { failed(error) }
     }
     private func display(_ scene:ExtendedScene,audible:Bool) throws {
@@ -405,7 +407,24 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
         if soundToggle.state != .on {campaignSound?.stopAll()}
         do {try campaignSound?.setActive(campaignRunning && soundToggle.state == .on)} catch {failed(error)}
     }
+    @objc private func chooseWADs() {
+        guard !openingPicker else {return};pause();openingPicker=true
+        let configuration=NSWorkspace.OpenConfiguration();configuration.createsNewApplicationInstance=true
+        configuration.arguments=["--choose-wads"]
+        // Keep the current paused preview and its unsaved game available.
+        NSWorkspace.shared.openApplication(at:Bundle.main.bundleURL,configuration:configuration) { [weak self] _,error in
+            DispatchQueue.main.async {
+                self?.openingPicker=false
+                if let error {NSAlert(error:error).runModal()}
+            }
+        }
+    }
+    private func reportLaunch(_ result:String)throws {
+        guard !launchReported,let i=CommandLine.arguments.firstIndex(of:"-switch-ready"),i+1<CommandLine.arguments.count else {return}
+        try result.write(toFile:CommandLine.arguments[i+1],atomically:true,encoding:.utf8);launchReported=true
+    }
     private func failed(_ error:Error) {
+        try? reportLaunch("failed")
         guard !closed else { return }
         changingLevel=false;stopped=true;pause();worker.cancel();status.stringValue="Preview stopped: \(error)"
     }

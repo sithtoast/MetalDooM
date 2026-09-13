@@ -132,7 +132,7 @@ final class SpriteRenderer {
         let u0: Float = thing.flip != 0 ? patch.width : 0, u1: Float = thing.flip != 0 ? 0 : patch.width
         let light = max(0.12,thing.light), fullbright = Float(thing.fullbright)*gain
         func vertex(_ position: SIMD3<Float>, _ u: Float, _ v: Float) -> WorldVertex {
-            WorldVertex(position:SIMD4(position,1),uvLight:SIMD4(u,v,light,fullbright))
+            WorldVertex(position:SIMD4(position,1),uvLight:SIMD4(u,v,light,fullbright),lighting:SIMD4(floor((thing.light*255).rounded()/16),3,0,0))
         }
         return [vertex(a,u0,vBottom),vertex(b,u1,vBottom),vertex(c,u1,vTop),
                     vertex(a,u0,vBottom),vertex(c,u1,vTop),vertex(d,u0,vTop)]
@@ -183,6 +183,7 @@ final class SpriteRenderer {
             guard !vertices.isEmpty else {continue}
             encoder.setVertexBytes(vertices,length:MemoryLayout<WorldVertex>.stride*6,index:0)
             encoder.setFragmentTexture(patch.texture,index:0)
+            if let indices=patch.indices {encoder.setFragmentTexture(indices,index:3)}
             encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:6)
         }
     }
@@ -217,12 +218,13 @@ final class SpriteRenderer {
             let x1 = x0+patch.width*scale, y1 = y0+patch.height*scale
             let u0: Float = frame.flip != 0 ? patch.width : 0, u1: Float = frame.flip != 0 ? 0 : patch.width
             func vertex(_ x: Float, _ y: Float, _ u: Float, _ v: Float) -> WorldVertex {
-                WorldVertex(position:SIMD4(x/Float(width)*2-1,1-y/Float(height)*2,0,1),uvLight:SIMD4(u,v,max(0.12,frame.light),Float(frame.fullbright)))
+                WorldVertex(position:SIMD4(x/Float(width)*2-1,1-y/Float(height)*2,0,1),uvLight:SIMD4(u,v,max(0.12,frame.light),Float(frame.fullbright)),lighting:SIMD4(floor((frame.light*255).rounded()/16),4,0,0))
             }
             let a = vertex(x0,y1,u0,patch.height), b = vertex(x1,y1,u1,patch.height)
             let c = vertex(x1,y0,u1,0), d = vertex(x0,y0,u0,0)
             encoder.setVertexBytes([a,b,c,a,c,d],length:MemoryLayout<WorldVertex>.stride*6,index:0)
             encoder.setFragmentTexture(patch.texture,index:0)
+            if let indices=patch.indices {encoder.setFragmentTexture(indices,index:3)}
             encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:6)
         }
     }
@@ -254,6 +256,7 @@ final class SpriteRenderer {
             let c = vertex(x1,y0,patch.width,0), d = vertex(x0,y0,0,0)
             encoder.setVertexBytes([a,b,c,a,c,d],length:MemoryLayout<WorldVertex>.stride*6,index:0)
             encoder.setFragmentTexture(patch.texture,index:0)
+            if let indices=patch.indices {encoder.setFragmentTexture(indices,index:3)}
             encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:6)
         }
         func draw(_ name: String, _ x: Float, _ y: Float) {

@@ -52,6 +52,15 @@ import Foundation
     let expected=try Geometry(map:update.map,textureHeights:heights)
     func samples(_ g:Geometry)->[String] {g.batches.flatMap{b in b.vertices.map{"\(b.material):\($0.position):\($0.uvLight)"}}.sorted()}
     try check(samples(actual)==samples(expected))
+    var extra=raw;extra[p+8]=15;extra[p+9]=1 // 271:255+one extra-light level
+    let lit=try ExtendedGeometry(data:extra,previous:initial.geometry)
+    let litGeometry=try Geometry(map:lit.map,textureHeights:heights)
+    let levels=Set(litGeometry.batches.flatMap{ $0.vertices.filter{$0.lighting.y==2}.map{$0.lighting.x} })
+    try check(lit.map.sectors[0].light==Float(271)/255 && levels.contains(17) && levels.contains(15))
+    extra[p+8]=0;extra[p+9]=2 // beyond the copied wall-light bound
+    var rejected=false;do{_=try ExtendedGeometry(data:extra,previous:initial.geometry)}catch{rejected=true}
+    try check(rejected)
+    print("PASS wall extra-light headroom survives copied geometry and directional contrast; out-of-range light rejects")
    }
    print("PASS \(mode) real special, resolved planes/lights, physical eye height, immutable copy, save/continuation and malformed cached lights")
   }

@@ -59,6 +59,27 @@ final class Drop: NSObject, NSDraggingInfo {
         panel.onPlay={ main,extras in precondition(main == base && extras == [b,a]);received=true }
         buttons.first { $0.title == "Play" }!.performClick(nil)
         precondition(received)
+        let doom=try file("doom2.wad","IWAD")
+        for name in ["id24res.wad","id1.wad","id1-res.wad","id1-weap.wad","id1-tex.wad","id1-mus.wad","extras.wad"] {_=try file(name,"PWAD")}
+        for (i,content) in BundledPreviewPlan.Content.allCases.enumerated() {
+            let selection=WADStackPanel(base:doom,bundledAvailable:true)
+            let menu=selection.contentView!.subviews.compactMap{$0 as? NSPopUpButton}.first!
+            menu.selectItem(at:i+1);NSApp.sendAction(menu.action!,to:menu.target,from:menu)
+            let extras=selection.contentView!.subviews.compactMap{$0 as? NSButton}.first{$0.title=="Include extras resources"}!
+            extras.state = .on
+            var chosen:BundledPreviewPlan?
+            selection.onPlayBundled={chosen=$0}
+            selection.contentView!.subviews.compactMap{$0 as? NSButton}.first{$0.title=="Play"}!.performClick(nil)
+            precondition(chosen?.content==content && chosen?.base==2 && chosen?.paths.first?.lastPathComponent=="extras.wad")
+        }
+        let inferred=try BundledPreviewPlan.picker(base:doom,addOns:[folder.appendingPathComponent("id1.wad")])
+        precondition(inferred?.content == .rust && inferred?.paths.count==3)
+        for additions in [["id1.wad","id1-tex.wad"],["id1-weap.wad","extra2.wad"]] {
+            var rejected=false;do{_=try BundledPreviewPlan.picker(base:doom,addOns:additions.map{folder.appendingPathComponent($0)})}catch{rejected=true};precondition(rejected)
+        }
+        let missing=folder.appendingPathComponent("id1.wad");try FileManager.default.removeItem(at:missing)
+        var rejected=false;do{_=try BundledPreviewPlan.picker(base:doom,addOns:[],content:.rust)}catch{rejected=true};precondition(rejected)
+        print("PASS all six bundled picker callbacks, extras/base order, automatic Rust add-on routing, conflicting stacks and missing resources")
         print("WAD picker passed: folder filtering, file URL drops, type rejection, duplicates, load order and Play handoff.")
     }
 }

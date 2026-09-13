@@ -5,7 +5,7 @@ Requires Apple Silicon and macOS 14 or later. This is an early preview.
 
 ## Install
 
-The current local development app is **0.10.0 build 159**, ad-hoc signed and
+The current local development app is **0.10.0 build 160**, ad-hoc signed and
 unnotarized. No new release package was produced. The previous **0.9.0 build 124**
 distribution was separately Developer ID signed, accepted by Apple and stapled.
 GitHub workflow assets remain unnotarized. For unnotarized previews, macOS may
@@ -16,7 +16,13 @@ Episode 5 can be added with Ultimate Doom. No game WADs are included.
 
 ## New in 0.10.0 — Rust development foundations
 
-Final successful local build: **159**.
+Final successful local build: **160**.
+
+Build 160 adds indexed world/actor/weapon lighting and bundled choices in the WAD
+picker, including correct dependencies and launch failure recovery. Native GPU
+lighting oracles, actual Rust boss deaths, classic effects and save/focus checks
+pass. See EXTENDED_LIGHTING.md, EXTENDED_BUNDLED.md and BRANCH_ACCEPTANCE.md for
+evidence and remaining acceptance limits.
 
 Build 159 adds explicit bundled resource/weapon/texture/music plans on Doom II,
 optional extras, MAP01–32 saves and named SKYDEFS flat compatibility. See

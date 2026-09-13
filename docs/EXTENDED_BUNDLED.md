@@ -1,8 +1,8 @@
-# Bundled single-player preview — 0.10.0 build 159
+# Bundled single-player preview — 0.10.0 build 160
 
 The explicit development preview can now run the rerelease's resource packs on
-Doom II, independently of the Legacy of Rust campaign. The ordinary picker and
-standard build retain their existing acceptance rules. No multiplayer mode is
+Doom II, independently of the Legacy of Rust campaign. The picker can route these explicit plans to the separate worker. Standard
+builds without the worker retain their classic acceptance rules. No multiplayer mode is
 included; `iddm1.wad` remains outside this milestone.
 
 Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/bundled-preview-final" bash scripts/build.sh`.
@@ -47,6 +47,20 @@ and profile. The Rust UI still bounds saves/maps to 16. Restore uses the current
 plan's base/profile and creates a fresh paused worker. No migration of old saves
 or automatic loading from other profiles is implied.
 
+## Picker
+
+In an extended-preview build, choose **Open WAD…**, select rerelease Doom II,
+then choose a bundled role under **Play**. **Include extras resources** prepends
+extras in the documented order. Recognized bundled files selected on the add-on
+side also select the corresponding plan. Missing dependencies, mixed roles and
+files from another folder are rejected before launch. Unrelated classic add-ons
+keep their existing path.
+
+The app starts a separate instance and waits for successful worker, artwork and
+audio initialization before ending the previous classic session. Failure preserves
+the current game. The preview menu offers **Choose WADs…**, opening a new picker
+while keeping the preview paused so unsaved progress remains available.
+
 ## Named sky flats
 
 Rerelease Doom II SKYDEFS maps `F_RSKY1/2/3` to `SKY1/2/3` without transfer
@@ -71,5 +85,5 @@ Loading extras makes its resources available. Its custom SBARDEF, carousel/menu
 presentation, alternate `H_` music selection and all presentation-specific cues
 are not implemented. Texture/resource loading does not exercise every authored
 map effect. Full campaign/boss playthroughs, sustained performance, layered/fire
-skies and software sky-stretch parity remain open. Native lighting still differs
-from software; EXTENDED_LIGHTING.md records the first measured baseline.
+skies and software sky-stretch parity remain open. Ordinary indexed lighting is implemented; whole-frame software parity remains
+open. EXTENDED_LIGHTING.md records its native pixel evidence and limits.

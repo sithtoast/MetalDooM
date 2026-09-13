@@ -13,6 +13,11 @@ main=(root/'Sources/main.swift').read_text().split('\nlet app = NSApplication.sh
 (out/'main.swift').write_text(main+'\n'+(root/'Tests/ExtendedSaveAppValidation.swift').read_text())
 s=(root/'Sources/ExtendedPreviewApp.swift').read_text().replace('plan.paths','(plan.paths+(ProcessInfo.processInfo.environment["LIFECYCLE_FIXTURE"].map{[URL(fileURLWithPath:$0)]} ?? []))')
 s=s.replace('Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/MetalDooMWorker")','URL(fileURLWithPath:ProcessInfo.processInfo.environment["LIFECYCLE_WORKER"]!)')
+# GUI automation shares the desktop with the user. Deliver focus-loss events
+# explicitly in the test instead of allowing unrelated apps to cancel steps.
+s=s.replace('private var launchReported=false', 'private var validationControlsFocus=true\n    private var launchReported=false')
+s=s.replace('func applicationDidResignActive(_ notification:Notification) { pause() }','func applicationDidResignActive(_ notification:Notification) { if !validationControlsFocus {pause()} }')
+s=s.replace('func windowDidResignKey(_ notification:Notification) { pause() }','func windowDidResignKey(_ notification:Notification) { if !validationControlsFocus {pause()} }')
 s+='''
 extension ExtendedPreviewApp {
     var validationUI:ExtendedUI? {levelUI}
@@ -28,6 +33,7 @@ extension ExtendedPreviewApp {
     var validationCampaignRunning:Bool {campaignRunning}
     var validationCampaignSounds:Int {campaignSound?.scheduledSounds ?? 0}
     func validationPause() {pause()}
+    func validationLoseFocus() {validationControlsFocus=false;windowDidResignKey(Notification(name:NSWindow.didResignKeyNotification));validationControlsFocus=true}
     func validationPress() {continueLevel()}
     var validationText:String {completion.stringValue}
     func validationRun() {toggleRunning()}
