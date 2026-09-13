@@ -82,4 +82,10 @@ with tempfile.TemporaryDirectory(prefix='metaldoom-publish-test-') as temporary:
     assert run('git', 'ls-remote', 'origin', 'refs/tags/v0.5.0') == ''
     assert run('git', 'rev-parse', 'v0.5.0^{commit}') == run('git', 'rev-parse', 'HEAD')
 
-print('Publish checks passed: dry run, first release, unchanged version, version bump, dirty checkout, downgrade, conflicting tag, branch/detached HEAD, and atomic rejection.')
+    before = ref('refs/heads/main')
+    (repo / 'Info.plist').write_bytes(plistlib.dumps({'CFBundleShortVersionString':'0.5.0','MetalDooMReleaseChannel':'beta.1'}))
+    run('git','add','Info.plist');run('git','commit','-m','beta channel')
+    assert 'manual notarized beta procedure' in run('bash','scripts/publish.sh',ok=False)
+    assert ref('refs/heads/main') == before
+
+print('Publish checks passed: dry run, first release, unchanged version, version bump, dirty checkout, downgrade, conflicting tag, branch/detached HEAD, atomic rejection, and beta main-publish rejection.')

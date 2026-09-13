@@ -3,7 +3,10 @@
 Classic Doom on Apple Silicon, with native Metal rendering and gameplay powered
 by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
-**Version 0.10.0 · experimental source preview · local builds are not notarized.**
+**Version 0.10.0 β1 · build 165 · experimental Apple Silicon beta.**
+
+[Download the signed, notarized β1 prerelease](https://github.com/sithtoast/MetalDooM/releases/tag/v0.10.0-beta.1).
+Published from the Rust branch; main is unmerged. Source builds remain ad-hoc signed.
 
 Build 164 adds [fire/layered skies, brightmaps, tints and bundled HUD/music
 presentation](docs/EXTENDED_PRESENTATION.md). The preview offers authored WAD HUDs,

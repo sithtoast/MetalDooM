@@ -22,6 +22,8 @@ PUSH_URL=$(git remote get-url --push --all origin) || fail 'Configure the origin
 [[ -n "$PUSH_URL" && "$PUSH_URL" != *$'\n'* ]] || fail 'origin must have exactly one push destination.'
 VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)
 [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || fail 'Info.plist must contain a major.minor.patch version without leading zeros.'
+CHANNEL=$(/usr/libexec/PlistBuddy -c 'Print :MetalDooMReleaseChannel' Info.plist 2>/dev/null || true)
+[[ -z "$CHANNEL" ]] || fail 'Use the manual notarized beta procedure for prerelease channels; main publishing is disabled.'
 TAG="v$VERSION"
 HEAD_COMMIT=$(git rev-parse HEAD)
 # Read the actual remote rather than relying on possibly stale local tags.

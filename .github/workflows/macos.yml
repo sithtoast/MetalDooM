@@ -3,7 +3,8 @@ name: macOS build and release
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    # Beta tags are published from verified local, notarized artifacts.
+    tags: ['v*', '!v*-beta.*']
   pull_request:
     branches: [main]
   workflow_dispatch:

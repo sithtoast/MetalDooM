@@ -4,6 +4,18 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 β1 — GitHub beta distribution (build 165)
+
+- Label the app as β1 and package the classic and experimental bundled-content
+  engines together for Apple Silicon/macOS 14+.
+- Developer ID sign the app, worker and library with Hardened Runtime and secure
+  timestamps; submit to Apple notarization and staple the accepted ticket.
+- Include current player/install guides, matching source and checksums. Publish
+  `v0.10.0-beta.1` as a GitHub prerelease from the Rust branch, without merging main.
+- Keep beta tags outside the older unnotarized CI publisher and reject beta
+  channels in the main-only publishing helper. Full campaign and exact software
+  renderer acceptance remain open.
+
 ## 0.10.0 refinement — sky, lighting and bundled presentation (build 164)
 
 - Render procedural fire skies from the engine's generated pixels and compose

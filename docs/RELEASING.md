@@ -82,13 +82,24 @@ Contributor documentation lives in docs/ and remains in the source archive.
 The app ZIP contains only the app, INSTALL.md, PLAYER_GUIDE.md, BUG_REPORT.md,
 license/attribution notices and SIGNING-STATUS.txt.
 
-## Existing notarized release
+## Branch beta releases
 
-The user completed notarization of **0.9.0 build 124** in the preceding task:
-Apple accepted submission `121f1db9-34a4-4f5f-aeb3-599a59de0727`; stapler,
-codesign and Gatekeeper checks passed in the host context. Its distribution ZIP
-is preserved in the primary checkout's `build/releases/MetalDooM-0.9.0-build124/`.
-That is prior-task evidence, not a new submission or repeat Gatekeeper check.
-The current **0.10.0 build 131** is an ad-hoc-signed development app; no packaging,
-Apple submission or publishing was performed. GitHub automation still produces
-unnotarized assets. Never overwrite the build-124 release while testing here.
+For **0.10.0 β1/build165**, retain `CFBundleShortVersionString=0.10.0` and set
+`MetalDooMReleaseChannel=beta.1`. The app displays β1; the Git tag and package use
+`v0.10.0-beta.1` and `0.10.0-beta.1`. Keep Apple's version field numeric.
+
+Build with `METALDOOM_EXTENDED_PREVIEW=1` and an isolated `METALDOOM_BUILD_DIR`.
+Set `METALDOOM_RELEASE_APP` to that completed app before invoking `release.sh`.
+Preparation signs the helper dylib, worker and enclosing app in that order, all
+with Developer ID, Hardened Runtime and secure timestamps. The notarized ZIP
+includes the app, guides, licenses and signing status.
+
+The main-only publisher rejects a beta channel. The hosted workflow excludes
+`v*-beta.*` tags to avoid creating duplicate or unnotarized beta assets. Publish
+only the reviewed branch and a new annotated beta tag, never main/master. Create
+a GitHub draft prerelease with the final binary/source ZIPs, SHA256SUMS.txt and
+SOURCE-COMMIT.txt, verify the uploaded assets, then publish the draft. Retain the
+last stable tag and do not mark the beta as the latest stable release.
+
+See VALIDATION.md for this beta's Apple submission and artifact verification.
+Prior0.9.0/build124 release files remain in the primary checkout unchanged.

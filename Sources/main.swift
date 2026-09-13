@@ -5,7 +5,9 @@ import UniformTypeIdentifiers
 
 let version = Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "development"
 let buildNumber = Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "unbundled"
-let appTitle = "MetalDooM \(version) (build \(buildNumber))"
+let releaseChannel = Bundle.main.object(forInfoDictionaryKey:"MetalDooMReleaseChannel") as? String ?? ""
+let releaseLabel = releaseChannel.isEmpty ? "" : " " + releaseChannel.replacingOccurrences(of:"beta.",with:"β")
+let appTitle = "MetalDooM \(version)\(releaseLabel) (build \(buildNumber))"
 
 final class MessageLabel: NSTextField {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }

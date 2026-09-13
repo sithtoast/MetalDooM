@@ -1,5 +1,42 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 β1 build 165: notarized branch beta
+
+Release: `v0.10.0-beta.1`, GitHub prerelease from `codex/legacy-of-rust`; main is
+unmerged and retains `afd73575611397b277b24312fee2616aa4bd6d36`. Numeric app version
+stays0.10.0 with beta.1 channel metadata and a visible β1 label. Candidate build
+log: `build/build165.log`; output: `build/beta1-preview/MetalDooM.app`.
+
+- Developer ID Application: William Holt (WG3UVY5459) signs the app, worker and
+  dylib with Hardened Runtime and secure timestamps. Apple accepted submission
+  **b881dc37-18b5-4416-8159-24c4383a8a84**. Stapler, deep/strict signatures and
+  Gatekeeper pass; Gatekeeper reports `Notarized Developer ID`.
+- Release ZIP: `build/releases/MetalDooM-0.10.0-beta.1-build165/MetalDooM-0.10.0-beta.1-build165-macOS-arm64.zip`.
+  SHA-256: `c9f3fc2995c322da2021770e5a8e4b649e49aa2190227df006e5611ef9327f38`.
+  ZIP integrity, beta/version/build metadata and exact packaged guide contents
+  pass. No WADs, saves or credential files are included. The extracted app also
+  passes signatures, ticket validation and Gatekeeper assessment.
+- The Mac is unlocked for this release check. Observed the signed app title
+  **MetalDooM 0.10.0 β1 (build 165)**, selected rerelease Doom II → Rust with extras
+  through the picker, and loaded MAP01. Run advanced simulation, Pause stopped it
+  at tic163, and switching fullscreen HUD → authored status bar visibly worked.
+  The extracted distributable separately loads MAP06/SKYX4 and advances native
+  simulation with its packaged helper. These are smoke checks, not a campaign
+  playthrough or whole-frame software comparison. Physical audibility is not
+  claimed by UI observations.
+- `build/beta-input-validation.log`, `build/beta-console-validation.log` and
+  `build/beta-metrics-validation.log` pass native no-WAD release checks.
+  `build/beta-publish-validation.log` passes disposable-repository publishing
+  tests, including rejection of beta channels by the main-only publisher.
+- Build164's full presentation/gameplay regression evidence below applies to
+  unchanged engine/renderer code. This refinement adds beta labeling and release
+  packaging, retaining the same0.10.0 feature version. Older bundles remain intact.
+
+The GitHub assets include the binary ZIP, a source ZIP archived from the tagged
+commit, SOURCE-COMMIT.txt and SHA256SUMS.txt. Beta tags are excluded from the older
+unnotarized CI workflow. Download acceptance on a separate Mac and full campaign
+playtesting remain open; exact software-renderer parity is separate work.
+
 ## 2026-09-12 — 0.10.0 build 164: bundled presentation adapters
 
 Candidate: `build/presentation-release-preview/MetalDooM.app`;

@@ -2,6 +2,22 @@
 
 See [INSTALL.md](INSTALL.md) for installation and [BUG_REPORT.md](BUG_REPORT.md) for bug reports.
 
+## Experimental Rust and bundled content
+
+Version **0.10.0 β1 (build 165)** includes a separate single-player preview for
+Legacy of Rust and the bundled resource, weapon, texture and music packs. In the
+WAD picker, choose rerelease Doom II and the desired Play mode, with its companion
+WADs in the same folder. Enable extras for the supplied presentation resources.
+No WADs are distributed with MetalDooM.
+
+The preview has Run/Pause, Restart, Save/Load and Continue controls. Select the
+WAD status bar, fullscreen HUD or native minimal HUD; choose recorded music when
+available or original MIDI. Use 1–7 to switch weapons, F to fire and E to use.
+Focus loss pauses play. Saves require matching content and worker build, so retain
+an older beta if you need its private saves. Full campaign playthrough acceptance,
+exact software-renderer parity, multiplayer and general mod compatibility remain
+outside this beta's guarantees.
+
 ## Music playback
 
 **Audio → Classic OPL** (default) uses Chocolate Doom's Doom 1.9 OPL2/Sound
@@ -317,8 +333,7 @@ Quit before switching base games. Saves identify IWAD contents, so TNT and
 Plutonia saves cannot be mixed, and renaming an identical IWAD preserves saves.
 
 This is dedicated Final Doom support, not general GAMECONF/UMAPINFO or DeHackEd
-support. Legacy of Rust/ID24 and Doom 64
-remain future milestones.
+support. Doom 64 remains a future milestone.
 
 
 ## Graphics presets, HDR and volumetric lighting

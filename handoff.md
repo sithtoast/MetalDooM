@@ -5,8 +5,23 @@
 Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, branch
 **codex/legacy-of-rust**, based on fetched origin/main merge **afd7357**. Preserve
 `/Users/wmh/Dev/MetalDooM` and its release artifacts. Current feature version is
-**0.10.0**, final successful build **164**. This remains the same unreleased Rust
+**0.10.0**, final successful build **165**. This remains the same unreleased Rust
 feature; do not bump the minor version for each refinement.
+
+**Release update: 0.10.0 β1/build165.** The user authorized publishing a signed,
+notarized GitHub prerelease from this branch, explicitly without merging main.
+Tag: `v0.10.0-beta.1`; app source: `build/beta1-preview/MetalDooM.app`;
+release directory: `build/releases/MetalDooM-0.10.0-beta.1-build165/`.
+Info.plist keeps numeric0.10.0 plus `MetalDooMReleaseChannel=beta.1` for β1 labels.
+Build164's presentation implementation is unchanged; this build adds beta identity
+and distribution packaging. Old beta/private saves require their matching worker.
+Apple accepted submission b881dc37-18b5-4416-8159-24c4383a8a84; stapling, strict
+signatures and extracted-ZIP Gatekeeper acceptance pass. The Mac was unlocked:
+β1 title, Rust picker launch, Run/Pause, authored HUD and extracted MAP06 smoke
+checks were observed. The older locked-screen limitation below is historical.
+See docs/RELEASE_NOTES.md and docs/VALIDATION.md for final publication evidence.
+The main-only publisher rejects beta channels; CI ignores beta tags so it cannot
+replace the verified local artifacts with an unnotarized build.
 
 The explicit Rust preview now has **object/weapon blending, unified fuzz/translucent ordering and actor/moving-surface interpolation**, **sky transfers and flat rotation**, **fake floors and transferred lighting**, **translucent walls and palette effects**, **normal/additive/per-state actor translucency**, **camera/weapon interpolation during Run**, **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
 plus death/restart and native completion/Continue,
