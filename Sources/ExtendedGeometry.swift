@@ -14,7 +14,8 @@ struct ExtendedGeometry {
         self.data=data
         let bytes=Bytes(data:data)
         try bytes.check(0,120)
-        guard data.prefix(4) == Data("MGE5".utf8), try bytes.i32(4) == 5 else {
+        let version=try bytes.i32(4)
+        guard (5...6).contains(version),data.prefix(4)==Data("MGE\(version)".utf8) else {
             throw PortError("Unsupported worker geometry format.")
         }
         tic=try bytes.i32(8)
@@ -25,7 +26,7 @@ struct ExtendedGeometry {
             throw PortError("Invalid geometry content fingerprint.")
         }
         contentSHA256=String(decoding:hash,as:UTF8.self)
-        let counts=try (0..<7).map { try bytes.i32(28+$0*4) }, strides=[8,24,36,140,16,12,24]
+        let counts=try (0..<7).map { try bytes.i32(28+$0*4) }, strides=[8,24,version==6 ? 40:36,version==6 ? 152:140,16,12,24]
         var expected=120
         for (count,stride) in zip(counts,strides) {
             guard (0...1_000_000).contains(count) else { throw PortError("Excessive geometry count.") }
@@ -55,13 +56,16 @@ struct ExtendedGeometry {
                 bank[sky.id]=sky
             }}
         }
+        func tint(_ p:Int)throws->Int {
+            let value=try bytes.i32(p);guard (0...255).contains(value) else {throw PortError("Invalid tint index")};return value
+        }
         func sector(_ p:Int)throws->Sector {
             let fl=try bytes.i32(p+44),cl=try bytes.i32(p+48),wall=try bytes.i32(p+8)
             guard (0...255).contains(fl),(0...255).contains(cl),(0...511).contains(wall) else {throw PortError("Invalid transferred plane light")}
             return try Sector(floor:fixed(p),ceiling:fixed(p+4),light:Float(wall)/255,
                 floorTexture:name(p+12),ceilingTexture:name(p+20),floorOffset:SIMD2(fixed(p+28),fixed(p+32)),ceilingOffset:SIMD2(fixed(p+36),fixed(p+40)),
                 floorRotation:UInt32(unsigned(p+76)),ceilingRotation:UInt32(unsigned(p+80)),floorSky:sky(p+84),ceilingSky:sky(p+112),
-                floorLight:Float(fl)/255,ceilingLight:Float(cl)/255,backFloor:fixed(p+52),backCeiling:fixed(p+56),backCeilingTexture:name(p+60),spriteClip:SIMD2(fixed(p+68),fixed(p+72)))
+                floorLight:Float(fl)/255,ceilingLight:Float(cl)/255,backFloor:fixed(p+52),backCeiling:fixed(p+56),backCeilingTexture:name(p+60),spriteClip:SIMD2(fixed(p+68),fixed(p+72)),tint:version==6 ? tint(p+140):0,floorTint:version==6 ? tint(p+144):0,ceilingTint:version==6 ? tint(p+148):0)
         }
         var offsets=[120]
         for i in 0..<7 { offsets.append(offsets.last!+counts[i]*strides[i]) }
@@ -77,12 +81,12 @@ struct ExtendedGeometry {
                equal(offsets[4],data.count-offsets[4]) {
                 var sides=previous.map.sides,sectors=previous.map.sectors
                 for i in sides.indices {
-                    let p=offsets[2]+i*36
-                    if !equal(p,36) { sides[i]=try Side(sector:bytes.i32(p),x:fixed(p+4),y:fixed(p+8),upper:name(p+12),lower:name(p+20),middle:name(p+28)) }
+                    let p=offsets[2]+i*strides[2]
+                    if !equal(p,strides[2]) { sides[i]=try Side(sector:bytes.i32(p),x:fixed(p+4),y:fixed(p+8),upper:name(p+12),lower:name(p+20),middle:name(p+28),tint:version==6 ? tint(p+36):0) }
                 }
                 for i in sectors.indices {
-                    let p=offsets[3]+i*140
-                    if !equal(p,140) { sectors[i]=try sector(p) }
+                    let p=offsets[3]+i*strides[3]
+                    if !equal(p,strides[3]) { sectors[i]=try sector(p) }
                 }
                 try validateSkies(sectors)
                 map=try DoomMap(copying:previous.map,sides:sides,sectors:sectors,start:SIMD2(fixed(16),fixed(20)),angle:Float(unsigned(24))*2 * .pi/4294967296)
@@ -98,7 +102,7 @@ struct ExtendedGeometry {
         let points=try records(0).map { try SIMD2(fixed($0),fixed($0+4)) }
         let lines=try records(1).map { try Line(a:bytes.i32($0),b:bytes.i32($0+4),flags:unsigned($0+8),front:bytes.i32($0+12),back:bytes.i32($0+16),blend:bytes.i32($0+20)) }
         guard lines.allSatisfy({(0...64).contains($0.blend)}) else {throw PortError("Invalid wall blend table ID")}
-        let sides=try records(2).map { try Side(sector:bytes.i32($0),x:fixed($0+4),y:fixed($0+8),upper:name($0+12),lower:name($0+20),middle:name($0+28)) }
+        let sides=try records(2).map { try Side(sector:bytes.i32($0),x:fixed($0+4),y:fixed($0+8),upper:name($0+12),lower:name($0+20),middle:name($0+28),tint:version==6 ? tint($0+36):0) }
         let sectors=try records(3).map {try sector($0)}
         try validateSkies(sectors)
         let segs=try records(4).map { try Seg(a:bytes.i32($0),b:bytes.i32($0+4),line:bytes.i32($0+8),side:bytes.i32($0+12)) }

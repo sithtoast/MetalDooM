@@ -1,5 +1,9 @@
 # Experimental extended simulation worker
 
+Current build164 adds the adapters and updated packets documented in
+[EXTENDED_PRESENTATION.md](EXTENDED_PRESENTATION.md). The milestone layout and
+validation details below are retained as implementation history.
+
 The **0.10.0 build 157** development milestone includes copied geometry, sprite
 frames, material animations, sound events, HUD and level music, explicit session planning, three Rust-required ID24 fields, an explicit
 [native preview](EXTENDED_PREVIEW.md), and headless tests with the actual Rust

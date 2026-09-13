@@ -4,6 +4,7 @@ struct ExtendedSprite {
     let name:String, x:Float, y:Float, z:Float, floorZ:Float, light:Float
     let flags:Int, editor:Int, state:Int
     var previous:SIMD4<Float>?=nil
+    var tint:Int=0,brightmap:Int=0
     func position(fraction:Float)->SIMD4<Float> {
         let current=SIMD4(x,y,z,floorZ)
         guard fraction<1,let previous else {return current}
@@ -17,12 +18,13 @@ struct ExtendedPresentation {
     let actors:[ExtendedSprite], weapons:[ExtendedSprite]
     init(data:Data) throws {
         let b=Bytes(data:data);try b.check(0,32)
-        guard data.prefix(4)==Data("MSP5".utf8),try b.i32(4)==5,(0...1).contains(try b.i32(28)) else { throw PortError("Invalid sprite snapshot header.") }
+        let version=try b.i32(4),actorStride=version==6 ? 64:56,weaponStride=version==6 ? 32:24
+        guard (5...6).contains(version),data.prefix(4)==Data("MSP\(version)".utf8),(0...1).contains(try b.i32(28)) else { throw PortError("Invalid sprite snapshot header.") }
         snapCamera=try b.i32(28)==1
         tic=try b.i32(8);let count=try b.i32(12),weaponCount=try b.i32(16)
         readyWeapon=try b.i32(20);ammo=try b.i32(24)
         guard tic>=0,(0...1_000_000).contains(count),(0...2).contains(weaponCount),(0...8).contains(readyWeapon),ammo>=(-1),
-              data.count==32+count*56+weaponCount*24 else { throw PortError("Invalid sprite snapshot counts or state.") }
+              data.count==32+count*actorStride+weaponCount*weaponStride else { throw PortError("Invalid sprite snapshot counts or state.") }
         func record(_ offset:Int,weapon:Bool) throws -> ExtendedSprite {
             let raw=data[offset..<offset+8],text=raw.prefix{$0 != 0}
             guard !text.isEmpty,text.allSatisfy({(33...126).contains($0)}),raw.dropFirst(text.count).allSatisfy({$0==0}) else { throw PortError("Invalid sprite resource name.") }
@@ -30,13 +32,15 @@ struct ExtendedPresentation {
             guard (0...255).contains(light),flags>=0,flags & ~(weapon ? 0xff1f:0xff3f)==0,flags & 16==0 || flags & 8 != 0,flags & 4==0 || flags & 24==0,
                   flags>>8==0 || (3...64).contains(flags>>8) && flags & 24==8 else { throw PortError("Invalid sprite presentation flags/light (\(flags)/\(light)).") }
             func fixed(_ p:Int) throws -> Float { Float(try b.i32(p))/65536 }
+            let tint=try version==6 ? b.i32(offset+(weapon ? 24:56)):0,mask=try version==6 ? b.i32(offset+(weapon ? 28:60)):0
+            guard (0...255).contains(tint),(0...511).contains(mask) else {throw PortError("Invalid sprite lighting resource")}
             return try ExtendedSprite(name:String(decoding:text,as:UTF8.self),x:fixed(offset+8),y:fixed(offset+12),
                 z:weapon ? 0:fixed(offset+16),floorZ:weapon ? 0:fixed(offset+20),light:Float(light)/255,
                 flags:flags,editor:weapon ? 0:b.i32(offset+32),state:weapon ? 0:b.i32(offset+36),
-                previous:weapon || flags&32==0 ? nil:SIMD4(fixed(offset+40),fixed(offset+44),fixed(offset+48),fixed(offset+52)))
+                previous:weapon || flags&32==0 ? nil:SIMD4(fixed(offset+40),fixed(offset+44),fixed(offset+48),fixed(offset+52)),tint:tint,brightmap:mask)
         }
-        actors=try (0..<count).map{try record(32+$0*56,weapon:false)}
-        weapons=try (0..<weaponCount).map{try record(32+count*56+$0*24,weapon:true)}
+        actors=try (0..<count).map{try record(32+$0*actorStride,weapon:false)}
+        weapons=try (0..<weaponCount).map{try record(32+count*actorStride+$0*weaponStride,weapon:true)}
     }
 }
 
@@ -86,24 +90,47 @@ struct ExtendedInterpolation {
 
 /// Palette-index tables refreshed per level, indexed background * 256 + foreground.
 struct ExtendedBlendTables {
-    static let maxByteCount=24+256*768+256*256+64*65536
+    static let maxByteCount=16*1024*1024
     let palettes:[UInt8], colormaps:[UInt8], tables:[[UInt8]]
+    let masks:[UInt8],materialMasks:[MaterialKey:Int]
+    let mapCount:Int,rowsPerMap:Int
+    var gpuMaps:[UInt8] {colormaps+masks}
+    func maskOffset(_ id:Int)->Float {id==0 ? 0:Float(colormaps.count+id*256)}
     var palette:[UInt8] {Array(palettes.prefix(768))}
     var normal:[UInt8] {tables[0]}
     var additive:[UInt8] {tables[1]}
     init(data:Data) throws {
         let b=Bytes(data:data);try b.check(0,24)
         let count=try b.i32(12),colors=try b.i32(8),maps=try b.i32(16)
+        let version=try b.i32(4)
         guard (2...64).contains(count),(768...256*768).contains(colors),colors%768==0,
-              (256...256*256).contains(maps),maps%256==0,data.count==24+colors+maps+count*65536,
-              data.prefix(4)==Data("MBL3".utf8),try b.i32(4)==3,try b.i32(20)==0 else {throw PortError("Invalid blend/color snapshot.")}
-        palettes=Array(data[24..<24+colors]);colormaps=Array(data[24+colors..<24+colors+maps])
+              (32*256...256*256).contains(maps),maps%256==0,data.count>=24+colors+maps+count*65536,
+              (3...4).contains(version),data.prefix(4)==Data("MBL\(version)".utf8),try b.i32(20)==0 else {throw PortError("Invalid blend/color snapshot.")}
+        palettes=Array(data[24..<24+colors]);var mappings=Array(data[24+colors..<24+colors+maps])
         let start=24+colors+maps
         tables=(0..<count).map {Array(data[(start+$0*65536)..<(start+($0+1)*65536)])}
+        var p=start+count*65536,maskData=[UInt8](repeating:0,count:256),bindings:[MaterialKey:Int]=[:]
+        if version==4 {
+            try b.check(p,12);let n=try b.i32(p),m=try b.i32(p+4),bindingsCount=try b.i32(p+8);p+=12
+            guard (0...255).contains(n),(1...512).contains(m),(0...65536).contains(bindingsCount),maps>=8704 else {throw PortError("Invalid lighting bank counts")}
+            try b.check(p,n*8704+m*256+bindingsCount*16)
+            mapCount=n+1;rowsPerMap=34
+            mappings=Array(mappings.prefix(8704))+Array(data[p..<p+n*8704]);p+=n*8704
+            maskData=Array(data[p..<p+m*256]);p+=m*256
+            guard maskData.allSatisfy({$0<=1}),maskData.prefix(256).allSatisfy({$0==0}) else {throw PortError("Invalid brightmap mask")}
+            for _ in 0..<bindingsCount {
+                let name=try b.name(p),kind=try b.i32(p+8),mask=try b.i32(p+12);p+=16
+                guard !name.isEmpty,(0...1).contains(kind),(1..<m).contains(mask) else {throw PortError("Invalid material brightmap")}
+                bindings[MaterialKey(name:name,flat:kind==1)]=mask
+            }
+        }
+        else {mapCount=1;rowsPerMap=maps/256}
+        guard p==data.count else {throw PortError("Trailing color snapshot")}
+        colormaps=mappings;masks=maskData;materialMasks=bindings
     }
     func validate(_ presentation:ExtendedPresentation,palette:Int=0,fixed:Int=0,walls:[Int]=[]) throws {
-        guard palette<palettes.count/768,fixed<colormaps.count/256,
-              (presentation.actors+presentation.weapons).allSatisfy({$0.blendTable<=tables.count}),walls.allSatisfy({$0<=tables.count}) else {throw PortError("Missing blend table, palette or colormap.")}
+        guard palette>=0,palette<palettes.count/768,fixed>=0,fixed<rowsPerMap,
+              (presentation.actors+presentation.weapons).allSatisfy({$0.blendTable<=tables.count && $0.tint<mapCount && $0.brightmap<masks.count/256}),walls.allSatisfy({$0<=tables.count}) else {throw PortError("Missing blend table, palette or colormap.")}
     }
     func rgba(index:Int)->[UInt8] {
         let palette=self.palette

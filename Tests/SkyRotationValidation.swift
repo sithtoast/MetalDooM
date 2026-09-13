@@ -16,7 +16,7 @@ import Foundation
     try check(sector.floorSky?.scale==SIMD2(mode=="sky272" ? 1:-1,1))
     try check(copied.map.sectors[1].ceilingSky==nil && !scene.geometry.skyVertices.isEmpty)
     try check(scene.geometry.batches.contains{$0.material.sky>0})
-    let raw=copied.data,b=Bytes(data:raw),p=120+(try b.i32(28))*8+(try b.i32(32))*24+(try b.i32(36))*36
+    let raw=copied.data,b=Bytes(data:raw),p=120+(try b.i32(28))*8+(try b.i32(32))*24+(try b.i32(36))*40
     for (offset,value) in [(84,UInt32.max),(104,0),(108,0),(112,0),(124,1)] {
      var bad=raw;for i in 0..<4 {bad[p+offset+i]=UInt8(truncatingIfNeeded:value>>(i*8))}
      for previous in [nil,initial.geometry] {

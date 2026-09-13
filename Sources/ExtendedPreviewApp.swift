@@ -20,6 +20,8 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     private var campaignSound:SoundPlayer?,campaignTimer:Timer?,campaignRunning=false
     private var campaignTrack=""
     private let completion=NSTextField(wrappingLabelWithString:"")
+    private var selectedHUD=1
+    private var recordedMusic=true
     private var musicPlayer:MusicPlayer?,musicGeneration=0
     private var clock=ExtendedPlaybackClock(), wake:DispatchWorkItem?
     private var playbackGeneration=0, manualTag:Int?, ready=false, stopped=false
@@ -74,10 +76,13 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             loadButton=NSButton(title:"Load…",target:self,action:#selector(loadGame))
             saveButton.isEnabled=false;loadButton.isEnabled=false
             let transport=NSStackView(views:[runButton,restartButton,saveButton,loadButton,continueButton,mode]);transport.spacing=12
+            let hud=NSPopUpButton();hud.addItems(withTitles:["WAD status bar","WAD fullscreen HUD","Native minimal HUD"]);hud.selectItem(at:1);hud.target=self;hud.action=#selector(changeHUD(_:));
+            let music=NSPopUpButton();music.addItems(withTitles:["Recorded music when available","Original MIDI"]);music.target=self;music.action=#selector(changeMusic(_:));
+            let presentationControls=NSStackView(views:[hud,music]);presentationControls.spacing=12
             completion.isHidden=true;completion.font=NSFont.systemFont(ofSize:16,weight:.semibold)
             let caption=NSTextField(labelWithString:"WASD move · Arrows turn/move · Shift run · E use · F fire · 1–7 weapon · Click to aim · Esc pause")
             caption.textColor = .secondaryLabelColor
-            let stack=NSStackView(views:[transport,controls,caption,completion,status,view]);stack.orientation = .vertical;stack.alignment = .leading;stack.spacing=8
+            let stack=NSStackView(views:[transport,controls,presentationControls,caption,completion,status,view]);stack.orientation = .vertical;stack.alignment = .leading;stack.spacing=8
             stack.translatesAutoresizingMaskIntoConstraints=false;view.translatesAutoresizingMaskIntoConstraints=false
             let content=NSView();window.contentView=content;content.addSubview(stack)
             NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo:content.leadingAnchor,constant:12),stack.trailingAnchor.constraint(equalTo:content.trailingAnchor,constant:-12),stack.topAnchor.constraint(equalTo:content.topAnchor,constant:12),stack.bottomAnchor.constraint(equalTo:content.bottomAnchor,constant:-12),view.widthAnchor.constraint(equalTo:stack.widthAnchor),view.heightAnchor.constraint(greaterThanOrEqualToConstant:300)])
@@ -221,7 +226,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
             continueButton.title="Continue to \(String(format:"MAP%02d",ui.nextMap))"
         }
         if ui.musicGeneration != musicGeneration {
-            if musicPlayer==nil { musicPlayer=try MusicPlayer(wad:scene.resources,map:scene.copiedGeometry.map.name,track:plan.track ?? ui.music,backend:"apple") }
+            if musicPlayer==nil { musicPlayer=try MusicPlayer(wad:scene.resources,map:scene.copiedGeometry.map.name,track:plan.track ?? ui.music,backend:"apple",preferRecorded:self.recordedMusic) }
             else { try musicPlayer?.select(plan.track ?? ui.music) }
             musicPlayer?.looping=ui.looping;musicPlayer?.enabled=musicToggle.state == .on
             musicGeneration=ui.musicGeneration;musicPlayer?.update(active:clock.busy && audible)
@@ -308,7 +313,7 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
                     do {
                         // New world/tic-zero snapshots must not reuse old mesh, sprite,
                         // audio sequence or input state. Resource identity stays fixed.
-                        let renderer=try Renderer(view:self.view);renderer.extendedRustWeaponNames=self.plan.rustWeapons
+                        let renderer=try Renderer(view:self.view);renderer.extendedRustWeaponNames=self.plan.rustWeapons;renderer.extendedHUD=self.selectedHUD
                         renderer.onError={ [weak self] in self?.failed($0) }
                         self.renderer=renderer;self.view.delegate=renderer
                         self.audioPlayer=nil;self.musicPlayer=nil;self.musicGeneration=0
@@ -377,9 +382,9 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
                     do {
                         // Prepare every fallible native resource before retiring the
                         // current worker. Bad saves leave that paused game intact.
-                        let renderer=try Renderer(view:self.view);renderer.extendedRustWeaponNames=self.plan.rustWeapons;try renderer.loadExtendedPreview(scene)
+                        let renderer=try Renderer(view:self.view);renderer.extendedRustWeaponNames=self.plan.rustWeapons;renderer.extendedHUD=self.selectedHUD;try renderer.loadExtendedPreview(scene)
                         let audio=try ExtendedSoundPlayer(resources:resources,initialTic:state.tic);try audio.prepare(state.audio)
-                        let music=try MusicPlayer(wad:resources,map:scene.copiedGeometry.map.name,track:self.plan.track ?? state.ui.music,backend:"apple")
+                        let music=try MusicPlayer(wad:resources,map:scene.copiedGeometry.map.name,track:self.plan.track ?? state.ui.music,backend:"apple",preferRecorded:self.recordedMusic)
                         music.looping=state.ui.looping;music.enabled=self.musicToggle.state == .on;music.update(active:false)
                         renderer.onError={ [weak self] in self?.failed($0) }
                         let previous=self.worker;self.worker=candidate;self.pendingWorker=nil;self.sceneBuilder=builder
@@ -401,6 +406,17 @@ final class ExtendedPreviewApp:NSObject,NSApplicationDelegate,NSWindowDelegate {
     }
     func applicationDidResignActive(_ notification:Notification) { pause() }
     func windowDidResignKey(_ notification:Notification) { pause() }
+    @objc private func changeHUD(_ sender:NSPopUpButton) {
+        selectedHUD=sender.indexOfSelectedItem==2 ? -1:sender.indexOfSelectedItem
+        renderer.extendedHUD=selectedHUD
+        renderer.setPreviewHUD(renderer.extendedHUD);view.draw()
+    }
+    @objc private func changeMusic(_ sender:NSPopUpButton) {
+        recordedMusic=sender.indexOfSelectedItem==0
+        guard let musicPlayer else {return}
+        musicPlayer.preferRecorded=recordedMusic
+        do {try musicPlayer.select(musicPlayer.trackName)} catch {failed(error)}
+    }
     @objc private func toggleMusic() { musicPlayer?.enabled=musicToggle.state == .on;musicPlayer?.update(active:clock.busy || campaignRunning) }
     @objc private func toggleSound() {
         audioPlayer?.muted=soundToggle.state != .on

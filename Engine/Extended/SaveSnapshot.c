@@ -19,6 +19,7 @@ extern int numtextures;
 #include "i_system.h"
 #include "yyjson.h"
 #include "m_array.h"
+#include "r_sky.h"
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,6 +59,46 @@ static int integer(json_t *root,const char *key,int low,int high) {
 static void array(json_t *root,const char *key,int count) {
     json_t *v=ME_SaveObject(root,key);if(!yyjson_is_arr(v) || yyjson_arr_size(v)!=(size_t)count)I_Error("Invalid saved %s count",key);
 }
+static void archive_skies(json_mut_doc_t *doc,json_mut_t *root) {
+    json_mut_t *list=JS_NewArray(doc);
+    for(unsigned i=0;i<array_size(levelskies);i++) {
+        sky_t *s=&levelskies[i];json_mut_t *obj=JS_NewObject(doc),*offsets=JS_NewArray(doc),*fire=JS_NewArray(doc);
+        for(int j=0;j<2;j++) {skytex_t *t=j?&s->foreground:&s->background;
+            JS_ArrayAddInt(doc,offsets,t->currx);JS_ArrayAddInt(doc,offsets,t->curry);
+            JS_ArrayAddInt(doc,offsets,t->prevx);JS_ArrayAddInt(doc,offsets,t->prevy);
+        }
+        JS_SetArray(doc,obj,"offsets",offsets);JS_SetInt(doc,obj,"tics",s->tics_left);
+        if(s->type==SkyType_Fire) {
+            int tex=s->background.texture,n=texturewidth[tex]*(textureheight[tex]>>FRACBITS);
+            for(int j=0;j<n;j++)JS_ArrayAddInt(doc,fire,s->fire[j]);
+        }
+        JS_SetArray(doc,obj,"fire",fire);JS_ArrayAddObject(doc,list,obj);
+    }
+    JS_SetArray(doc,root,"native_skies",list);
+}
+static void restore_skies(json_t *root) {
+    array(root,"native_skies",array_size(levelskies));json_t *list=ME_SaveObject(root,"native_skies");
+    for(unsigned i=0;i<array_size(levelskies);i++) {
+        sky_t *s=&levelskies[i];json_t *obj=yyjson_arr_get(list,i);array(obj,"offsets",8);
+        json_t *offsets=ME_SaveObject(obj,"offsets");
+        for(int j=0;j<2;j++) {skytex_t *t=j?&s->foreground:&s->background;
+            t->currx=ME_SaveInteger(yyjson_arr_get(offsets,j*4));t->curry=ME_SaveInteger(yyjson_arr_get(offsets,j*4+1));
+            t->prevx=ME_SaveInteger(yyjson_arr_get(offsets,j*4+2));t->prevy=ME_SaveInteger(yyjson_arr_get(offsets,j*4+3));
+        }
+        s->tics_left=integer(obj,"tics",0,MAX(0,s->updatetime));
+        int tex=s->background.texture,w=texturewidth[tex],h=textureheight[tex]>>FRACBITS;
+        array(obj,"fire",s->type==SkyType_Fire?w*h:0);
+        if(s->type==SkyType_Fire) {
+            json_t *fire=ME_SaveObject(obj,"fire");
+            for(int j=0;j<w*h;j++) {
+                int v=ME_SaveInteger(yyjson_arr_get(fire,j));
+                if(v<0 || v>=array_size(s->palette))I_Error("Invalid saved fire palette index");s->fire[j]=v;
+            }
+            // Rebuild visible columns without consuming RNG or advancing a tic.
+            for(int x=0;x<w;x++) {byte *col=R_GetColumn(tex,x);for(int y=0;y<h;y++)col[y]=s->palette[s->fire[y*w+x]];}
+        }
+    }
+}
 size_t ME_WriteSave(void *out,size_t capacity) {
     if(ME_LevelPhase()!=0 || gameaction!=ga_nothing)return 0;
     json_mut_doc_t *doc=JS_NewDoc();json_mut_t *root=JS_NewObject(doc);JS_SetRoot(doc,root);
@@ -72,6 +113,7 @@ size_t ME_WriteSave(void *out,size_t capacity) {
     for(int i=0;i<numtextures;i++)JS_ArrayAddInt(doc,textures,texturetranslation[i]);
     for(int i=0;i<numflats;i++)JS_ArrayAddInt(doc,flats,flattranslation[i]);
     JS_SetArray(doc,root,"native_textures",textures);JS_SetArray(doc,root,"native_flats",flats);
+    archive_skies(doc,root);
     P_ArchiveKeyframe(doc,root);
     ME_ArchiveNativeUI(doc,root);
     size_t length=0;char *json=JS_DocWriteString(doc,&length);JS_FreeDoc(doc);
@@ -109,6 +151,7 @@ int ME_ReadSave(const void *data,size_t size) {
         int target=ME_SaveInteger(yyjson_arr_get(yyjson_obj_get(root,"native_flats"),i));
         if(target<0 || target>=numflats)I_Error("Invalid saved flat translation");flattranslation[i]=target;
     }
+    restore_skies(root);
     ME_UnArchiveNativeUI(root);ME_ResetRestoredAudio();
     gameaction=ga_nothing;gamestate=GS_LEVEL;secretexit=false;
     yyjson_doc_free(doc);return 1;

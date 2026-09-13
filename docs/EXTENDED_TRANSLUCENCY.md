@@ -1,5 +1,9 @@
 # Rust actor, weapon and wall translucency — 0.10.0 build 157
 
+Current build164 adds the adapters and updated packets documented in
+[EXTENDED_PRESENTATION.md](EXTENDED_PRESENTATION.md). The milestone layout and
+validation details below are retained as implementation history.
+
 The explicit Rust preview draws ordinary translucent actors, additive glowing
 actors and per-state custom blend tables. Opaque geometry and actors draw first;
 translucent actors draw far to near with depth testing and no depth writes.

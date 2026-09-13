@@ -51,6 +51,13 @@ final class ExtendedSceneBuilder {
             } else {_=try image(key)}
             if let target=view.materials.translations[key.unblended] { _=try image(target) }
         }
+        for definition in view.materials.skies.values {
+            for layer in [definition.background,definition.foreground].compactMap({$0}) {
+                let base=MaterialKey(name:layer.name,flat:false)
+                _=try image(base)
+                if let target=view.materials.translations[base] {_=try image(target)}
+            }
+        }
         let sky=try image(MaterialKey(name:view.sky,flat:false))
         for sprite in view.presentation.actors+view.presentation.weapons where indices[sprite.name]==nil {
             guard let index=resources.spriteLumpIndex(sprite.name) else { throw PortError("Missing worker sprite: \(sprite.name)") }

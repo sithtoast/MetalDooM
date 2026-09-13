@@ -1,5 +1,9 @@
 # Rust palette effects — 0.10.0 build 151
 
+Current build164 adds the adapters and updated packets documented in
+[EXTENDED_PRESENTATION.md](EXTENDED_PRESENTATION.md). The milestone layout and
+validation details below are retained as implementation history.
+
 The explicit Rust preview now shows damage and pickup flashes, berserk red,
 radiation-suit green, invulnerability and light amplification. The headless engine
 uses its normal enabled palette option. MUI3/version 3 retains the 144-byte HUD

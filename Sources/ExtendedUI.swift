@@ -4,11 +4,13 @@ struct ExtendedUI {
     let tic:Int,health:Int,armor:Int,weapon:Int,readyAmmo:Int,keys:UInt32,weapons:UInt32
     let ammo:[Int],maxAmmo:[Int],music:String,looping:Bool,musicGeneration:Int,ammoType:Int
     let phase:Int,map:Int,nextMap:Int,kills:Int,totalKills:Int,items:Int,totalItems:Int,secrets:Int,totalSecrets:Int,levelTics:Int,secretExit:Bool
-    let palette:Int,fixedMap:Int
+    let palette:Int,fixedMap:Int,armorType:Int
     var playing:Bool { phase==0 }
     init(data:Data) throws {
         let b=Bytes(data:data)
-        guard data.count==144,data.prefix(4)==Data("MUI3".utf8),try b.i32(4)==3,try b.i32(88)==0 else { throw PortError("Invalid UI snapshot header/length") }
+        let version=try b.i32(4)
+        armorType=try b.i32(88)
+        guard data.count==144,(3...4).contains(version),data.prefix(4)==Data("MUI\(version)".utf8),(0...2).contains(armorType),version==4 || armorType==0 else { throw PortError("Invalid UI snapshot header/length") }
         tic=try b.i32(8);health=try b.i32(12);armor=try b.i32(16);weapon=try b.i32(20);readyAmmo=try b.i32(24)
         let cards=try b.i32(28),owned=try b.i32(32),flags=try b.i32(76)
         musicGeneration=try b.i32(80);ammoType=try b.i32(84)

@@ -1,4 +1,4 @@
-# Bundled single-player preview — 0.10.0 build 160
+# Bundled single-player preview — 0.10.0 build 164
 
 The explicit development preview can now run the rerelease's resource packs on
 Doom II, independently of the Legacy of Rust campaign. The picker can route these explicit plans to the separate worker. Standard
@@ -81,9 +81,12 @@ and both replacement weapons' pickup/firing frames and ammo use in fixtures.
 independent full geometry and checks a named-flat sky with a projected pixel
 oracle. See VALIDATION.md for actual results and the running candidate.
 
-Loading extras makes its resources available. Its custom SBARDEF, carousel/menu
-presentation, alternate `H_` music selection and all presentation-specific cues
-are not implemented. Texture/resource loading does not exercise every authored
-map effect. Full campaign/boss playthroughs, sustained performance, layered/fire
-skies and software sky-stretch parity remain open. Ordinary indexed lighting is implemented; whole-frame software parity remains
-open. EXTENDED_LIGHTING.md records its native pixel evidence and limits.
+The effective bundled SBARDEF now supplies the native HUD tree. Status-bar,
+fullscreen and native minimal choices are available, with supplied carousel art
+on weapon changes. Extras H_ Vorbis soundtracks play when a match exists; the user
+can select original MIDI. Rust's later SBARDEF/weapon patches override support
+resources in the existing load order. See EXTENDED_PRESENTATION.md for the
+supported nodes, recorded-track matching and validation. This adapts the assets
+to the native frontend; it does not reproduce KEX's menus or claim arbitrary
+SBARDEF extensions/general ID24 inventories. Full campaign playthroughs, sustained
+performance and exact software raster/sky-stretch/fuzz matching remain open.

@@ -1,5 +1,9 @@
 # Sky transfers and flat rotation — 0.10.0 build 155
 
+Current build164 adds the adapters and updated packets documented in
+[EXTENDED_PRESENTATION.md](EXTENDED_PRESENTATION.md). The milestone layout and
+validation details below are retained as implementation history.
+
 The explicit Rust preview now draws sector-local Boom sky transfers (271/272)
 and rotated floors/ceilings, including combined offsets (2051–2056). The worker
 owns special activation, sky identities, orientation and live offsets. Rendering

@@ -249,11 +249,13 @@ struct Sector: Equatable {
     var floorLight:Float?=nil,ceilingLight:Float?=nil
     var backFloor:Float?=nil,backCeiling:Float?=nil,backCeilingTexture:String?=nil
     var spriteClip:SIMD2<Float> = SIMD2(-Float.infinity,Float.infinity)
+    var tint:Int=0,floorTint:Int=0,ceilingTint:Int=0
     var backView:Sector {Sector(floor:backFloor ?? floor,ceiling:backCeiling ?? ceiling,light:light,floorTexture:floorTexture,ceilingTexture:backCeilingTexture ?? ceilingTexture)}
 }
 struct Side: Equatable {
     let sector: Int, x: Float, y: Float
     let upper: String, lower: String, middle: String
+    var tint:Int=0
 }
 struct Line: Equatable { let a: Int, b: Int, flags: Int, front: Int, back: Int; var blend:Int=0 }
 struct Seg: Equatable { let a: Int, b: Int, line: Int, side: Int }

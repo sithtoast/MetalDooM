@@ -50,12 +50,12 @@ size_t ME_WriteUI(void *out,size_t capacity) {
     for(int i=0;i<NUMCARDS;i++)if(player->cards[i])keys |= 1u<<i;
     for(int i=0;i<NUMWEAPONS;i++)if(player->weaponowned[i])weapons |= 1u<<i;
     int ammo=weaponinfo[player->readyweapon].ammo;
-    memcpy(p,"MUI3",4);p+=4;word(&p,3);word(&p,leveltime);
+    memcpy(p,"MUI4",4);p+=4;word(&p,4);word(&p,leveltime);
     word(&p,player->health);word(&p,player->armorpoints);word(&p,player->readyweapon);
     word(&p,ammo==am_noammo ? -1:player->ammo[ammo]);word(&p,keys);word(&p,weapons);
     for(int i=0;i<NUMAMMO;i++)word(&p,player->ammo[i]);
     for(int i=0;i<NUMAMMO;i++)word(&p,player->maxammo[i]);
-    memcpy(p,track,8);p+=8;word(&p,looped);word(&p,generation);word(&p,ammo==am_noammo ? -1:ammo);word(&p,0);
+    memcpy(p,track,8);p+=8;word(&p,looped);word(&p,generation);word(&p,ammo==am_noammo ? -1:ammo);word(&p,player->armortype);
     int phase=ME_LevelPhase();
     word(&p,phase);word(&p,gamemap);word(&p,phase==2 ? wminfo.next+1:0);
     word(&p,player->killcount);word(&p,totalkills);word(&p,player->itemcount);word(&p,totalitems);

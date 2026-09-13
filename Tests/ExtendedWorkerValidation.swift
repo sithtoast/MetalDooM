@@ -66,7 +66,15 @@ import Foundation
                 do {try tables.validate(initial.presentation,palette:palette,fixed:fixed,walls:walls)} catch {rejected=true}
                 guard rejected else {throw PortError("Missing wall/color resource accepted")}
             }
-            print("PASS exact TRANMAP bytes, separate additive table, actor selection, stable copied state and 12 malformed blend packets")
+            let bankPacket=Data("MBL4".utf8)+words([4,UInt32(tables.palettes.count),2,8704,0])+Data(tables.palettes+Array(tables.colormaps.prefix(8704))+tables.normal+tables.additive)+words([1,1,0])+Data(Array(tables.colormaps.prefix(8704))+[UInt8](repeating:0,count:256))
+            let bank=try ExtendedBlendTables(data:bankPacket)
+            guard bank.mapCount==2,bank.rowsPerMap==34 else {throw PortError("Incorrect custom bank shape")}
+            try bank.validate(initial.presentation,fixed:32)
+            for fixed in [-1,34,67] {
+                var rejected=false;do {try bank.validate(initial.presentation,fixed:fixed)}catch{rejected=true}
+                guard rejected else {throw PortError("Fixed row crossed into another colormap")}
+            }
+            print("PASS exact TRANMAP bytes, separate additive table, actor selection, stable copied state, 12 malformed blend packets and per-bank fixed-row bounds")
         }
         do {
             let customPaths=[base,fixtures.appendingPathComponent("blend-custom.wad")]
@@ -244,7 +252,7 @@ import Foundation
                 return data
             }
             let invalid=[Data(original.prefix(31)),Data(original.dropLast()),original+Data([0]),
-                mutate(4,6),mutate(12,UInt32.max),mutate(16,3),mutate(28,2),mutate(32,0),mutate(32+28,16),mutate(32+28,64),mutate(32+28,12)]
+                mutate(4,7),mutate(12,UInt32.max),mutate(16,3),mutate(28,2),mutate(32,0),mutate(32+28,16),mutate(32+28,64),mutate(32+28,12)]
             for data in invalid {
                 var rejected=false
                 do { _=try ExtendedPresentation(data:data) } catch { rejected=true }

@@ -17,6 +17,9 @@ func saveAppValidation() throws {
         guard condition() else {throw PortError("Timed out: \(text); \(subject.validationStatus)")}
     }
     try wait("initial"){subject.validationUI != nil}
+    subject.validationChooseHUD(0)
+    subject.validationAdvance(restart:true);try wait("restart retains HUD"){subject.validationPaused && subject.validationUI?.tic==0}
+    guard subject.validationHUD==0 else {throw PortError("Restart lost selected HUD layout")}
     let originalMusic=subject.validationMusic
     subject.validationStep();try wait("initial step"){subject.validationUI!.tic==35 && subject.validationPaused}
     subject.validationSave(file);try wait("save"){subject.validationStatus.hasPrefix("Saved") && subject.validationPaused}
@@ -24,9 +27,9 @@ func saveAppValidation() throws {
     for _ in 0..<2 {
         subject.validationStep();try wait("advance beyond save"){subject.validationUI!.tic==70 && subject.validationPaused}
         subject.validationLoad(file);try wait("load"){subject.validationStatus.hasPrefix("Loaded") && subject.validationPaused}
-        guard subject.validationUI!.tic==35,subject.validationMusic==originalMusic,subject.validationSaveEnabled else {throw PortError("Restore HUD/music/buttons mismatch: \(subject.validationMusic ?? "nil")")}
+        guard subject.validationUI!.tic==35,subject.validationMusic==originalMusic,subject.validationSaveEnabled,subject.validationHUD==0 else {throw PortError("Restore HUD/music/buttons mismatch: \(subject.validationMusic ?? "nil")")}
     }
-    print("PASS native save, two independent worker restores at tic35, subsequent audio/step, paused controls and music")
+    print("PASS native save, two independent worker restores at tic35, subsequent audio/step, paused controls/music and HUD choice retained across restart/load")
     var broken=try Data(contentsOf:file);broken[broken.count-1] ^= 1
     let bad=folder.appendingPathComponent("corrupt.mdrust");try broken.write(to:bad)
     subject.validationLoad(bad);try wait("reject corrupt"){subject.validationStatus.hasPrefix("Save/load failed") && subject.validationPaused}

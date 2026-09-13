@@ -5,6 +5,10 @@ by Chocolate Doom. Built for macOS 14 or later; Intel Macs are not supported.
 
 **Version 0.10.0 · experimental source preview · local builds are not notarized.**
 
+Build 164 adds [fire/layered skies, brightmaps, tints and bundled HUD/music
+presentation](docs/EXTENDED_PRESENTATION.md). The preview offers authored WAD HUDs,
+weapon carousel art and recorded extras tracks with an original MIDI option.
+
 Build 160 adds [indexed preview lighting](docs/EXTENDED_LIGHTING.md) and
 [bundled content choices in the WAD picker](docs/EXTENDED_BUNDLED.md). Select Rust
 or a resource/weapon/texture/music plan with the appropriate rerelease files.

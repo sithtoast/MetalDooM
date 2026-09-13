@@ -24,13 +24,15 @@ extension Renderer {
         blendBytes.withUnsafeBytes{blendTexture.replace(region:MTLRegionMake2D(0,0,256,256),mipmapLevel:0,withBytes:$0.baseAddress!,bytesPerRow:1024)}
         let output=try texture(.bgra8Unorm,256,[UInt8](repeating:0,count:1024),1024)
         let paletteBuffer=device.makeBuffer(bytes:palette,length:palette.count,options:.storageModeShared)!
-        let mapBuffer=device.makeBuffer(bytes:maps,length:maps.count,options:.storageModeShared)!
+        let tint=maps.prefix(8704).map{UInt8((Int($0)+17)%256)},mask=(0..<256).map{UInt8($0%5==1 ? 1:0)}
+        let bank=Array(maps.prefix(8704))+tint+mask
+        let mapBuffer=device.makeBuffer(bytes:bank,length:bank.count,options:.storageModeShared)!
         let depthDescriptor=MTLTextureDescriptor.texture2DDescriptor(pixelFormat:.depth32Float,width:256,height:1,mipmapped:false)
         depthDescriptor.storageMode = .private;depthDescriptor.usage = .renderTarget
         let depthTexture=device.makeTexture(descriptor:depthDescriptor)!
         var samples=0
         // Independent integer light-table oracle: native shaders provide output.
-        for kind in 1...4 {for level in [0,1,4,8,12,15] {for distance in [16,64,128,256,512,1024,2048] {for fixed in [0,1,32] {
+        for mode in 0...3 {for kind in 1...4 {for level in [0,1,4,8,12,15] {for distance in [16,64,128,256,512,1024,2048] {for fixed in [0,1,32] {
             for fullbright in (kind>=3 ? [false,true]:[false]) {for blended in [false,true] {
                 var row:Int
                 if fixed>0 {row=fixed}
@@ -46,7 +48,7 @@ extension Renderer {
                 }
                 let d=Float(distance)
                 func v(_ x:Float,_ y:Float,_ u:Float,_ z:Float)->WorldVertex {
-                    WorldVertex(position:SIMD4(x*d,y*d,0,d),uvLight:SIMD4(u,z,0.5,fullbright ? 1:0),lighting:SIMD4(Float(level),Float(kind),0,0))
+                    WorldVertex(position:SIMD4(x*d,y*d,0,d),uvLight:SIMD4(u,z,0.5,fullbright ? 1:0),lighting:SIMD4(Float(level),Float(kind),mode>=2 ? 8704:0,mode%2==1 ? 17408:0))
                 }
                 let vertices=[v(-1,-1,0,1),v(1,-1,256,1),v(1,1,256,0),v(-1,-1,0,1),v(1,1,256,0),v(-1,1,0,0)]
                 let pass=MTLRenderPassDescriptor();pass.colorAttachments[0].texture=output;pass.colorAttachments[0].clearColor=MTLClearColorMake(Double(bgRGB[0])/255,Double(bgRGB[1])/255,Double(bgRGB[2])/255,1);pass.colorAttachments[0].loadAction = .clear;pass.colorAttachments[0].storeAction = .store
@@ -55,7 +57,7 @@ extension Renderer {
                 e.setFrontFacing(.counterClockwise)
                 e.setRenderPipelineState(blended ? programs.translucentSprite:kind<=2 ? pipeline:spritePipeline)
                 e.setVertexBytes(vertices,length:vertices.count*MemoryLayout<WorldVertex>.stride,index:0)
-                var matrix=matrix_identity_float4x4,power=SIMD4<Float>(-Float(fixed),0,0,-1),emission=SIMD4<Float>.zero
+                var matrix=matrix_identity_float4x4,power=SIMD4<Float>(-Float(fixed),0,0,-1),emission=SIMD4<Float>(0,0,0,mode%2==1 ? 17408:0)
                 e.setVertexBytes(&matrix,length:64,index:1);e.setFragmentBytes(&power,length:16,index:2);e.setFragmentBytes(&emission,length:16,index:11)
                 e.setFragmentBuffer(paletteBuffer,offset:0,index:3);e.setFragmentBuffer(mapBuffer,offset:0,index:4)
                 e.setFragmentTexture(source,index:0);e.setFragmentTexture(indices,index:3);e.setFragmentTexture(blendTexture,index:2)
@@ -64,7 +66,8 @@ extension Renderer {
                 guard command.status == .completed else {throw PortError("Lighting GPU command failed")}
                 var result=[UInt8](repeating:0,count:1024);output.getBytes(&result,bytesPerRow:1024,from:MTLRegionMake2D(0,0,256,1),mipmapLevel:0)
                 for i in 0..<256 {
-                    let mapped=Int(maps[row*256+i]),entry=(blended ? (canonicalBG+mapped)%256:mapped)*3
+                    let selectedRow=fixed==0 && mode%2==1 && mask[i] != 0 ? 0:row
+                    let mapped=Int((mode>=2 ? tint:maps)[selectedRow*256+i]),entry=(blended ? (canonicalBG+mapped)%256:mapped)*3
                     for c in 0..<3 where result[i*4+c] != palette[entry+2-c] {
                         throw PortError("Indexed light mismatch kind\(kind) level\(level) depth\(distance) fixed\(fixed) full\(fullbright) index\(i) row\(row): \(result[i*4+c]) != \(palette[entry+2-c])")
                     }
@@ -72,6 +75,7 @@ extension Renderer {
                 }
             }}
         }}}}
+        }
         print("PASS \(samples) native indexed plane/wall/actor/weapon samples, discrete distance tables, fullbright, fixed-map and blend-table precedence")
     }
 }

@@ -299,7 +299,7 @@ struct Geometry {
             let four = vertex(a,top,u,anchor-top+side.y,light)
             // w marks directional walls; the fragment shader rejects the far side.
             var vertices = [one,two,three,one,three,four]
-            for i in vertices.indices { vertices[i].uvLight.w = 1;vertices[i].lighting=SIMD4(wallLight,2,0,0) }
+            for i in vertices.indices { vertices[i].uvLight.w = 1;vertices[i].lighting=SIMD4(wallLight,2,Float(side.tint*8704),0) }
             groups[MaterialKey(name:texture,flat:texture == "F_SKY1",blend:blend,sky:sky), default:[]] += vertices
         }
         for index in lineIndices ?? Array(map.lines.indices) {
@@ -386,7 +386,7 @@ struct Geometry {
                 for points in triangles {
                     let triangle = points.map { p in
                         var result=vertex(SIMD2<Float>(p),height,Float(p.x*c-p.y*s)+u,Float(-p.x*s-p.y*c)+v,max(0.12,(ceiling ? sector.ceilingLight:sector.floorLight) ?? sector.light))
-                        result.lighting=SIMD4(floor((((ceiling ? sector.ceilingLight:sector.floorLight) ?? sector.light)*255).rounded()/16),1,0,0)
+                        result.lighting=SIMD4(floor((((ceiling ? sector.ceilingLight:sector.floorLight) ?? sector.light)*255).rounded()/16),1,Float((ceiling ? sector.ceilingTint:sector.floorTint)*8704),0)
                         return result
                     }
                     groups[MaterialKey(name:name,flat:true,sky:skyID),default:[]] += triangle

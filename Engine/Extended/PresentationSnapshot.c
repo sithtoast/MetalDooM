@@ -9,6 +9,7 @@
 #include "r_state.h"
 #include "r_main.h"
 #include "r_tranmap.h"
+#include "r_bmaps.h"
 #include "w_wad.h"
 #include "i_system.h"
 #include <string.h>
@@ -48,10 +49,10 @@ size_t ME_WritePresentation(void *out,size_t capacity) {
         if(t->function.p1==P_MobjThinker && eligible((mobj_t *)t))actors++;
     for(int i=0;i<NUMPSPRITES;i++)if(players[0].psprites[i].state && !invisible(players[0].psprites[i].state->sprite))weapons++;
     if(actors>1000000 || weapons>2)I_Error("Excessive presentation count");
-    size_t size=32+(size_t)actors*56+(size_t)weapons*24;
+    size_t size=32+(size_t)actors*64+(size_t)weapons*32;
     if(!out || capacity<size)return size;
-    unsigned char *p=out;memcpy(p,"MSP5",4);p+=4;
-    word(&p,5);word(&p,leveltime);word(&p,actors);word(&p,weapons);
+    unsigned char *p=out;memcpy(p,"MSP6",4);p+=4;
+    word(&p,6);word(&p,leveltime);word(&p,actors);word(&p,weapons);
     word(&p,players[0].readyweapon);
     int ammo=weaponinfo[players[0].readyweapon].ammo;
     word(&p,ammo==am_noammo ? -1:players[0].ammo[ammo]);word(&p,players[0].mo->interp > 0 ? 0:1);
@@ -74,6 +75,9 @@ size_t ME_WritePresentation(void *out,size_t capacity) {
         word(&p,(f->flip[rot]?1:0)|((m->frame & FF_FULLBRIGHT)?2:0)|((m->flags & MF_SHADOW)?4:0)|blend|(m->interp==1 && m->native_previous_tic==leveltime?32:0));
         word(&p,m->info->doomednum);word(&p,m->state-states);
         for(int i=0;i<4;i++)word(&p,m->native_previous[i]);
+        const byte *mask=R_BrightmapForState(m->state-states);
+        if(mask==nobrightmap)mask=R_BrightmapForSprite(m->sprite);
+        word(&p,ME_ThingTint(m));word(&p,ME_BrightMask(mask));
     }
     for(int i=0;i<NUMPSPRITES;i++) {
         pspdef_t *psp=&players[0].psprites[i];if(!psp->state || invisible(psp->state->sprite))continue;
@@ -89,6 +93,7 @@ size_t ME_WritePresentation(void *out,size_t capacity) {
         int fuzz=players[0].powers[pw_invisibility]>128 || (players[0].powers[pw_invisibility]&8);
         word(&p,(f->flip[0]?1:0)|((psp->state->frame & FF_FULLBRIGHT)?2:0)|
             (fuzz?4:0)|blend_flags(players[0].mo,psp->state,fuzz,0));
+        word(&p,ME_ThingTint(players[0].mo));word(&p,ME_BrightMask(R_BrightmapForState(psp->state-states)));
     }
     return size;
 }

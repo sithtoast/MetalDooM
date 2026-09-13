@@ -1,4 +1,4 @@
-# Rust native preview — 0.10.0 build 160
+# Rust native preview — 0.10.0 build 164
 
 An explicit development preview now starts the extended simulation in a separate
 child process and draws its copied geometry with the existing native Metal world
@@ -97,7 +97,7 @@ clock supports counting stats, entering markers, stories, credits and the custom
 cast without ticking the simulation. Pause/Restart also work during presentation.
 
 Build 159 adds optional bundled Doom II content profiles, extras resource loading
-and named SKYDEFS flat support; see EXTENDED_BUNDLED.md. Build 160 adds indexed native lighting and picker integration; see
+and named SKYDEFS flat support; see EXTENDED_BUNDLED.md. Build 164 adds authored brightmaps/tints, fire/layered skies and bundled HUD/music; see EXTENDED_PRESENTATION.md. Build 160 adds indexed native lighting and picker integration; see
 EXTENDED_LIGHTING.md and BRANCH_ACCEPTANCE.md for remaining acceptance limits.
 
 ## Process and protocol
@@ -126,7 +126,7 @@ paths. Every request/reply header is 16 bytes, little-endian:
 
 Operations: 1 ticks (1–35 six-byte commands); 2 geometry (empty body); 3 graceful
 quit (empty body/reply); 4 lifecycle action (u32: 0 restart, 1 continue).
-Operation 8 copies the [MBL3 blend/color tables](EXTENDED_TRANSLUCENCY.md)
+Operation 8 copies the [MBL4 blend/color/brightmap tables](EXTENDED_PRESENTATION.md)
 with an empty request; Swift fetches them at startup and refreshes after level
 changes and restore. Operations 5–7 carry
 campaign metadata and private Save/Restore (see their linked contracts).
@@ -137,9 +137,9 @@ byte or command terminates the session with a bounded error reply.
 
 Startup and geometry replies carry an `MVW5` body: magic, tic, fixed x/y/eye-z,
 unsigned Doom angle, signed health, eight-byte sky name, geometry byte count,
-sprite byte count, material byte count, audio byte count, UI byte count (56 bytes total), then optional [MGE5](EXTENDED_GEOMETRY.md),
-required [MSP5](EXTENDED_SPRITES.md), [MMT1](EXTENDED_MATERIALS.md) and
-[MSA1](EXTENDED_AUDIO.md) and [MUI3](EXTENDED_LIFECYCLE.md). Tick replies
+sprite byte count, material byte count, audio byte count, UI byte count (56 bytes total), then optional [MGE6](EXTENDED_PRESENTATION.md),
+required [MSP6](EXTENDED_PRESENTATION.md), [MMT2](EXTENDED_PRESENTATION.md) and
+[MSA1](EXTENDED_AUDIO.md) and [MUI4](EXTENDED_PRESENTATION.md). Tick replies
 include geometry when changed and always include sprite/material/UI state and drained sound events. Old body versions reject. Swift checks envelope size/
 sequence/status, view/geometry/sprite/material/audio/UI tic agreement, map identity and stable content identity. Maximum reply
 is 160 MiB + 56 bytes; errors are at most 2048 bytes. Startup/requests have a

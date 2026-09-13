@@ -1,5 +1,9 @@
 # Copied Rust actor and weapon frames — MSP5, build 157
 
+Current build164 adds the adapters and updated packets documented in
+[EXTENDED_PRESENTATION.md](EXTENDED_PRESENTATION.md). The milestone layout and
+validation details below are retained as implementation history.
+
 `ME_CopyPresentation` returns an MSP5 snapshot on the session thread between
 ticks. NULL queries required bytes; insufficient capacity returns that size and
 leaves the buffer untouched. Zero means no ready session/error. It is an additive

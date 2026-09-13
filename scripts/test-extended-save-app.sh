@@ -20,6 +20,8 @@ s=s.replace('func applicationDidResignActive(_ notification:Notification) { paus
 s=s.replace('func windowDidResignKey(_ notification:Notification) { pause() }','func windowDidResignKey(_ notification:Notification) { if !validationControlsFocus {pause()} }')
 s+='''
 extension ExtendedPreviewApp {
+    var validationHUD:Int {renderer.extendedHUD}
+    func validationChooseHUD(_ index:Int) {let popup=NSPopUpButton();popup.addItems(withTitles:["bar","fullscreen","minimal"]);popup.selectItem(at:index);changeHUD(popup)}
     var validationUI:ExtendedUI? {levelUI}
     var validationStatus:String {status.stringValue}
     var validationSaveEnabled:Bool {saveButton.isEnabled}

@@ -6,6 +6,10 @@
 #include "p_tick.h"
 #include "p_mobj.h"
 #include "r_state.h"
+#include "r_main.h"
+#include "r_data.h"
+#include "r_bmaps.h"
+extern int numtextures,firstcolormaplump;
 #include "w_wad.h"
 #include "z_zone.h"
 #include "i_system.h"
@@ -35,7 +39,7 @@ void ME_InitBlendTables(void) {
     if(table_count || !main_tranmap || !main_addimap)I_Error("Invalid blend table initialization");
     tables[0]=main_tranmap;tables[1]=main_addimap;table_count=2;
     for(int state=0;state<num_states;state++)register_table(states[state].tranmap);
-    state_table_count=table_count;
+    state_table_count=table_count;ME_InitLighting();
 }
 void ME_LevelBlendTables(void) {
     table_count=state_table_count;
@@ -49,13 +53,26 @@ size_t ME_WriteBlendTables(void *out,size_t capacity) {
     int colors=W_LumpLength(palette),mapping=W_LumpLength(maps);
     if(colors<768 || colors%768 || colors>256*768 || mapping<256 || mapping%256 || mapping>256*256)
         I_Error("Invalid palette/colormap resource sizes");
-    const size_t size=24+(size_t)colors+mapping+(size_t)table_count*65536;
+    if(numcolormaps<1 || numcolormaps>256)I_Error("Excessive tint bank");
+    unsigned bindings=0;
+    for(int flat=0;flat<2;flat++)for(int i=flat?0:1;i<(flat?numflats:numtextures);i++)
+        if(ME_BrightMask(flat?R_BrightmapForFlatNum(i):R_BrightmapForTexName(textures[i]->name)))bindings++;
+    for(int i=1;i<numcolormaps;i++)if(W_LumpLength(firstcolormaplump+i)<34*256)I_Error("Short custom colormap");
+    const size_t extra=12+(numcolormaps-1)*34*256+ME_BrightMaskCount()*256+bindings*16;
+    const size_t size=extra+24+(size_t)colors+mapping+(size_t)table_count*65536;
     if(!out || capacity<size)return size;
-    unsigned char *p=out;memcpy(p,"MBL3",4);p+=4;
-    word(&p,3);word(&p,colors);word(&p,table_count);word(&p,mapping);word(&p,0);
+    unsigned char *p=out;memcpy(p,"MBL4",4);p+=4;
+    word(&p,4);word(&p,colors);word(&p,table_count);word(&p,mapping);word(&p,0);
     memcpy(p,W_CacheLumpNum(palette,PU_CACHE),colors);p+=colors;
     memcpy(p,W_CacheLumpNum(maps,PU_CACHE),mapping);p+=mapping;
     for(unsigned i=0;i<table_count;i++){memcpy(p,tables[i],65536);p+=65536;}
+    word(&p,numcolormaps-1);word(&p,ME_BrightMaskCount());word(&p,bindings);
+    for(int i=1;i<numcolormaps;i++){memcpy(p,colormaps[i],34*256);p+=34*256;}
+    for(unsigned i=0;i<ME_BrightMaskCount();i++){memcpy(p,ME_BrightMaskData(i),256);p+=256;}
+    for(int flat=0;flat<2;flat++)for(int i=flat?0:1;i<(flat?numflats:numtextures);i++) {
+        unsigned mask=ME_BrightMask(flat?R_BrightmapForFlatNum(i):R_BrightmapForTexName(textures[i]->name));if(!mask)continue;
+        memcpy(p,flat?lumpinfo[firstflat+i].name:textures[i]->name,8);p+=8;word(&p,flat);word(&p,mask);
+    }
     return size;
 }
 

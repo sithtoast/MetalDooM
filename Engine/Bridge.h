@@ -112,3 +112,6 @@ int MD_ConfigureWADStack(const char *paths, const int32_t *order, int count);
 
 // Main-thread offline OPL2 rendering; 44.1 kHz stereo WAV, maximum ten minutes.
 int MD_RenderOPL(const void *genmidi, int length, const char *midiPath, const char *wavPath);
+
+int MD_DecodeVorbis(const uint8_t *data,int length,int16_t **pcm,int *channels,int *rate);
+void MD_FreeVorbis(int16_t *pcm);

@@ -4,6 +4,25 @@ User-visible changes are recorded by successful app build. Build numbers can ski
 when intermediate builds were used for validation. WADs and generated artifacts
 are never included in the repository.
 
+## 0.10.0 refinement — sky, lighting and bundled presentation (build 164)
+
+- Render procedural fire skies from the engine's generated pixels and compose
+  independently scrolling sky layers with index-zero transparency. Save/Load now
+  preserves fire buffers, update phase and both layers' scroll positions.
+- Apply authored per-color brightmaps and custom side, sector, plane and actor
+  colormaps, including inherited camera/control-sector tints and fixed-map
+  precedence before translucency.
+- Offer the selected WAD's status bar or fullscreen HUD alongside native minimal
+  HUD, and show supplied weapon carousel icons when the selected weapon changes.
+  Resource overrides select Rust's own HUD and weapon artwork.
+- Play matching recorded H_ soundtracks from extras, including repeated-track
+  aliases, with original MIDI selection and fallback. Package an MIT-licensed
+  Vorbis decoder; no external audio installation is needed.
+- Validate 1,548,288 indexed lighting samples, 49,152 layered-sky pixels, all six
+  bundled HUD roles, 44 recorded tracks, restored sky animation, 352 bundled map
+  checks and classic/extended Metal regressions. Full campaign playthroughs and
+  exact software rasterization remain separate acceptance work.
+
 ## 0.10.0 refinement — indexed lighting and bundled WAD picker (build 160)
 
 - Add Rust and bundled content choices to the WAD picker, assembling resource

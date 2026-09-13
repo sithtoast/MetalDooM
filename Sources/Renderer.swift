@@ -10,8 +10,11 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var transparentWorld:TranslucentWorld?
     private var indexFallback:MTLTexture?
     var extendedIndexedLighting=true
+    var extendedHUD=1
+    func setPreviewHUD(_ value:Int){sprites?.previewHUD=value;hudStyle=value==0 ? .classic:.minimal}
     private var previewIndices:[MaterialKey:MTLTexture]=[:]
     private var extendedPalette:MTLBuffer?,extendedColormaps:MTLBuffer?,colorFallback:MTLBuffer?
+    private var previewColors:ExtendedBlendTables?
     private var previewPaletteIndex:UInt32=0
     private func bindColors(_ encoder:MTLRenderCommandEncoder) {
         if colorFallback==nil {colorFallback=device.makeBuffer(length:768,options:.storageModeShared)}
@@ -20,6 +23,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             d.storageMode = .shared;d.usage = .shaderRead;indexFallback=device.makeTexture(descriptor:d)
             var zero:UInt8=0;indexFallback?.replace(region:MTLRegionMake2D(0,0,1,1),mipmapLevel:0,withBytes:&zero,bytesPerRow:1)
         }
+        var emission=SIMD4<Float>.zero;encoder.setFragmentBytes(&emission,length:16,index:11)
         encoder.setFragmentTexture(indexFallback,index:3)
         encoder.setFragmentBuffer(extendedPalette ?? colorFallback,offset:0,index:3)
         encoder.setFragmentBuffer(extendedColormaps ?? colorFallback,offset:0,index:4)
@@ -243,6 +247,9 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var resolutionKey = ""
     private var weaponSnapshot: MTLTexture?
     private var sky: MTLTexture?
+    private var previewSkyDefinitions:[Int:ExtendedMaterials.Sky]=[:]
+    private var previewForegroundTextures:[String:MTLTexture]=[:]
+    private var previewFireTextures:[Int:MTLTexture]=[:]
     private var skyGeometry: MTLBuffer?
     private var skyVertexCount = 0
     private var textureHeights: [String:Float] = [:]
@@ -347,11 +354,11 @@ final class Renderer: NSObject, MTKViewDelegate {
         using namespace metal;
         \(WorldSampling.shader)
         struct Vertex { float4 position; float4 uvLight; float4 lighting; };
-        struct Out { float4 position [[position]]; float2 uv; float light; float distance; float fullbright; float3 world; float2 lighting [[flat]]; };
+        struct Out { float4 position [[position]]; float2 uv; float light; float distance; float fullbright; float3 world; float4 lighting [[flat]]; };
         vertex Out worldVertex(uint id [[vertex_id]], const device Vertex *v [[buffer(0)]],
                                constant float4x4 &matrix [[buffer(1)]]) {
             Out o; o.position = matrix * v[id].position; o.uv = v[id].uvLight.xy;
-            o.lighting=v[id].lighting.xy; o.world = v[id].position.xyz; o.light = v[id].uvLight.z; o.distance = o.position.w; o.fullbright = v[id].uvLight.w; return o;
+            o.lighting=v[id].lighting; o.world = v[id].position.xyz; o.light = v[id].uvLight.z; o.distance = o.position.w; o.fullbright = v[id].uvLight.w; return o;
         }
         uint paletteIndex(float3 color, constant uchar *palette) {
             int3 rgb=int3(round(clamp(color,0.0,1.0)*255.0));
@@ -376,15 +383,17 @@ final class Renderer: NSObject, MTKViewDelegate {
             else scale=clamp(int(floor(2560.0/max(distance,0.001))),0,47);
             return uint(clamp(start-scale/2,0,31));
         }
-        uint indexedEntry(uint source,float2 lighting,float distance,bool fullbright,float4 power,constant uchar *maps) {
-            return maps[lightRow(lighting,distance,fullbright,power)*256+source];
+        uint indexedEntry(uint source,float4 lighting,float distance,bool fullbright,float4 power,constant uchar *maps,float mask=0) {
+            float offset=lighting.y>=3 ? lighting.w:mask;
+            bool bright=offset>0 && maps[uint(offset)+source]!=0;
+            return maps[uint(lighting.z)+lightRow(lighting.xy,distance,fullbright || bright,power)*256+source];
         }
         float3 paletteColor(uint entry,constant uchar *palette) {
             return float3(palette[entry*3],palette[entry*3+1],palette[entry*3+2])/255.0;
         }
         float3 powerColor(float3 rgb, float4 power, constant uchar *palette, constant uchar *maps) {
-            if(power.x<0) {
-                uint entry=maps[uint(-power.x)*256+paletteIndex(rgb,palette)];
+            if(power.x<0 || power.w < -1) {
+                uint entry=maps[uint(max(0.0,-power.w-1))+uint(max(0.0,-power.x))*256+paletteIndex(rgb,palette)];
                 return float3(palette[entry*3],palette[entry*3+1],palette[entry*3+2])/255.0;
             }
             if (power.x > 0) return float3(floor((1.0-dot(rgb,float3(0.299,0.587,0.114)))*31.0)/31.0);
@@ -417,7 +426,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             if(power.w<0 && in.lighting.y>0) {
                 float2 size=float2(tex.get_width(),tex.get_height());
                 uint2 pixel=uint2(floor(in.uv-floor(in.uv/size)*size));
-                return float4(paletteColor(indexedEntry(indices.read(pixel).r,in.lighting,in.distance,false,power,maps),palette),1);
+                return float4(paletteColor(indexedEntry(indices.read(pixel).r,in.lighting,in.distance,false,power,maps,emission.w),palette),1);
             }
             float shade = (power.x>0 || power.y>0) ? 1.0 : in.light * clamp(1.0 - in.distance / 3200.0, 0.3, 1.0);
             return float4(powerColor(emissiveColor(c.rgb,c.rgb*shade,emission,power),power,palette,maps), 1.0);
@@ -438,7 +447,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         fragment float4 translucentSpriteFragment(Out in [[stage_in]], bool front [[front_facing]], float4 background [[color(0)]],
                 texture2d<float> tex [[texture(0)]], texture2d<float,access::read> table [[texture(2)]],
                 texture2d<uint,access::read> indices [[texture(3)]], constant uchar *palette [[buffer(3)]], constant uchar *maps [[buffer(4)]],
-                constant float4 &power [[buffer(2)]], constant uint &wall [[buffer(5)]]) {
+                constant float4 &power [[buffer(2)]], constant uint &wall [[buffer(5)]], constant float4 &emission [[buffer(11)]]) {
             if(wall && !front) discard_fragment();
             float2 uv=in.uv;
             if(wall) uv.x=uv.x-floor(uv.x/tex.get_width())*tex.get_width();
@@ -447,7 +456,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             if(c.a<0.5) discard_fragment();
             float shade=power.y>0 || (!wall && in.fullbright>0.5) ? 1.0:in.light*clamp(1.0-in.distance/3200.0,0.3,1.0);
             uint foreground;
-            if(power.w<0 && in.lighting.y>0) foreground=indexedEntry(indices.read(pixel).r,in.lighting,in.distance,!wall && in.fullbright>0.5,power,maps);
+            if(power.w<0 && in.lighting.y>0) foreground=indexedEntry(indices.read(pixel).r,in.lighting,in.distance,!wall && in.fullbright>0.5,power,maps,emission.w);
             else {
                 foreground=shade==1.0 ? indices.read(pixel).r:paletteIndex(c.rgb*shade,palette);
                 if(power.x<0) foreground=maps[uint(-power.x)*256+foreground];
@@ -477,20 +486,25 @@ final class Renderer: NSObject, MTKViewDelegate {
             constexpr sampler s(coord::normalized, s_address::repeat, t_address::clamp_to_edge, filter::nearest);
             return float4(tex.sample(s,uv).rgb,1);
         }
+        float4 mappedSky(float3 direction,texture2d<float> tex,float4 mapping) {
+            if(mapping.z==0) return skyColor(direction,tex);
+            float angle=atan2(-direction.z,direction.x);
+            float column=floor(fract(angle/(2*M_PI_F)+mapping.x/1024.0)*1024.0)*mapping.z;
+            float slope=direction.y/max(length(direction.xz),0.0001);
+            float2 uv=float2(column/tex.get_width(),(mapping.y-160*slope*mapping.w)/tex.get_height());
+            constexpr sampler s(coord::normalized,address::repeat,filter::nearest);
+            return tex.sample(s,uv);
+        }
+        float3 layeredSky(float3 direction,texture2d<float> tex,texture2d<float> foreground,float4 mapping,float4 frontMapping) {
+            float3 color=mappedSky(direction,tex,mapping).rgb;
+            if(frontMapping.z!=0) {float4 front=mappedSky(direction,foreground,frontMapping);color=mix(color,front.rgb,front.a);}
+            return color;
+        }
         fragment float4 skySurfaceFragment(Out in [[stage_in]], bool front [[front_facing]],
-                    constant float4 &eye [[buffer(0)]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]], constant uchar *palette [[buffer(3)]], constant uchar *maps [[buffer(4)]], constant float4 &mapping [[buffer(6)]]) {
+                    constant float4 &eye [[buffer(0)]], texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]], constant uchar *palette [[buffer(3)]], constant uchar *maps [[buffer(4)]], constant float4 &mapping [[buffer(6)]], constant float4 &frontMapping [[buffer(7)]], texture2d<float> foreground [[texture(4)]]) {
             if (in.fullbright > 0.5 && !front) discard_fragment();
             float3 direction=in.world-eye.xyz;
-            float3 color;
-            if(mapping.z==0) color=skyColor(direction,tex).rgb;
-            else {
-                float angle=atan2(-direction.z,direction.x);
-                float column=floor(fract(angle/(2*M_PI_F)+mapping.x/1024.0)*1024.0)*mapping.z;
-                float slope=direction.y/max(length(direction.xz),0.0001);
-                float2 uv=float2(column/tex.get_width(),(mapping.y-160*slope*mapping.w)/tex.get_height());
-                constexpr sampler s(coord::normalized,address::repeat,filter::nearest);
-                color=tex.sample(s,uv).rgb;
-            }
+            float3 color=layeredSky(direction,tex,foreground,mapping,frontMapping);
             return float4(powerColor(color,power,palette,maps),1);
         }
         struct SkyOut { float4 position [[position]]; float2 uv; };
@@ -500,11 +514,11 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         fragment float4 tintFragment(SkyOut in [[stage_in]], constant float4 &color [[buffer(0)]]) { return color; }
         fragment float4 skyFragment(SkyOut in [[stage_in]], constant float4 &camera [[buffer(0)]],
-                                    texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]], constant uchar *palette [[buffer(3)]], constant uchar *maps [[buffer(4)]]) {
+                                    texture2d<float> tex [[texture(0)]], constant float4 &power [[buffer(2)]], constant uchar *palette [[buffer(3)]], constant uchar *maps [[buffer(4)]], constant float4 &mapping [[buffer(6)]], constant float4 &frontMapping [[buffer(7)]], texture2d<float> foreground [[texture(4)]]) {
             float x = (in.uv.x*2.0-1.0)*camera.z*0.57735027;
             float y = (in.uv.y*2.0-1.0)*0.57735027;
             float f = cos(camera.y)-y*sin(camera.y), h = sin(camera.y)+y*cos(camera.y);
-            return float4(powerColor(skyColor(float3(cos(camera.x)*f+sin(camera.x)*x,h,-sin(camera.x)*f+cos(camera.x)*x),tex).rgb,power,palette,maps),1);
+            return float4(powerColor(layeredSky(float3(cos(camera.x)*f+sin(camera.x)*x,h,-sin(camera.x)*f+cos(camera.x)*x),tex,foreground,mapping,frontMapping),power,palette,maps),1);
         }
         """
         worldShader=shader;worldFormat=view.colorPixelFormat
@@ -664,9 +678,13 @@ final class Renderer: NSObject, MTKViewDelegate {
                 previewIndices[key]=t
             }
         }
+        if let colors=scene.view.blendTables {
+            guard scene.view.materials.skies.values.allSatisfy({$0.tint<colors.mapCount}),scene.copiedGeometry.map.sides.allSatisfy({$0.tint<colors.mapCount}),scene.copiedGeometry.map.sectors.allSatisfy({$0.tint<colors.mapCount && $0.floorTint<colors.mapCount && $0.ceilingTint<colors.mapCount}) else {throw PortError("Missing surface colormap")}
+        }
+        previewColors=scene.view.blendTables
         if extendedPalette==nil,let colors=scene.view.blendTables {
             extendedPalette=device.makeBuffer(bytes:colors.palettes,length:colors.palettes.count,options:.storageModeShared)
-            extendedColormaps=device.makeBuffer(bytes:colors.colormaps,length:colors.colormaps.count,options:.storageModeShared)
+            extendedColormaps=device.makeBuffer(bytes:colors.gpuMaps,length:colors.gpuMaps.count,options:.storageModeShared)
             guard extendedPalette != nil,extendedColormaps != nil else {throw PortError("Cannot allocate palette/colormap resources")}
         }
         if previewSurfaceMesh==nil {
@@ -682,8 +700,27 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         previewSurfaces.accept(scene.copiedGeometry.map);previewSurfaceFraction=1
         previewActors=scene.view.presentation.actors
-        sky=textures[MaterialKey(name:scene.view.sky,flat:false)]
+        for definition in scene.view.materials.skies.values {
+            guard let foreground=definition.foreground else {continue}
+            let base=MaterialKey(name:foreground.name,flat:false),key=scene.view.materials.translations[base] ?? base
+            if previewForegroundTextures[key.name]==nil,
+               let source=scene.images[key],let indices=source.paletteIndices {
+                var rgba=source.rgba
+                for i in indices.indices {rgba[i*4+3]=indices[i]==0 ? 0:255}
+                previewForegroundTextures[key.name]=try texture(PixelImage(width:source.width,height:source.height,rgba:rgba))
+            }
+        }
+        previewSkyDefinitions=scene.view.materials.skies
+        for (id,definition) in previewSkyDefinitions where !definition.pixels.isEmpty {
+            let palette=scene.view.blendTables!.palette
+            let rgba=definition.pixels.flatMap {i->[UInt8] in let p=Int(i)*3;return [palette[p],palette[p+1],palette[p+2],255]}
+            if let t=previewFireTextures[id],t.width==definition.width,t.height==definition.height {
+                rgba.withUnsafeBytes {t.replace(region:MTLRegionMake2D(0,0,t.width,t.height),mipmapLevel:0,withBytes:$0.baseAddress!,bytesPerRow:t.width*4)}
+            } else {previewFireTextures[id]=try texture(PixelImage(width:definition.width,height:definition.height,rgba:rgba))}
+        }
         previewTranslations=scene.view.materials.translations
+        let skyBase=MaterialKey(name:scene.view.sky,flat:false)
+        sky=previewSkyDefinitions[1]?.pixels.isEmpty==false ? previewFireTextures[1]:textures[previewTranslations[skyBase] ?? skyBase]
         position=SIMD2(scene.view.x,scene.view.y);eyeZ=scene.view.eyeZ;yaw=scene.view.angle;pitch=0
         previewInterpolation.accept(.init(tic:scene.view.tic,map:scene.view.ui.map,
             playing:scene.view.ui.playing,snap:scene.view.presentation.snapCamera,
@@ -704,6 +741,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         try sprites?.setPreview(things:actors,weapons:weapons,images:scene.spritePatches,
             blend:scene.view.presentation.actors.map(\.blendTable),weaponBlend:scene.view.presentation.weapons.map(\.blendTable),
+            lighting:scene.view.presentation.actors.map{SIMD2(Float($0.tint*8704),scene.view.blendTables!.maskOffset($0.brightmap))},
+            weaponLighting:scene.view.presentation.weapons.map{SIMD2(Float($0.tint*8704),scene.view.blendTables!.maskOffset($0.brightmap))},
             clips:scene.view.presentation.actors.map {actor in
                 let map=scene.copiedGeometry.map
                 return map.sectors[map.sector(at:SIMD2(actor.x,actor.y))].spriteClip
@@ -713,9 +752,11 @@ final class Renderer: NSObject, MTKViewDelegate {
         hud.health=Int32(ui.health);hud.armor=Int32(ui.armor);hud.readyAmmo=Int32(ui.readyAmmo);hud.readyWeapon=Int32(ui.weapon)
         hud.keys=ui.keys;hud.weapons=ui.weapons
         previewWeaponLabel=extendedRustWeaponNames ? ui.rustWeaponName:ui.classicWeaponName;previewAmmoLabel=extendedRustWeaponNames ? ui.rustAmmoName:ui.classicAmmoName
+        sprites?.previewUI=ui;sprites?.previewHUD=extendedHUD;sprites?.rustWeaponIcons=extendedRustWeaponNames
+        hud.faceIndex=Int32(ui.health<=0 ? 41:min(4,max(0,(100-ui.health)*5/101))*8+(ui.tic/17)%3)
         extendedPreview=true;hud.tick=Int32(scene.view.tic)
         hud.invisibility=weapons.contains{$0.shadow != 0} ? 129:0
-        hudStyle = .minimal
+        hudStyle = extendedHUD==0 ? .classic:.minimal
     }
 
     private func uploadExtendedGeometry(_ geometry:Geometry,changedMaterials:Set<MaterialKey>,map value:DoomMap)throws {
@@ -760,6 +801,22 @@ final class Renderer: NSObject, MTKViewDelegate {
             }
             return GPUBatch(vertices:buffer,texture:texture,material:batch.material,count:batch.vertices.count)
         }
+    }
+    private func bindSky(_ id:Int,fallback:MTLTexture,encoder:MTLRenderCommandEncoder,fallbackMapping:SIMD4<Float> = .zero) {
+        func mapping(_ sky:SkyTransfer)->SIMD4<Float> {SIMD4(Float(Double(sky.angle)*1024/4294967296),sky.mid,sky.scale.x,sky.scale.y)}
+        let definition=extendedPreview ? previewSkyDefinitions[id]:nil
+        var bg=definition.map{mapping($0.background)} ?? fallbackMapping
+        var fg=definition?.foreground.map(mapping) ?? .zero
+        encoder.setFragmentBytes(&bg,length:16,index:6);encoder.setFragmentBytes(&fg,length:16,index:7)
+        encoder.setFragmentTexture(definition?.foreground.flatMap { layer in
+            let base=MaterialKey(name:layer.name,flat:false)
+            return previewForegroundTextures[(previewTranslations[base] ?? base).name]
+        } ?? fallback,index:4)
+        if let layer=definition?.background {
+            let base=MaterialKey(name:layer.name,flat:false)
+            encoder.setFragmentTexture(textures[previewTranslations[base] ?? base] ?? fallback,index:0)
+        }
+        if let fire=previewFireTextures[id],definition?.pixels.isEmpty==false {encoder.setFragmentTexture(fire,index:0)}
     }
     private func animatedTexture(_ batch: GPUBatch) -> MTLTexture {
         if extendedPreview {
@@ -910,7 +967,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         // encoder fails, so the next frame never consumes an unbuilt structure.
         guard var encoder = command.makeRenderCommandEncoder(descriptor:pass) else { command.commit(); return }
         var power=SIMD4<Float>(hud.fixedColorMap==32 ? 1:0,hud.fixedColorMap==1 ? 1:0,Float(hud.tick),sceneEffects.contains(.textureFiltering) ? 1:0)
-        if extendedPreview {power.x = -Float(hud.fixedColorMap);power.y = hud.fixedColorMap>0 ? 1:0;power.w=extendedIndexedLighting ? -1:0}
+        if extendedPreview {power.x = -Float(hud.fixedColorMap);power.y = hud.fixedColorMap>0 ? 1:0;power.w=extendedIndexedLighting ? -Float(1+(previewSkyDefinitions[1]?.tint ?? 0)*8704):0}
         bindColors(encoder)
         var noPower=SIMD4<Float>.zero
         encoder.setFragmentBytes(&power,length:MemoryLayout<SIMD4<Float>>.stride,index:2)
@@ -929,6 +986,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                 encoder.setRenderPipelineState(skyPipeline)
                 encoder.setFragmentBytes(&camera,length:MemoryLayout<SIMD4<Float>>.stride,index:0)
                 encoder.setFragmentTexture(sky,index:0)
+                bindSky(1,fallback:sky,encoder:encoder)
                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:3)
                 encoder.setRenderPipelineState(pipeline)
             }
@@ -944,6 +1002,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                 encoder.setVertexBuffer(skyGeometry,offset:0,index:0)
                 encoder.setFragmentBytes(&skyEye,length:MemoryLayout<SIMD4<Float>>.stride,index:0)
                 encoder.setFragmentTexture(sky,index:0)
+                bindSky(1,fallback:sky,encoder:encoder)
                 encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:skyVertexCount)
                 encoder.setRenderPipelineState(pipeline)
             }
@@ -983,12 +1042,17 @@ final class Renderer: NSObject, MTKViewDelegate {
                     encoder.setFragmentBytes(&mapping,length:16,index:6)
                     encoder.setVertexBuffer(batch.vertices,offset:0,index:0)
                     encoder.setFragmentTexture(animatedTexture(batch),index:0)
+                    bindSky(batch.material.sky,fallback:animatedTexture(batch),encoder:encoder,fallbackMapping:mapping)
                     encoder.drawPrimitives(type:.triangle,vertexStart:0,vertexCount:batch.count)
                 }
                 encoder.setRenderPipelineState(pipeline)
             }
             for batch in batches where batch.material.blend==0 && batch.material.sky==0 {
                 var emission=sceneEffects.contains(.emissive) ? emissionSettings(batch.material):.zero
+                if extendedPreview,let colors=previewColors {
+                    let key=previewTranslations[batch.material.unblended] ?? batch.material.unblended
+                    emission.w=colors.maskOffset(colors.materialMasks[key] ?? 0)
+                }
                 encoder.setFragmentBytes(&emission,length:MemoryLayout<SIMD4<Float>>.stride,index:11)
                 encoder.setVertexBuffer(batch.vertices,offset:0,index:0); encoder.setFragmentTexture(animatedTexture(batch),index:0)
                 if extendedPreview {
@@ -1039,6 +1103,9 @@ final class Renderer: NSObject, MTKViewDelegate {
                                 encoder.setRenderPipelineState(programs.translucentSprite)
                                 try sprites.bindBlend(polygon.blend,encoder:encoder)
                                 encoder.setFragmentTexture(indices,index:3)
+                                var emission=SIMD4<Float>.zero
+                                if let key,let colors=previewColors {emission.w=colors.maskOffset(colors.materialMasks[key] ?? 0)}
+                                encoder.setFragmentBytes(&emission,length:16,index:11)
                                 var kind:UInt32=polygon.wall ? 1:0;encoder.setFragmentBytes(&kind,length:4,index:5)
                             }
                             encoder.setDepthStencilState(fuzzDepth);encoder.setFragmentTexture(texture,index:0)

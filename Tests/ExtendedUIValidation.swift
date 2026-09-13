@@ -62,13 +62,13 @@ private final class MusicMeter {
         let initial=try Data(contentsOf:exe.deletingLastPathComponent().appendingPathComponent("initial-view.mvw"))
         let raw=Data(initial.suffix(144))
         var cases=[Data(raw.dropLast()),raw+Data([0])]
-        for (offset,value) in [(4,4),(8,-1),(16,-1),(20,9),(24,51),(28,64),(32,512),(36,-1),(52,-1),(76,2),(80,0),(84,4),(88,1),(92,4),(96,0),(100,1),(104,-1),(128,1),(132,2),(136,256),(140,256)] {
+        for (offset,value) in [(4,5),(8,-1),(16,-1),(20,9),(24,51),(28,64),(32,512),(36,-1),(52,-1),(76,2),(80,0),(84,4),(88,3),(92,4),(96,0),(100,1),(104,-1),(128,1),(132,2),(136,256),(140,256)] {
             var bad=raw;for i in 0..<4 { bad[offset+i]=UInt8(truncatingIfNeeded:UInt32(bitPattern:Int32(value))>>(i*8)) };cases.append(bad)
         }
         var bad=raw;bad[68]=0;cases.append(bad)
         for data in cases { var rejected=false;do{_=try ExtendedUI(data:data)}catch{rejected=true};try require(rejected,"Malformed HUD/music accepted") }
         var mismatch=initial;mismatch[mismatch.count-144+8]=1
         var rejected=false;do{_=try ExtendedView(data:mismatch)}catch{rejected=true};try require(rejected,"Mismatched HUD tic accepted")
-        print("PASS \(cases.count) malformed MUI3 packets and HUD/view tic mismatch")
+        print("PASS \(cases.count) malformed MUI4 packets and HUD/view tic mismatch")
     }
 }

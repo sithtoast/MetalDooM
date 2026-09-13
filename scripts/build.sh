@@ -41,6 +41,7 @@ xcrun swiftc -swift-version 5 -O -target arm64-apple-macosx14.0 \
   -o "$APP_DIR/Contents/MacOS/MetalDooM"
 mkdir -p "$APP_DIR/Contents/Resources"
 bash "$PROJECT_DIR/scripts/build-icon.sh" "$TEMP_BUILD/AppIcon.iconset" "$APP_DIR/Contents/Resources/AppIcon.icns"
+cp "$PROJECT_DIR/Vendor/stb/LICENSE" "$APP_DIR/Contents/Resources/stb-vorbis-LICENSE.txt"
 cp "$PROJECT_DIR/LICENSE" "$APP_DIR/Contents/Resources/LICENSE"
 cp "$PROJECT_DIR/Vendor/ChocolateDoom/opl/COPYING.LESSER" "$APP_DIR/Contents/Resources/Nuked-OPL3-LICENSE.txt"
 cp "$PROJECT_DIR/Vendor/ChocolateDoom/UPSTREAM.md" "$APP_DIR/Contents/Resources/ChocolateDoom.txt"

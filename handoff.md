@@ -5,7 +5,7 @@
 Current development checkout: `/Users/wmh/.codex/worktrees/c0e4/MetalDooM`, branch
 **codex/legacy-of-rust**, based on fetched origin/main merge **afd7357**. Preserve
 `/Users/wmh/Dev/MetalDooM` and its release artifacts. Current feature version is
-**0.10.0**, final successful build **160**. This remains the same unreleased Rust
+**0.10.0**, final successful build **164**. This remains the same unreleased Rust
 feature; do not bump the minor version for each refinement.
 
 The explicit Rust preview now has **object/weapon blending, unified fuzz/translucent ordering and actor/moving-surface interpolation**, **sky transfers and flat rotation**, **fake floors and transferred lighting**, **translucent walls and palette effects**, **normal/additive/per-state actor translucency**, **camera/weapon interpolation during Run**, **scrolling floors and ceilings**, **Save/Load**, **animated intermissions, stories, credits and custom cast**,
@@ -17,13 +17,13 @@ routes explicit bundled choices to a separate extended-preview instance. Keep
 preview labelling until full campaign acceptance.
 No speedrun/demo/upload work was requested; that idea remains a future aside.
 
-Read [bundled content](docs/EXTENDED_BUNDLED.md) and [lighting baseline](docs/EXTENDED_LIGHTING.md), then [skies/rotation](docs/EXTENDED_SKIES_ROTATION.md), [control sectors](docs/EXTENDED_CONTROL_SECTORS.md), [palette effects](docs/EXTENDED_PALETTES.md), [translucency](docs/EXTENDED_TRANSLUCENCY.md), [interpolation](docs/EXTENDED_INTERPOLATION.md), [scrolling flats](docs/EXTENDED_SCROLLING.md), [save/restore](docs/EXTENDED_SAVES.md), [preview/process contract](docs/EXTENDED_PREVIEW.md),
+Read [current presentation adapters](docs/EXTENDED_PRESENTATION.md), then [bundled content](docs/EXTENDED_BUNDLED.md) and [lighting baseline](docs/EXTENDED_LIGHTING.md), then [skies/rotation](docs/EXTENDED_SKIES_ROTATION.md), [control sectors](docs/EXTENDED_CONTROL_SECTORS.md), [palette effects](docs/EXTENDED_PALETTES.md), [translucency](docs/EXTENDED_TRANSLUCENCY.md), [interpolation](docs/EXTENDED_INTERPOLATION.md), [scrolling flats](docs/EXTENDED_SCROLLING.md), [save/restore](docs/EXTENDED_SAVES.md), [preview/process contract](docs/EXTENDED_PREVIEW.md),
 [campaign presentation](docs/EXTENDED_CAMPAIGN.md), [lifecycle](docs/EXTENDED_LIFECYCLE.md), [HUD/music](docs/EXTENDED_UI.md), [incremental geometry](docs/EXTENDED_MESH.md), [audio](docs/EXTENDED_AUDIO.md), [materials/cache](docs/EXTENDED_MATERIALS.md),
 [sprites](docs/EXTENDED_SPRITES.md), [geometry](docs/EXTENDED_GEOMETRY.md),
 [worker](docs/EXTENDED_ENGINE.md), [validation](docs/VALIDATION.md) and
 [roadmap](docs/LEGACY_OF_RUST.md).
 
-Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/indexed-picker-preview" bash scripts/build.sh`.
+Build with `METALDOOM_EXTENDED_PREVIEW=1 METALDOOM_BUILD_DIR="$PWD/build/presentation-release-preview" bash scripts/build.sh`.
 Launch with `--rust-preview /path/to/rerelease --map MAP01` (through MAP16).
 Only the explicit option packages/signs the helper/dylib and notices. Standard
 builds remain classic. Ordered resources are id24res → Doom II → id1, base index 1;
@@ -49,6 +49,41 @@ presentation, not sample-accurate hardware timing. Old timed `play` remains for
 diagnostics only. Finite steps allow natural sample tails; explicit pause stops
 voices/mixer. Closing/error cancels future work; termination reaps the child and
 removes scratch. Sound mute stops/skips voices; unmute only plays future starts.
+
+**Build 164 closes the bundled presentation adapters.** Normal sky transfers and
+indexed lighting were already present; this refinement adds generated fire pixels,
+independent sky layers, authored brightmaps, custom colormap tints, effective
+SBARDEF HUD trees, transient supplied weapon carousel art, and recorded H_ music.
+Read EXTENDED_PRESENTATION.md for exact scope and private wire changes. The picker
+and menus remain native. Unsupported non-bundled SBARDEF extensions are explicit;
+whole-frame software raster/stretch/fuzz parity and full campaign playthroughs
+remain separate. Do not re-list bundled fire/brightmap/HUD/music as unimplemented.
+
+Private ABI2 stays18exports. Current packets are MGE6 (side40/sector152), MSP6
+(actor64/weapon32), MMT2 (sky mappings/fire pixels), MBL4 (custom maps/brightmaps),
+and MUI4 (armor class at88); MVW5 framing is unchanged. Save JSON now preserves
+sky scroll/fire buffers/phase as well as RNG, so restored frames and future tics
+match. The shader retains48-byte vertices; lighting.z is a tint byte offset,
+lighting.w an actor/weapon brightmask offset. Geometry metadata survives splits.
+
+The preview's HUD popup offers authored status bar/fullscreen or native minimal.
+HUD choice survives restart and Save/Load. Recorded music defaults to available
+H_ Ogg tracks and falls back to MIDI, with a popup for original MIDI. The bounded
+stb_vorbis adapter is bundled with its MIT license; it needs no Homebrew runtime.
+All44 tracks decode and malformed framing/end-of-stream rejects.
+
+Candidate: `build/presentation-release-preview/MetalDooM.app`,0.10.0/build164,
+`build/build164.log`. Build161 is preserved in `build/presentation-preview`;
+the build160 bundle and private saves are preserved. No earlier user session was
+terminated. Builds162/163 remain available in their separate output directories.
+Deep/strict signing passes; the final0.10.0/build164 executable runs as PID4009
+with packaged worker PID4109, paused on Rust MAP06 with extras. At the latest UI
+inspection attempt the Mac was locked; manual window/control verification is
+pending user unlock. Do not claim a screenshot or running-title observation yet.
+See VALIDATION.md for completed GPU/audio/save checks and the remaining inspection.
+
+Earlier milestone descriptions below are historical; their remaining-presentation
+lists are superseded by build164 and the current BRANCH_ACCEPTANCE.md.
 
 **Build160 adds indexed lighting and the bundled picker.** Read
 [branch acceptance](docs/BRANCH_ACCEPTANCE.md) first. WorldVertex is now48bytes

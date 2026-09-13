@@ -37,3 +37,11 @@ void ME_ValidateKeyframe(json_t *root);
 void ME_ArchiveNativeUI(json_mut_doc_t *doc,json_mut_t *root);
 void ME_UnArchiveNativeUI(json_t *root);
 void ME_ResetRestoredAudio(void);
+
+unsigned ME_BrightMask(const unsigned char *mask);
+void ME_InitLighting(void);
+unsigned ME_BrightMaskCount(void);
+const unsigned char *ME_BrightMaskData(unsigned i);
+int ME_RenderTint(int tint);
+struct mobj_s;
+int ME_ThingTint(const struct mobj_s *m);

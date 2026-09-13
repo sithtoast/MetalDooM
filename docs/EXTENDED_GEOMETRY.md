@@ -1,5 +1,9 @@
 # Copied extended geometry — MGE5, build 155
 
+Current build164 adds the adapters and updated packets documented in
+[EXTENDED_PRESENTATION.md](EXTENDED_PRESENTATION.md). The milestone layout and
+validation details below are retained as implementation history.
+
 The experimental worker now supplies its decoded map to the same `DoomMap` and
 `Geometry` types used by the native renderer. `Sources/ExtendedGeometry.swift`
 decodes copied bytes without linking or loading Woof into the app process.

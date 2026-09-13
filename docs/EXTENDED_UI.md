@@ -1,5 +1,9 @@
 # Rust HUD and level music — 0.10.0 build 143
 
+Current build164 adds the adapters and updated packets documented in
+[EXTENDED_PRESENTATION.md](EXTENDED_PRESENTATION.md). The milestone layout and
+validation details below are retained as implementation history.
+
 The explicit Rust preview now draws a native minimal HUD from copied extended
 player state and plays the worker-selected level track through Apple's MIDI
 synth. The two simulation engines continue sharing Swift/AppKit/Metal presentation.

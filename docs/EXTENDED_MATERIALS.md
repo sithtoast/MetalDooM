@@ -1,5 +1,9 @@
 # Rust material animation and scene reuse — build 139
 
+Current build164 adds the adapters and updated packets documented in
+[EXTENDED_PRESENTATION.md](EXTENDED_PRESENTATION.md). The milestone layout and
+validation details below are retained as implementation history.
+
 The preview now draws the engine's current wall/flat animation translations.
 It retains decoded images, sprite patches, GPU textures and unchanged meshes
 within one fixed worker session. Build 137 adds continuous one-tic playback and paced manual actions.

@@ -21,9 +21,15 @@ final class SpriteRenderer {
     private var things: [MD_Thing] = []
     private var previewWeapons:[MD_WeaponSprite]?
     private var previewBlend:[Int]=[],previewWeaponBlend:[Int]=[]
+    private var previewLighting:[SIMD2<Float>]=[],previewWeaponLighting:[SIMD2<Float>]=[]
     private var previewClips:[SIMD2<Float>]=[]
     private var blendPalette:MTLBuffer?
     private var blendTextures:[MTLTexture]=[]
+    private var statusDefinition:StatusBarDefinition?
+    var previewUI:ExtendedUI?
+    var previewHUD=1 // Authored fullscreen; 0=status bar, -1=native minimal.
+    var rustWeaponIcons=false
+    private var carouselUntil=0,carouselWeapon = -1
     private let hudDepth: MTLDepthStencilState
     init(device: MTLDevice, wad: WAD, preload: Bool = true, hudOnly:Bool=false) throws {
         self.device = device; art = try Art(wad:wad)
@@ -53,6 +59,17 @@ final class SpriteRenderer {
             for i in stride(from:0,to:rgba.count,by:4) { rgba[i]=0;rgba[i+1]=0;rgba[i+2]=0 }
             hudPatches["shadow:"+name]=try upload(PatchImage(image:PixelImage(width:patch.image.width,height:patch.image.height,rgba:rgba),left:patch.left,top:patch.top))
         }
+        if hudOnly,let definition=wad.lump("SBARDEF") {
+            let decoded=try StatusBarDefinition(data:definition.data)
+            for name in decoded.patchNames where hudPatches[name]==nil {
+                // Some conditionally hidden fonts have absent digits in classic resources.
+                if let patch=try art.patch(named:name) {hudPatches[name]=try upload(patch)}
+            }
+            statusDefinition=decoded
+            for stem in ["SMFIST","SMPISG","SMSHOT","SMMGUN","SMLAUN","SMPLAS","SMBFGG","SMCSAW","SMSGN2","SMFLAM","SMHEAT"] {
+                for frame in 0...1 {let name=stem+String(frame);if let patch=try art.patch(named:name) {hudPatches[name]=try upload(patch)}}
+            }
+        }
         if !preload { return }
         // Decode all original sprite frames once, so engine animation changes do
         // not cause frame-time texture uploads or invisible missing frames.
@@ -76,7 +93,7 @@ final class SpriteRenderer {
         for i in weapons.indices {weapons[i].x=positions[i].x;weapons[i].y=positions[i].y}
         previewWeapons=weapons
     }
-    func setPreview(things:[MD_Thing],weapons:[MD_WeaponSprite],images:[Int:PatchImage],blend:[Int]=[],weaponBlend:[Int]=[],clips:[SIMD2<Float>]=[],tables:ExtendedBlendTables?=nil) throws {
+    func setPreview(things:[MD_Thing],weapons:[MD_WeaponSprite],images:[Int:PatchImage],blend:[Int]=[],weaponBlend:[Int]=[],lighting:[SIMD2<Float>]=[],weaponLighting:[SIMD2<Float>]=[],clips:[SIMD2<Float>]=[],tables:ExtendedBlendTables?=nil) throws {
         guard blend.isEmpty || blend.count==things.count && blend.allSatisfy({(0...64).contains($0)}) else {throw PortError("Invalid sprite blend modes.")}
         if blendTextures.isEmpty,let tables {
             guard let palette=device.makeBuffer(bytes:tables.palette,length:768,options:.storageModeShared) else {throw PortError("Cannot allocate blend palette.")}
@@ -93,6 +110,8 @@ final class SpriteRenderer {
         guard blend.allSatisfy({$0<=blendTextures.count}) else {throw PortError("Missing actor blend tables.")}
         guard clips.isEmpty || clips.count==things.count else {throw PortError("Invalid actor clipping count")}
         guard weaponBlend.isEmpty || weaponBlend.count==weapons.count && weaponBlend.allSatisfy({(0...blendTextures.count).contains($0)}) else {throw PortError("Missing weapon blend tables")}
+        guard lighting.isEmpty || lighting.count==things.count,weaponLighting.isEmpty || weaponLighting.count==weapons.count else {throw PortError("Invalid sprite lighting counts")}
+        previewLighting=lighting;previewWeaponLighting=weaponLighting
         previewBlend=blend;previewWeaponBlend=weaponBlend;previewClips=clips
         for (index,image) in images where patches[index] == nil { patches[index]=try upload(image) }
         self.things=things;previewWeapons=weapons
@@ -115,7 +134,7 @@ final class SpriteRenderer {
         }
         return GPUPatch(texture:texture,indices:indices,width:Float(image.width),height:Float(image.height),left:Float(patch.left),top:Float(patch.top))
     }
-    private func worldVertices(_ thing:MD_Thing,patch:GPUPatch,yaw:Float,gain:Float,clip:SIMD2<Float>?=nil)->[WorldVertex] {
+    private func worldVertices(_ thing:MD_Thing,patch:GPUPatch,yaw:Float,gain:Float,clip:SIMD2<Float>?=nil,lighting:SIMD2<Float> = .zero)->[WorldVertex] {
         let right=SIMD3(sin(yaw),0,cos(yaw))
         let center = SIMD3(thing.x,thing.z,-thing.y)
         let left = center-right*patch.left
@@ -132,7 +151,7 @@ final class SpriteRenderer {
         let u0: Float = thing.flip != 0 ? patch.width : 0, u1: Float = thing.flip != 0 ? 0 : patch.width
         let light = max(0.12,thing.light), fullbright = Float(thing.fullbright)*gain
         func vertex(_ position: SIMD3<Float>, _ u: Float, _ v: Float) -> WorldVertex {
-            WorldVertex(position:SIMD4(position,1),uvLight:SIMD4(u,v,light,fullbright),lighting:SIMD4(floor((thing.light*255).rounded()/16),3,0,0))
+            WorldVertex(position:SIMD4(position,1),uvLight:SIMD4(u,v,light,fullbright),lighting:SIMD4(floor((thing.light*255).rounded()/16),3,lighting.x,lighting.y))
         }
         return [vertex(a,u0,vBottom),vertex(b,u1,vBottom),vertex(c,u1,vTop),
                     vertex(a,u0,vBottom),vertex(c,u1,vTop),vertex(d,u0,vTop)]
@@ -140,7 +159,7 @@ final class SpriteRenderer {
     func transparentActors(yaw:Float)throws->[TransparentPolygon] {
         try things.indices.filter {things[$0].shadow != 0 || !previewBlend.isEmpty && previewBlend[$0]>0}.compactMap {i -> TransparentPolygon? in
             guard let p=patches[Int(things[i].lump)],let indices=p.indices else {throw PortError("Missing translucent actor patch")}
-            let v=worldVertices(things[i],patch:p,yaw:yaw,gain:1,clip:previewClips.isEmpty ? nil:previewClips[i])
+            let v=worldVertices(things[i],patch:p,yaw:yaw,gain:1,clip:previewClips.isEmpty ? nil:previewClips[i],lighting:previewLighting.isEmpty ? .zero:previewLighting[i])
             guard !v.isEmpty else {return nil}
             return TransparentPolygon(vertices:[v[0],v[1],v[2],v[5]],material:nil,texture:p.texture,indices:indices,blend:things[i].shadow != 0 ? -1:previewBlend[i],wall:false)
         }
@@ -179,7 +198,7 @@ final class SpriteRenderer {
                 encoder.setFragmentTexture(indices,index:3)
                 encoder.setFragmentBuffer(blendPalette,offset:0,index:3)
             }
-            let vertices=worldVertices(thing,patch:patch,yaw:yaw,gain:fullbrightGain,clip:previewClips.isEmpty ? nil:previewClips[index])
+            let vertices=worldVertices(thing,patch:patch,yaw:yaw,gain:fullbrightGain,clip:previewClips.isEmpty ? nil:previewClips[index],lighting:previewLighting.isEmpty ? .zero:previewLighting[index])
             guard !vertices.isEmpty else {continue}
             encoder.setVertexBytes(vertices,length:MemoryLayout<WorldVertex>.stride*6,index:0)
             encoder.setFragmentTexture(patch.texture,index:0)
@@ -218,7 +237,7 @@ final class SpriteRenderer {
             let x1 = x0+patch.width*scale, y1 = y0+patch.height*scale
             let u0: Float = frame.flip != 0 ? patch.width : 0, u1: Float = frame.flip != 0 ? 0 : patch.width
             func vertex(_ x: Float, _ y: Float, _ u: Float, _ v: Float) -> WorldVertex {
-                WorldVertex(position:SIMD4(x/Float(width)*2-1,1-y/Float(height)*2,0,1),uvLight:SIMD4(u,v,max(0.12,frame.light),Float(frame.fullbright)),lighting:SIMD4(floor((frame.light*255).rounded()/16),4,0,0))
+                WorldVertex(position:SIMD4(x/Float(width)*2-1,1-y/Float(height)*2,0,1),uvLight:SIMD4(u,v,max(0.12,frame.light),Float(frame.fullbright)),lighting:SIMD4(floor((frame.light*255).rounded()/16),4,previewWeaponLighting.isEmpty ? 0:previewWeaponLighting[index].x,previewWeaponLighting.isEmpty ? 0:previewWeaponLighting[index].y))
             }
             let a = vertex(x0,y1,u0,patch.height), b = vertex(x1,y1,u1,patch.height)
             let c = vertex(x1,y0,u1,0), d = vertex(x0,y0,u0,0)
@@ -277,6 +296,54 @@ final class SpriteRenderer {
         else if index==40 { face="STFGOD0" }
         else if expression<3 { face="STFST\(pain)\(expression)" }
         else { face=["STFTR\(pain)0","STFTL\(pain)0","STFOUCH\(pain)","STFEVL\(pain)","STFKILL\(pain)"][expression-3] }
+        if let ui=previewUI {
+            if carouselWeapon != ui.weapon {if carouselWeapon>=0 {carouselUntil=ui.tic+53};carouselWeapon=ui.weapon}
+            if ui.tic<carouselUntil {
+                let stems=["SMFIST","SMPISG","SMSHOT","SMMGUN","SMLAUN",rustWeaponIcons ? "SMFLAM":"SMPLAS",rustWeaponIcons ? "SMHEAT":"SMBFGG","SMCSAW","SMSGN2"]
+                let owned=stems.indices.filter{ui.weapons & (1<<$0) != 0 && hudPatches[stems[$0]+"0"] != nil}
+                for (position,weapon) in owned.enumerated() {
+                    let x=(style == .classic ? 160:Float(width)/scale/2)+Float(position)*52-Float(owned.count-1)*26
+                    let y=style == .classic ? -28:Float(height)/scale-64
+                    patch(stems[weapon]+(weapon==ui.weapon ? "1":"0"),x,y)
+                }
+            }
+            if previewHUD>=0,let definition=statusDefinition,definition.bars.indices.contains(previewHUD) {
+                let bar=definition.bars[previewHUD]
+                // Authored 320-wide canvases remain centered; preserve patch origins.
+                let dx=style == .minimal ? (Float(width)/scale-320)/2:0
+                let dy=style == .minimal ? Float(height)/scale-Float(bar.height):0
+                func graphic(_ name:String,_ x:Float,_ y:Float,_ alignment:Int) {
+                    guard let p=hudPatches[name] else {return}
+                    var x=x,y=y
+                    switch alignment&3 {case 1:x-=p.width/2;case 2:x-=p.width;default:break}
+                    switch alignment&12 {case 4:y-=p.height/2;case 8:y-=p.height;default:break}
+                    if alignment&16 != 0 {x+=p.left};if alignment&32 != 0 {y+=p.top}
+                    patch(name,x,y)
+                }
+                func visit(_ nodes:[StatusBarDefinition.Node],_ parentX:Float,_ parentY:Float) {
+                    for node in nodes where StatusBarDefinition.visible(node.conditions,ui:ui) {
+                        let x=parentX+node.x,y=parentY+node.y
+                        switch node.kind {
+                        case "graphic":graphic(node.patch!,x,y,node.alignment)
+                        case "face":graphic(face,x,y,node.alignment)
+                        case "number","percent":
+                            let font=definition.fonts[node.font!]!,prefix=font.stem+"NUM"
+                            let value=max(0,StatusBarDefinition.value(node,ui:ui))
+                            var names=String(min(value,Int(pow(10,Double(node.maxLength)))-1)).map{prefix+String($0)}
+                            if node.kind=="percent" {names.append(font.stem+"PRCNT")}
+                            let mono=font.type==0 ? hudPatches[prefix+"0"]?.width ?? 0:(0...9).map{hudPatches[prefix+String($0)]?.width ?? 0}.max() ?? 0
+                            func span(_ name:String)->Float {name.hasPrefix(prefix) && font.type<2 ? mono:hudPatches[name]?.width ?? 0}
+                            let width=names.reduce(Float(0)){$0+span($1)}
+                            var cursor=x-(node.alignment&3==2 ? width:node.alignment&3==1 ? width/2:0)
+                            for name in names {graphic(name,cursor,y,node.alignment & ~3 | 48);cursor+=span(name)}
+                        default:break // Canvas and multiplayer-only face background.
+                        }
+                        visit(node.children,x,y)
+                    }
+                }
+                visit(bar.nodes,dx,dy);return
+            }
+        }
         if style == .minimal {
             let w=Float(width)/scale, h=Float(height)/scale
             func label(_ text: String, _ x: Float, _ y: Float) {
@@ -331,5 +398,82 @@ final class SpriteRenderer {
                                    (state.rockets,state.maxRockets,17),(state.cells,state.maxCells,23)] {
             number(value,288,Float(y),"STYSNUM"); number(maximum,314,Float(y),"STYSNUM")
         }
+    }
+}
+
+/// The authored ID24 status-bar tree. Parsing is bounded; layout and condition
+/// evaluation are independent of Metal so bundled definitions can be audited.
+struct StatusBarDefinition {
+    struct Font {let stem:String,type:Int}
+    struct Node {
+        let kind:String,x:Float,y:Float,alignment:Int,patch:String?,font:String?,type:Int,param:Int,maxLength:Int
+        let conditions:[(Int,Int)],children:[Node]
+    }
+    struct Bar {let height:Int,fullscreen:Bool,nodes:[Node]}
+    let fonts:[String:Font],bars:[Bar],patchNames:Set<String>
+    init(data:Data)throws {
+        guard data.count<=1024*1024,let root=try JSONSerialization.jsonObject(with:data) as? [String:Any],root["type"] as? String=="statusbar",
+              root["version"] as? String=="1.0.0",let body=root["data"] as? [String:Any],let rawFonts=body["numberfonts"] as? [[String:Any]],
+              let rawBars=body["statusbars"] as? [[String:Any]],(1...16).contains(rawBars.count),rawFonts.count<=64 else {throw PortError("Invalid SBARDEF header")}
+        var fontBank:[String:Font]=[:],names=Set<String>(),count=0
+        for raw in rawFonts {
+            guard let name=raw["name"] as? String,let stem=raw["stem"] as? String,stem.count<=5,let type=raw["type"] as? Int,(0...2).contains(type),fontBank[name]==nil else {throw PortError("Invalid SBARDEF font")}
+            fontBank[name]=Font(stem:stem,type:type)
+            for digit in 0...9 {names.insert("\(stem)NUM\(digit)")}
+        }
+        func nodes(_ raw:Any?,depth:Int)throws->[Node] {
+            guard depth<=16 else {throw PortError("SBARDEF nesting is too deep")}
+            guard let raw=raw as? [[String:Any]] else {if raw==nil || raw is NSNull {return []};throw PortError("Invalid SBARDEF children")}
+            return try raw.map {entry in
+                count+=1;guard count<=4096,entry.count==1,let kind=entry.keys.first,["canvas","graphic","face","facebackground","number","percent"].contains(kind),let value=entry[kind] as? [String:Any],
+                    let x=value["x"] as? Int,let y=value["y"] as? Int,(-8192...8192).contains(x),(-8192...8192).contains(y),let align=value["alignment"] as? Int,(0...63).contains(align),align&3 != 3,align&12 != 12 else {throw PortError("Unsupported SBARDEF element")}
+                for field in ["tranmap","translation"] where value[field] != nil && !(value[field] is NSNull) {throw PortError("Unsupported SBARDEF \(field)")}
+                let patch=value["patch"] as? String,font=value["font"] as? String,type=value["type"] as? Int ?? 0,param=value["param"] as? Int ?? 0,length=value["maxlength"] as? Int ?? 3
+                if kind=="graphic" {guard let patch,!patch.isEmpty,patch.count<=8 else {throw PortError("Invalid HUD patch")};names.insert(patch)}
+                if kind=="number" || kind=="percent" {guard let font,let selected=fontBank[font],(0...5).contains(type),((0...3).contains(param) || param == -1879048192),(1...10).contains(length) else {throw PortError("Invalid HUD number")};if kind=="percent" {names.insert(selected.stem+"PRCNT")}}
+                guard value["conditions"]==nil || value["conditions"] is NSNull || value["conditions"] is [[String:Int]] else {throw PortError("Invalid HUD conditions")}
+                let conditions=try (value["conditions"] as? [[String:Int]] ?? []).map {condition->(Int,Int) in
+                    guard let c=condition["condition"],let p=condition["param"],(0...18).contains(c),((0...31).contains(p) || c==5 && p == -1879048192) else {throw PortError("Unsupported HUD condition")};return (c,p)
+                }
+                return try Node(kind:kind,x:Float(x),y:Float(y),alignment:align,patch:patch,font:font,type:type,param:param,maxLength:length,conditions:conditions,children:nodes(value["children"],depth:depth+1))
+            }
+        }
+        bars=try rawBars.map {raw in
+            guard let h=raw["height"] as? Int,(0...200).contains(h),let full=raw["fullscreenrender"] as? Bool,raw["fillflat"]==nil || raw["fillflat"] is NSNull else {throw PortError("Unsupported status-bar canvas")}
+            return try Bar(height:h,fullscreen:full,nodes:nodes(raw["children"],depth:0))
+        }
+        fonts=fontBank;patchNames=names
+    }
+    static func visible(_ conditions:[(Int,Int)],ui:ExtendedUI)->Bool {
+        let slots=[1,2,3,4,5,6,7,1,3],ammo=[-1,0,1,0,3,2,2,-1,1]
+        func owned(_ weapon:Int)->Bool {(0...8).contains(weapon) && ui.weapons & (1<<weapon) != 0}
+        func item(_ p:Int)->Bool {p>=1 && p<=6 ? ui.keys & (1<<(p-1)) != 0:p==15 && ui.armorType==2}
+        return conditions.allSatisfy {c,p in
+            switch c {
+            case 0:return owned(p)
+            case 1:return ui.weapon==p
+            case 2:return ui.weapon != p
+            case 3:return (0...8).contains(p) && ammo[p]>=0
+            case 4:return ui.ammoType>=0
+            case 5:return ui.ammoType==p
+            case 6:return slots.indices.contains{slots[$0]==p && owned($0)}
+            case 7:return !slots.indices.contains{slots[$0]==p && owned($0)}
+            case 8:return slots[ui.weapon]==p
+            case 9:return slots[ui.weapon] != p
+            case 10:return item(p)
+            case 11:return !item(p)
+            case 12:return 7>=p
+            case 13:return 7<p
+            case 14:return p==0
+            case 15:return p != 0
+            case 16:return p==2
+            case 17:return p != 2
+            case 18:return p==0
+            default:return false
+            }
+        }
+    }
+    static func value(_ node:Node,ui:ExtendedUI)->Int {
+        switch node.type {case 0:return ui.health;case 1:return ui.armor;case 2:return 0;case 3:return ui.ammo.indices.contains(node.param) ? ui.ammo[node.param]:0;case 4:return ui.readyAmmo;case 5:return ui.maxAmmo.indices.contains(node.param) ? ui.maxAmmo[node.param]:0;default:return 0}
     }
 }

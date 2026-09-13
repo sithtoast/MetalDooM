@@ -1,4 +1,4 @@
-# Indexed preview lighting — 0.10.0 build 160
+# Indexed preview lighting — 0.10.0 build 164
 
 The extended preview now shades opaque world surfaces, actors, weapons and
 translucent foregrounds through the original palette indices and COLORMAP rows.
@@ -25,7 +25,7 @@ horizontal -1 / vertical +1 fake contrast before final clamping; walls and actor
 use one of 48 scale buckets. Weapons use the final scale bucket. The worker copies
 player extra light in 16-unit increments, and weapon light uses the resolved
 floor/ceiling average. Wall light retains headroom to 511 so extra light is not
-clamped before directional contrast. MGE5 layout is unchanged; copied wall-light
+clamped before directional contrast. MGE6 adds tint references; copied wall-light
 validation accepts 0–511, plane/actor light remains 0–255. Engine/resource save
 fingerprints still require a matching build.
 
@@ -38,10 +38,10 @@ background effect.
 
 ## Evidence
 
-`scripts/test-indexed-lighting.sh /path/to/doom2.wad` renders 387,072 native GPU
+`scripts/test-indexed-lighting.sh /path/to/doom2.wad` renders 1,548,288 native GPU
 samples against an independent integer table oracle: four primitive kinds, six
 light levels, seven distances, fixed rows 0/1/32, fullbright variants and opaque/
-custom-blended output. It uses the production shader pipelines with Metal API
+custom-blended output, both with/without selective brightmaps and a custom tint. It uses the production shader pipelines with Metal API
 validation. Original source indices are checked across all 256 palette entries.
 
 The bundled native-map suite compares all six plans' first/last maps with extras
@@ -57,7 +57,9 @@ the current shader. Current acceptance uses actual GPU readback above.
 
 ## Remaining parity work
 
-Per-color brightmaps, custom sector/thing colormap tints, software rasterization,
-projection edge cases, sky stretching and fuzz pattern matching remain separate.
-The table-sample evidence does not establish whole-frame software-renderer parity.
-Full campaign and sustained performance acceptance are in BRANCH_ACCEPTANCE.md.
+Software rasterization, projection edge cases, optional software sky stretching
+and fuzz pattern matching remain separate. Brightmaps and custom tints now use the
+engine's authored masks and colormap bank; see EXTENDED_PRESENTATION.md for their
+wire layout and precedence. The table-sample evidence does not establish
+whole-frame software parity. Campaign/performance acceptance remains in
+BRANCH_ACCEPTANCE.md.

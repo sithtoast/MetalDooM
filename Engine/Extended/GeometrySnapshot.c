@@ -47,7 +47,6 @@ static void Sky(unsigned char **p,int value) {
     unsigned index=(unsigned)value & ~PL_SKYFLAT;
     if(index>=array_size(levelskies))I_Error("Invalid transferred sky index");
     const sky_t *sky=R_GetLevelsky(index);const skytex_t *t=&sky->background;
-    if(sky->type!=SkyType_Normal)I_Error("Unsupported layered or procedural transferred sky");
     Word(p,index+1);Texture(p,t->texture);
     Word(p,((uint32_t)t->currx<<6)+(sky->side ? (uint32_t)sky->side->textureoffset:0));
     Word(p,(uint32_t)t->mid+(uint32_t)t->curry+(sky->side ? (uint32_t)sky->side->rowoffset:0));
@@ -56,7 +55,7 @@ static void Sky(unsigned char **p,int value) {
 size_t ME_WriteGeometry(void *out, size_t capacity)
 {
     const int counts[] = {numvertexes, numlines, numsides, numsectors, numsegs, numsubsectors, numnodes};
-    const size_t strides[] = {8,24,36,140,16,12,24};
+    const size_t strides[] = {8,24,40,152,16,12,24};
     size_t size = 120;
     for (int i = 0; i < 7; i++) {
         if (counts[i] < 0 || counts[i] > 1000000) I_Error("Excessive geometry count");
@@ -64,8 +63,8 @@ size_t ME_WriteGeometry(void *out, size_t capacity)
     }
     if (!out || capacity < size) return size;
     unsigned char *p = out;
-    memcpy(p,"MGE5",4); p += 4;
-    Word(&p,5); Word(&p,leveltime); Word(&p,gamemap);
+    memcpy(p,"MGE6",4); p += 4;
+    Word(&p,6); Word(&p,leveltime); Word(&p,gamemap);
     Word(&p,players[0].mo->x); Word(&p,players[0].mo->y); Word(&p,players[0].mo->angle);
     for (int i=0;i<7;i++) Word(&p,counts[i]);
     memcpy(p,ME_CurrentSession()->content_sha256,64); p += 64;
@@ -78,7 +77,7 @@ size_t ME_WriteGeometry(void *out, size_t capacity)
     for (int i=0;i<numsides;i++) {
         const side_t *s=&sides[i];
         Word(&p,s->sector-sectors); Word(&p,s->textureoffset); Word(&p,s->rowoffset);
-        Texture(&p,s->toptexture); Texture(&p,s->bottomtexture); Texture(&p,s->midtexture);
+        Texture(&p,s->toptexture); Texture(&p,s->bottomtexture); Texture(&p,s->midtexture);Word(&p,ME_RenderTint(s->tint>=0?s->tint:s->sector->tint));
     }
     for (int i=0;i<numsectors;i++) {
         sector_t front,back;int fl,cl,unused1,unused2;
@@ -95,6 +94,9 @@ size_t ME_WriteGeometry(void *out, size_t capacity)
         fixed_t bottom,top;ME_SectorClip(&sectors[i],&bottom,&top);Word(&p,bottom);Word(&p,top);
         Word(&p,s->floor_rotation);Word(&p,s->ceiling_rotation);
         Sky(&p,s->floorsky);Sky(&p,s->ceilingsky);
+        Word(&p,ME_RenderTint(s->tint));
+        Word(&p,ME_RenderTint(s->tintfloor>=0?s->tintfloor:s->floorlightsec>=0?sectors[s->floorlightsec].tint:s->tint));
+        Word(&p,ME_RenderTint(s->tintceiling>=0?s->tintceiling:s->ceilinglightsec>=0?sectors[s->ceilinglightsec].tint:s->tint));
     }
     for (int i=0;i<numsegs;i++) {
         const seg_t *s=&segs[i];

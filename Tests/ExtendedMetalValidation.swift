@@ -49,7 +49,7 @@ func runMeshMetalValidation() throws {
         let additive=(0..<256).flatMap{bg in (0..<256).map{fg in UInt8(min(255,bg+fg))}}
         let custom=(0..<256).flatMap{bg in (0..<256).map{fg in UInt8((2*bg+fg)/3)}}
         let palettes=palette+(0..<256).flatMap{[UInt8($0),0,0]}
-        let maps=Array(UInt8(0)...UInt8(255))+Array(UInt8(0)...UInt8(255))+Array((UInt8(0)...UInt8(255)).reversed())
+        let maps=Array(UInt8(0)...UInt8(255))+Array(UInt8(0)...UInt8(255))+Array((UInt8(0)...UInt8(255)).reversed())+(3..<34).flatMap{_ in Array(UInt8(0)...UInt8(255))}
         let tables=try ExtendedBlendTables(data:Data("MBL3".utf8)+words([3,UInt32(palettes.count),3,UInt32(maps.count),0])+Data(palettes+maps+normal+additive+custom))
         var images:[Int:PatchImage]=[:]
         // Distinct RGB control colors avoid invisible mask pixels where opaque

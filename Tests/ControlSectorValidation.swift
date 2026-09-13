@@ -32,7 +32,7 @@ import Foundation
     if mode=="underwater" {try check(a.x<0 && a.eyeZ<64)}
    }
    let raw=initial.geometry!.data,bytes=Bytes(data:raw)
-   let p=120+(try bytes.i32(28))*8+(try bytes.i32(32))*24+(try bytes.i32(36))*36
+   let p=120+(try bytes.i32(28))*8+(try bytes.i32(32))*24+(try bytes.i32(36))*40
    for field in [44,48] {
     var bad=raw;bad[p+field]=0;bad[p+field+1]=1
     for previous in [nil,initial.geometry] {

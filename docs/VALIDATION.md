@@ -1,5 +1,75 @@
 # Validation history and regression checks
 
+## 2026-09-12 — 0.10.0 build 164: bundled presentation adapters
+
+Candidate: `build/presentation-release-preview/MetalDooM.app`;
+`build/build164.log`. Build161 remains in `build/presentation-preview`; earlier
+bundles, running user games and private saves are preserved. Version remains
+0.10.0 for this unreleased feature refinement. No push/merge was requested.
+
+Deep/strict app signing passes, the bundle reports **0.10.0/build164**, and the
+private ABI2 still exports exactly18 functions. The final executable is running
+as PID4009 with its packaged worker PID4109, paused on Rust MAP06 with extras.
+`build/presentation-native164.log` contains no reported errors. This verifies the
+running executable path and bundle version, not an observed window/title.
+Executable SHA-256: `4dc0ca5e3fdb456135ac68ca6972bed033ca2535edc2beae0b318c46e9ad6af2`.
+
+Completed checks:
+
+- `build/presentation-indexed-validation.log`: **1,548,288** exact GPU color
+  samples, with selective brightmaps/custom tints, four primitive kinds, distance
+  tables and fullbright/fixed-map/opaque/blended precedence.
+- `build/presentation-assets-validation.log`: **49,152** independent sky pixels
+  on fullscreen and sector pipelines, both layer mappings and index-zero
+  transparency; all six effective bundled HUD definitions render distinct
+  status-bar/fullscreen/native layouts. Recorded track/alias selection, muted
+  AVAudioPlayer advance/pause, looping, non-looping completion, stale completion
+  isolation and return to original MIDI pass.
+- `build/presentation-resource-validation.log`: real engine normal/fire/layered
+  skies, generated-column equality, copy/RNG invariance, authored texture/flat
+  brightmaps and custom side/sector/plane/thing tint precedence.
+- `build/presentation-sky-save-validation.log`: all three sky types preserve
+  scroll/fire state through restore plus 28 exact future tics; four malformed sky
+  save cases reject. The complete Rust save suite also passed in
+  `build/presentation-save-validation.log`.
+- `build/presentation-recorded-validation.log`: all 44 actual extras H_ tracks
+  decode to non-silent mono/stereo PCM; truncated/malformed Ogg input rejects.
+- `build/presentation-bundled-validation.log`: all 352 bundled map checks,
+  distinct plan identities, component weapon pickup/firing, first/last-map saves
+  and future state, texture packs and all 17 music-pack MIDIs pass.
+- `build/presentation-metal-validation.log`: full classic-reference extended
+  scene pixels, all 12 bundled first/last maps with extras, transfer/rotation,
+  fake floors, translucent/fuzz ordering, scrolling, actor/weapon interpolation,
+  actual door/lift motion and stopped-mover regressions pass.
+- `build/presentation-classic-validation.log`: classic/AO/HDR effects, preset
+  switching/restoration, HUD isolation, save/load and resource teardown pass.
+- `build/presentation-control-validation.log` and
+  `build/presentation-sky-rotation-validation.log`: 374,400 frozen fake-flat
+  cases plus actual control sectors and sky/rotation/save/bounds checks pass.
+
+- `build/presentation-worker-validation.log`: worker copy/protocol boundaries,
+  all Rust scene snapshots, malformed packets, custom blend banks, per-map fixed
+  row limits and hostile worker replies pass.
+
+- `build/presentation-ui-validation.log`: UI complete-copy canaries, all Rust
+  HUD/music snapshots, MIDI rendering/looping/pause, 24 malformed MUI4 packets
+  and UI/view tic mismatch checks pass.
+- `build/presentation-resources-final.log`: the new resource wrapper passes on
+  the final worker, including all three sky types, future save state and all44
+  recorded tracks.
+
+The new repeatable entry points are `scripts/test-bundled-presentation.sh` and
+`scripts/test-presentation-resources.sh`; existing test-presentation.sh remains
+unchanged. The final HUD selection persistence check is recorded in
+`build/presentation-save-app-validation.log`.
+
+Native visual inspection is pending: the UI tool reported a locked Mac, and the
+user has been asked to unlock it. Do not infer an observed running window/title
+or final screenshot from bundle signing, offscreen GPU tests or process launch.
+Full campaign playthroughs and exact software raster/stretch/fuzz parity remain
+outside these targeted checks.
+
+
 ## 2026-09-12 — 0.10.0 build 160: indexed lighting and bundled picker
 
 Candidate: `build/indexed-picker-preview/MetalDooM.app`; `build/build160.log`.

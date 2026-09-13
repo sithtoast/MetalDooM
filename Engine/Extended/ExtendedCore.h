@@ -51,7 +51,7 @@ ME_API int ME_CopySnapshot(ME_Snapshot *out);
 /* Returns total actors; copies at most capacity entries. */
 ME_API size_t ME_CopyThings(ME_Thing *out, size_t capacity);
 ME_API size_t ME_CopyError(char *out, size_t capacity);
-/* MGE5 geometry snapshot; see docs/EXTENDED_GEOMETRY.md. Returns required
+/* MGE6 geometry snapshot; see docs/EXTENDED_PRESENTATION.md. Returns required
  * bytes, copying only when capacity fits the complete snapshot. NULL queries
  * size. Zero means no ready session/error. Call on the session thread between
  * ticks. This is copied data, not an IPC or save-game contract. */
@@ -63,12 +63,12 @@ typedef struct {
 } ME_View;
 ME_API int ME_CopyView(ME_View *out);
 
-/* MSP5 resolved sprite/weapon values, same whole-buffer semantics as geometry. */
+/* MSP6 resolved sprite/weapon values, same whole-buffer semantics as geometry. */
 ME_API size_t ME_CopyPresentation(void *out, size_t capacity);
 
-/* MMT1 animation translations, same whole-buffer semantics as geometry. */
+/* MMT2 animation translations and authoritative layered/fire skies, same whole-buffer semantics as geometry. */
 ME_API size_t ME_CopyMaterials(void *out, size_t capacity);
-/* MBL3 palettes/colormaps and table bank; refresh after level changes/restore. */
+/* MBL4 palettes/custom colormaps, brightmaps and blend table bank; refresh after level changes/restore. */
 ME_API size_t ME_CopyBlendTables(void *out, size_t capacity);
 
 /* Opt in before initialization. Headless probes remain capture-free by default. */
@@ -76,7 +76,7 @@ ME_API int ME_EnableAudio(void);
 /* MSA1 FIFO: NULL/undersized queries preserve events; a complete copy drains. */
 ME_API size_t ME_CopyAudio(void *out,size_t capacity);
 
-/* MUI3 HUD/music/lifecycle presentation; complete-copy semantics, no state drain. */
+/* MUI4 HUD/music/lifecycle presentation; complete-copy semantics, no state drain. */
 ME_API size_t ME_CopyUI(void *out,size_t capacity);
 /* 0: restart current level with fresh inventory; 1: continue completed level.
  * Returns a fresh tic-zero world. Does not reinitialize the session/resources. */

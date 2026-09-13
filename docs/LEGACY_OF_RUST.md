@@ -1,6 +1,6 @@
 # Legacy of Rust development and ID24 evidence
 
-Status: **0.10.0 build 160 native preview with sky transfers/flat rotation, fake floors/transferred lighting, translucent walls and palette effects, object/state/weapon blend tables, shared fuzz/transparent ordering, camera/weapon/actor/moving-surface interpolation, scrolling floors/ceilings, Save/Load, restart, normal/secret transitions, animated intermissions, stories, credits, custom cast, HUD, music and sound; indexed lighting and bundled picker integration; full Rust campaign support remains pending.**
+Status: **0.10.0 build 164 native preview with sky transfers/flat rotation, fake floors/transferred lighting, translucent walls and palette effects, object/state/weapon blend tables, shared fuzz/transparent ordering, camera/weapon/actor/moving-surface interpolation, scrolling floors/ceilings, Save/Load, restart, normal/secret transitions, animated intermissions, stories, credits, custom cast, HUD, music and sound; indexed lighting, authored brightmaps/tints, layered/fire skies, bundled HUD/recorded music and picker integration; full Rust campaign support remains pending.**
 First campaign acceptance remains fully playable bundled single-player Rust.
 Multiplayer and the online add-on catalog are outside scope. General ID24
 conformance is a separate target and must never be inferred from this campaign.
@@ -59,8 +59,8 @@ Byte comparisons establish why sibling names must not imply dependencies:
 Comparison counts are directory entries against id1's last same-name lump, not a
 claim that blindly concatenating directories produces a valid resource namespace.
 The explicit plans load only their listed dependencies. The extended-build picker now offers the same explicit plans and recognizes
-selected bundled add-ons. Extras presentation and remaining software rendering
-parity remain open; see EXTENDED_BUNDLED.md, EXTENDED_LIGHTING.md and
+selected bundled add-ons. Bundled extras presentation is implemented; remaining software rendering
+parity remains open; see EXTENDED_BUNDLED.md, EXTENDED_LIGHTING.md and
 BRANCH_ACCEPTANCE.md.
 
 ## Seventeen map blocks, sixteen campaign maps
